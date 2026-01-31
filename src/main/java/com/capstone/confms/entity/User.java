@@ -9,11 +9,13 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @Entity
 @Table(name = "users")
-public class User extends BaseEntity{
+public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
@@ -31,10 +33,16 @@ public class User extends BaseEntity{
     @Column(name = "phone_number", nullable = false)
     private String phoneNumber;
 
-    @Column(name = "country", nullable = false)
+    @Column(name = "country", length = 50)
     private String country;
 
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = false;
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "otp_code", length = 6)
+    private String otpCode;
+
+    @Column(name = "otp_expiration")
+    private LocalDateTime otpExpiration;
 
 }

@@ -11,6 +11,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class PaperCheckLogDTO {
-    private PaperFile paperFile;
+    private Integer paperFileId;
     private Boolean isPassedPlagiarism;
 }

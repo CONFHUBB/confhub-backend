@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewMetaReviewDTO {
-    private Paper paper;
-    private User user;
+    private Integer paperId;
+    private Integer userId;
     private Decision finalDecision;
     private String reason;
 }

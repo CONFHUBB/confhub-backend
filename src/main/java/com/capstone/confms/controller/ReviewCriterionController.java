@@ -14,38 +14,38 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/review")
+@RequestMapping("/api/v1/review-criterion")
 @RequiredArgsConstructor
 @Tag(name = "Review Criterion Management", description = "Operations related to Review Criterion setup and related entities")
 public class ReviewCriterionController {
 
     private final ReviewCriterionService reviewCriterionService;
 
-    @PostMapping("/criteria")
+    @PostMapping
     @Operation(summary = "Create a new Review Criterion")
     public ResponseEntity<ReviewCriterionResponseDTO> createReviewCriterion(@Valid @RequestBody ReviewCriterionDTO dto) {
         return new ResponseEntity<>(reviewCriterionService.createReviewCriterion(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/criteria")
+    @GetMapping
     @Operation(summary = "Get all Review Criteria")
     public ResponseEntity<List<ReviewCriterionResponseDTO>> getAllReviewCriteria() {
         return ResponseEntity.ok(reviewCriterionService.getAllReviewCriteria());
     }
 
-    @GetMapping("/criteria/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Review Criterion by ID")
     public ResponseEntity<ReviewCriterionResponseDTO> getReviewCriterionById(@PathVariable Integer id) {
         return ResponseEntity.ok(reviewCriterionService.getReviewCriterionById(id));
     }
 
-    @PutMapping("/criteria/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Review Criterion details")
     public ResponseEntity<ReviewCriterionResponseDTO> updateReviewCriterion(@Valid @PathVariable Integer id, @RequestBody ReviewCriterionDTO dto) {
         return ResponseEntity.ok(reviewCriterionService.updateReviewCriterion(id, dto));
     }
 
-    @DeleteMapping("/criteria/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Review Criterion")
     public ResponseEntity<Void> deleteReviewCriterion(@PathVariable Integer id) {
         reviewCriterionService.deleteReviewCriterion(id);

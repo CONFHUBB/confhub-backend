@@ -6,6 +6,7 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,8 @@ import java.util.stream.Collectors;
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final PaperRepository paperRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<ReviewResponseDTO> getAllReviews() {
@@ -32,7 +35,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewResponseDTO createReview(ReviewDTO dto) {
-        log.info("Registering new Review for paper ID: {}", dto.getPaper() != null ? dto.getPaper().getId() : "Unknown");
+        log.info("Registering new Review for paper ID: {}", dto.getPaperId() != null ? dto.getPaperId() : "Unknown");
         Review review = new Review();
         mapDtoToEntity(dto, review);
         return mapToResponseDTO(reviewRepository.save(review));
@@ -64,8 +67,14 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private void mapDtoToEntity(ReviewDTO dto, Review entity) {
-        entity.setPaper(dto.getPaper());
-        entity.setReviewer(dto.getReviewer());
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        User reviewer = userRepository.findById(dto.getReviewerId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewerId()));
+
+        entity.setPaper(paper);
+        entity.setReviewer(reviewer);
         entity.setStatus(dto.getStatus());
         entity.setTotalScore(dto.getTotalScore());
         if (entity.getId() == null) {

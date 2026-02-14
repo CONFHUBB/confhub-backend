@@ -6,6 +6,7 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.PaperFileService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class PaperFileServiceImpl implements PaperFileService {
 
     private final PaperFileRepository paperFileRepository;
+    private final PaperRepository paperRepository;
 
     @Override
     public List<PaperFileResponseDTO> getAllPaperFiles() {
@@ -63,7 +65,10 @@ public class PaperFileServiceImpl implements PaperFileService {
     }
 
     private void mapDtoToPaperFileEntity(PaperFileDTO dto, PaperFile entity) {
-        entity.setPaper(dto.getPaper());
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        entity.setPaper(paper);
         entity.setUrl(dto.getUrl());
         entity.setIsActive(dto.getIsActive());
         if (entity.getId() == null) {

@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class PaperFileDTO {
-    private Paper paper;
+    private Integer paperId;
     private String url;
     private Boolean isActive;
 }

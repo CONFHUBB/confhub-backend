@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 public class ReviewCommentServiceImpl implements ReviewCommentService {
 
     private final ReviewCommentRepository reviewCommentRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     public List<ReviewCommentResponseDTO> getAllReviewComments() {
@@ -64,7 +65,10 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
     }
 
     private void mapDtoToReviewCommentEntity(ReviewCommentDTO dto, ReviewComment entity) {
-        entity.setReview(dto.getReview());
+        Review review = reviewRepository.findById(dto.getReviewId())
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + dto.getReviewId()));
+
+        entity.setReview(review);
         entity.setContent(dto.getContent());
         entity.setIsVisibleToAuthor(dto.getIsVisibleToAuthor());
         if (entity.getId() == null) {

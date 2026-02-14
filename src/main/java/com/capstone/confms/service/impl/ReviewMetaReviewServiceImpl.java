@@ -7,6 +7,7 @@ import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewMetaReviewService;
 import com.capstone.confms.service.ReviewService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,9 @@ import java.util.stream.Collectors;
 public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
 
     private final ReviewMetaReviewRepository reviewMetaReviewRepository;
+    private final PaperRepository paperRepository;
+    private final UserRepository userRepository;
+
 
     @Override
     public List<ReviewMetaReviewResponseDTO> getAllReviewMetaReviews() {
@@ -64,8 +68,15 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     }
 
     private void mapDtoToReviewMetaReviewEntity(ReviewMetaReviewDTO dto, ReviewMetaReview entity) {
-        entity.setPaper(dto.getPaper());
-        entity.setUser(dto.getUser());
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
+
+        entity.setPaper(paper);
+        entity.setUser(user);
+
         entity.setFinalDecision(dto.getFinalDecision());
         entity.setReason(dto.getReason());
         if (entity.getId() == null) {

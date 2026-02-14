@@ -21,31 +21,31 @@ public class PaperFileController {
 
     private final PaperFileService paperFileService;
 
-    @PostMapping("/files")
+    @PostMapping
     @Operation(summary = "Create a new Paper File")
     public ResponseEntity<PaperFileResponseDTO> createPaperFile(@Valid @RequestBody PaperFileDTO dto) {
         return new ResponseEntity<>(paperFileService.createPaperFile(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/files")
+    @GetMapping
     @Operation(summary = "Get all Paper Files")
     public ResponseEntity<List<PaperFileResponseDTO>> getAllPaperFiles() {
         return ResponseEntity.ok(paperFileService.getAllPaperFiles());
     }
 
-    @GetMapping("/files/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Paper File by ID")
     public ResponseEntity<PaperFileResponseDTO> getPaperFileById(@PathVariable Integer id) {
         return ResponseEntity.ok(paperFileService.getPaperFileById(id));
     }
 
-    @PutMapping("/files/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Paper File details")
     public ResponseEntity<PaperFileResponseDTO> updatePaperFile(@Valid @PathVariable Integer id, @RequestBody PaperFileDTO dto) {
         return ResponseEntity.ok(paperFileService.updatePaperFile(id, dto));
     }
 
-    @DeleteMapping("/files/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Paper File")
     public ResponseEntity<Void> deletePaperFile(@PathVariable Integer id) {
         paperFileService.deletePaperFile(id);

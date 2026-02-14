@@ -6,6 +6,7 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewerInterestService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,8 @@ import java.util.stream.Collectors;
 public class ReviewerInterestServiceImpl implements ReviewerInterestService {
 
     private final ReviewerInterestRepository reviewerInterestRepository;
+    private final UserRepository userRepository;
+    private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
 
     @Override
     public List<ReviewerInterestResponseDTO> getAllReviewerInterests() {
@@ -63,8 +66,14 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
     }
 
     private void mapDtoToReviewerInterestEntity(ReviewerInterestDTO dto, ReviewerInterest entity) {
-        entity.setReviewer(dto.getReviewer());
-        entity.setTrackTopic(dto.getTrackTopic());
+        User reviewer = userRepository.findById(dto.getReviewerId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewerId()));
+
+        ConferenceTrackTopic conferenceTrackTopic = conferenceTrackTopicRepository.findById(dto.getConferenceTrackTopicId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getConferenceTrackTopicId()));
+
+        entity.setReviewer(reviewer);
+        entity.setTrackTopic(conferenceTrackTopic);
         entity.setExpertise(dto.getExpertise());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());

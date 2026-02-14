@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewDTO {
-    private Paper paper;
-    private User reviewer;
+    private Integer paperId;
+    private Integer reviewerId;
     private String status;
     private BigDecimal totalScore;
 }

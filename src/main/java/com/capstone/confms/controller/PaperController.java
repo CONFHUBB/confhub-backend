@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/paper-conflict")
+@RequestMapping("/api/v1/paper")
 @RequiredArgsConstructor
 @Tag(name = "Paper Management", description = "Operations related to Paper setup and related entities")
 public class PaperController {

@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewCommentDTO {
-    private Review review;
+    private Integer reviewId;
     private String content;
     private Boolean isVisibleToAuthor;
 }

@@ -2,10 +2,15 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.PaperConflictDTO;
 import com.capstone.confms.dto.response.PaperConflictResponseDTO;
+import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.PaperConflict;
+import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.PaperConflictRepository;
+import com.capstone.confms.repository.PaperRepository;
+import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.PaperConflictService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +26,8 @@ import java.util.stream.Collectors;
 public class PaperConflictServiceImpl implements PaperConflictService {
 
     private final PaperConflictRepository paperConflictRepository;
+    private final PaperRepository paperRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<PaperConflictResponseDTO> getAllPaperConflicts() {
@@ -63,8 +70,14 @@ public class PaperConflictServiceImpl implements PaperConflictService {
     }
 
     private void mapDtoToPaperConflictEntity(PaperConflictDTO dto, PaperConflict entity) {
-        entity.setPaper(dto.getPaper());
-        entity.setUser(dto.getUser());
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
+
+        entity.setPaper(paper);
+        entity.setUser(user);
         entity.setConflictType(dto.getConflictType());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());

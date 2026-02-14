@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewCriterionDTO {
-    private ConferenceReviewForm conferenceReviewForm;
+    private Integer conferenceReviewFormId;
     private String name;
     private String description;
     private BigDecimal weight;

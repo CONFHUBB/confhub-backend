@@ -22,31 +22,31 @@ public class PaperConflictController {
 
     private final PaperConflictService paperConflictService;
 
-    @PostMapping("/conflicts")
+    @PostMapping
     @Operation(summary = "Create a new Paper Conflict")
     public ResponseEntity<PaperConflictResponseDTO> createPaperConflict(@Valid @RequestBody PaperConflictDTO dto) {
         return new ResponseEntity<>(paperConflictService.createPaperConflict(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/conflicts")
+    @GetMapping
     @Operation(summary = "Get all Paper Conflicts")
     public ResponseEntity<List<PaperConflictResponseDTO>> getAllPaperConflicts() {
         return ResponseEntity.ok(paperConflictService.getAllPaperConflicts());
     }
 
-    @GetMapping("/conflicts/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Paper Conflict by ID")
     public ResponseEntity<PaperConflictResponseDTO> getPaperConflictById(@PathVariable Integer id) {
         return ResponseEntity.ok(paperConflictService.getPaperConflictById(id));
     }
 
-    @PutMapping("/conflicts/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Paper Conflict details")
     public ResponseEntity<PaperConflictResponseDTO> updatePaperConflict(@Valid @PathVariable Integer id, @RequestBody PaperConflictDTO dto) {
         return ResponseEntity.ok(paperConflictService.updatePaperConflict(id, dto));
     }
 
-    @DeleteMapping("/conflicts/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Paper Conflict")
     public ResponseEntity<Void> deletePaperConflict(@PathVariable Integer id) {
         paperConflictService.deletePaperConflict(id);

@@ -14,38 +14,38 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/review")
+@RequestMapping("/api/v1/review-controller")
 @RequiredArgsConstructor
 @Tag(name = "Review Score Management", description = "Operations related to Review Score setup and related entities")
 public class ReviewScoreController {
 
     private final ReviewScoreService reviewScoreService;
 
-    @PostMapping("/scores")
+    @PostMapping
     @Operation(summary = "Create a new Review Score")
     public ResponseEntity<ReviewScoreResponseDTO> createReviewScore(@Valid @RequestBody ReviewScoreDTO dto) {
         return new ResponseEntity<>(reviewScoreService.createReviewScore(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/scores")
+    @GetMapping
     @Operation(summary = "Get all Review Scores")
     public ResponseEntity<List<ReviewScoreResponseDTO>> getAllReviewScores() {
         return ResponseEntity.ok(reviewScoreService.getAllReviewScores());
     }
 
-    @GetMapping("/scores/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Review Score by ID")
     public ResponseEntity<ReviewScoreResponseDTO> getReviewScoreById(@PathVariable Integer id) {
         return ResponseEntity.ok(reviewScoreService.getReviewScoreById(id));
     }
 
-    @PutMapping("/scores/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Review Score details")
     public ResponseEntity<ReviewScoreResponseDTO> updateReviewScore(@Valid @PathVariable Integer id, @RequestBody ReviewScoreDTO dto) {
         return ResponseEntity.ok(reviewScoreService.updateReviewScore(id, dto));
     }
 
-    @DeleteMapping("/scores/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Review Score")
     public ResponseEntity<Void> deleteReviewScore(@PathVariable Integer id) {
         reviewScoreService.deleteReviewScore(id);

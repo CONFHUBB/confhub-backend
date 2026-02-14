@@ -7,6 +7,7 @@ import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.PaperRebuttalService;
 import com.capstone.confms.service.PaperService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,9 @@ import java.util.stream.Collectors;
 public class PaperRebuttalServiceImpl implements PaperRebuttalService {
 
     private final PaperRebuttalRepository paperRebuttalRepository;
+    private final PaperRepository paperRepository;
+    private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     public List<PaperRebuttalResponseDTO> getAllPaperRebuttals() {
@@ -64,9 +68,19 @@ public class PaperRebuttalServiceImpl implements PaperRebuttalService {
     }
 
     private void mapDtoToPaperRebuttalEntity(PaperRebuttalDTO dto, PaperRebuttal entity) {
-        entity.setPaper(dto.getPaper());
-        entity.setReview(dto.getReview());
-        entity.setUser(dto.getUser());
+
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
+
+        Review review = reviewRepository.findById(dto.getReviewId())
+                .orElseThrow(() -> new EntityNotFoundException("Review not found with ID: " + dto.getReviewId()));
+
+        entity.setPaper(paper);
+        entity.setReview(review);
+        entity.setUser(user);
         entity.setContent(dto.getContent());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());

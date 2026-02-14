@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewerInterestDTO {
-    private User reviewer;
-    private ConferenceTrackTopic trackTopic;
+    private Integer reviewerId;
+    private Integer conferenceTrackTopicId;
     private Expertise expertise;
 }

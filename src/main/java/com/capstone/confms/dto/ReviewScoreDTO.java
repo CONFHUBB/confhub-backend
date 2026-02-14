@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewScoreDTO {
-    private Review review;
-    private ReviewCriterion reviewCriteria;
+    private Integer reviewId;
+    private Integer reviewCriteriaId;
     private BigDecimal score;
     private String comment;
 }

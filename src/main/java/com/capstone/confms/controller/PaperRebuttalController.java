@@ -21,31 +21,31 @@ public class PaperRebuttalController {
 
     private final PaperRebuttalService paperRebuttalService;
 
-    @PostMapping("/rebuttals")
+    @PostMapping
     @Operation(summary = "Create a new Paper Rebuttal")
     public ResponseEntity<PaperRebuttalResponseDTO> createPaperRebuttal(@Valid @RequestBody PaperRebuttalDTO dto) {
         return new ResponseEntity<>(paperRebuttalService.createPaperRebuttal(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/rebuttals")
+    @GetMapping
     @Operation(summary = "Get all Paper Rebuttals")
     public ResponseEntity<List<PaperRebuttalResponseDTO>> getAllPaperRebuttals() {
         return ResponseEntity.ok(paperRebuttalService.getAllPaperRebuttals());
     }
 
-    @GetMapping("/rebuttals/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Paper Rebuttal by ID")
     public ResponseEntity<PaperRebuttalResponseDTO> getPaperRebuttalById(@PathVariable Integer id) {
         return ResponseEntity.ok(paperRebuttalService.getPaperRebuttalById(id));
     }
 
-    @PutMapping("/rebuttals/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Paper Rebuttal details")
     public ResponseEntity<PaperRebuttalResponseDTO> updatePaperRebuttal(@Valid @PathVariable Integer id, @RequestBody PaperRebuttalDTO dto) {
         return ResponseEntity.ok(paperRebuttalService.updatePaperRebuttal(id, dto));
     }
 
-    @DeleteMapping("/rebuttals/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Paper Rebuttal")
     public ResponseEntity<Void> deletePaperRebuttal(@PathVariable Integer id) {
         paperRebuttalService.deletePaperRebuttal(id);

@@ -47,14 +47,12 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         ConferenceTrack track = trackRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Track not found with ID: " + id));
 
-        // Update Conference relationship if the ID changed
         if (dto.getConferenceId() != null && !dto.getConferenceId().equals(track.getConference().getId())) {
             Conference newConference = conferenceRepository.findById(dto.getConferenceId())
                     .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
             track.setConference(newConference);
         }
 
-        // Map fields
         mapRequestDtoToEntity(dto, track);
         
         ConferenceTrack updatedTrack = trackRepository.save(track);
@@ -84,19 +82,14 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         trackRepository.deleteById(id);
     }
 
-    // --- Helper Methods ---
 
     private void validateDates(ConferenceTrackDTO dto) {
         if (dto.getSubmissionStart() != null && dto.getSubmissionEnd() != null 
             && dto.getSubmissionStart().isAfter(dto.getSubmissionEnd())) {
             throw new IllegalArgumentException("Submission Start date cannot be after End date");
         }
-        // Add other date validations as needed
     }
 
-    /**
-     * Maps the Entity to the new ConferenceTrackResponseDTO
-     */
     private ConferenceTrackResponseDTO mapEntityToResponse(ConferenceTrack entity) {
         ConferenceTrackResponseDTO response = new ConferenceTrackResponseDTO();
         response.setId(entity.getId());

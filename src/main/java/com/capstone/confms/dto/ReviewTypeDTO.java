@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ReviewTypeDTO {
-    private Conference conference;
+    private Integer conferenceId;
     private Boolean isBlind;
     private Boolean isRebuttal;
 }

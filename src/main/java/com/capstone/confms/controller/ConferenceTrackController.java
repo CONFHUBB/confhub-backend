@@ -23,25 +23,25 @@ public class ConferenceTrackController {
     private final ConferenceTrackService conferenceTrackService;
 
     @PostMapping
-    @Operation(summary = "Create a new conference")
+    @Operation(summary = "Create a new conference track")
     public ResponseEntity<ConferenceTrackResponseDTO> createConferenceTrack(@Valid @RequestBody ConferenceTrackDTO dto) {
         return new ResponseEntity<>(conferenceTrackService.createTrack(dto), HttpStatus.CREATED);
     }
 
     @GetMapping
-    @Operation(summary = "Get all conferences")
+    @Operation(summary = "Get all conference tracks")
     public ResponseEntity<List<ConferenceTrackResponseDTO>> getAllConferenceTrack() {
         return ResponseEntity.ok(conferenceTrackService.getAllTracks());
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get conference by ID")
+    @Operation(summary = "Get conference track by ID")
     public ResponseEntity<ConferenceTrackResponseDTO> getByIdConferenceTrack(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceTrackService.getTrackById(id));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update conference details")
+    @Operation(summary = "Update conference track details")
     public ResponseEntity<ConferenceTrackResponseDTO> updateConferenceTrack(@Valid @PathVariable Integer id, @RequestBody ConferenceTrackDTO dto) {
         return ResponseEntity.ok(conferenceTrackService.updateTrack(id, dto));
     }

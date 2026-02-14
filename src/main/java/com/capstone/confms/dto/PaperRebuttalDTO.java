@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class PaperRebuttalDTO {
-    private Paper paper;
-    private Review review;
-    private User user;
+    private Integer paperId;
+    private Integer reviewId;
+    private Integer userId;
     private String content;
 }

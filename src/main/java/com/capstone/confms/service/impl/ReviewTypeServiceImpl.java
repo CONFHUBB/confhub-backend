@@ -7,6 +7,7 @@ import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewService;
 import com.capstone.confms.service.ReviewTypeService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class ReviewTypeServiceImpl implements ReviewTypeService {
 
     private final ReviewTypeRepository reviewTypeRepository;
+    private final ConferenceRepository conferenceRepository;
 
     @Override
     public List<ReviewTypeResponseDTO> getAllReviewTypes() {
@@ -64,7 +66,10 @@ public class ReviewTypeServiceImpl implements ReviewTypeService {
     }
 
     private void mapDtoToReviewTypeEntity(ReviewTypeDTO dto, ReviewType entity) {
-        entity.setConference(dto.getConference());
+        Conference conference = conferenceRepository.findById(dto.getConferenceId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getConferenceId()));
+
+        entity.setConference(conference);
         entity.setIsBlind(dto.getIsBlind());
         entity.setIsRebuttal(dto.getIsRebuttal());
         if (entity.getId() == null) {

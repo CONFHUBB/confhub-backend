@@ -6,6 +6,7 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.PaperService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class PaperServiceImpl implements PaperService {
 
     private final PaperRepository paperRepository;
+    private final ConferenceTrackRepository conferenceTrackRepository;
 
     @Override
     public List<PaperResponseDTO> getAllPapers() {
@@ -64,6 +66,10 @@ public class PaperServiceImpl implements PaperService {
     }
 
     private void mapDtoToEntity(PaperDTO dto, Paper entity) {
+
+        ConferenceTrack conferenceTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getConferenceTrackId()));
+
         entity.setAbstractField(dto.getAbstractField());
         entity.setStatus(dto.getStatus());
         entity.setTitle(dto.getTitle());
@@ -73,7 +79,7 @@ public class PaperServiceImpl implements PaperService {
         entity.setKeyword4(dto.getKeyword4());
         entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
         entity.setSubmissionTime(dto.getSubmissionTime());
-        entity.setTrack(dto.getTrack());
+        entity.setTrack(conferenceTrack);
         // Handling auditing fields if not automatically handled by JPA Auditing
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());

@@ -23,6 +23,7 @@ public class ReviewCriterionServiceImpl implements ReviewCriterionService {
 
 
     private final ReviewCriterionRepository reviewCriterionRepository;
+    private final ConferenceReviewFormRepository conferenceReviewFormRepository;
 
     @Override
     public List<ReviewCriterionResponseDTO> getAllReviewCriteria() {
@@ -65,7 +66,11 @@ public class ReviewCriterionServiceImpl implements ReviewCriterionService {
     }
 
     private void mapDtoToReviewCriterionEntity(ReviewCriterionDTO dto, ReviewCriterion entity) {
-        entity.setConferenceReviewForm(dto.getConferenceReviewForm());
+
+        ConferenceReviewForm conferenceReviewForm = conferenceReviewFormRepository.findById(dto.getConferenceReviewFormId())
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + dto.getConferenceReviewFormId()));
+
+        entity.setConferenceReviewForm(conferenceReviewForm);
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
         entity.setWeight(dto.getWeight());

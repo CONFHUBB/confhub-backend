@@ -1,12 +1,14 @@
 package com.capstone.confms.service.impl;
 
-import com.capstone.confms.dto.*;
-import com.capstone.confms.dto.response.*;
-import com.capstone.confms.entity.*;
+import com.capstone.confms.dto.PaperCheckLogDTO;
+import com.capstone.confms.dto.response.PaperCheckLogResponseDTO;
+import com.capstone.confms.entity.PaperCheckLog;
+import com.capstone.confms.entity.PaperFile;
 import com.capstone.confms.exception.ResourceNotFoundException;
-import com.capstone.confms.repository.*;
+import com.capstone.confms.repository.PaperCheckLogRepository;
+import com.capstone.confms.repository.PaperFileRepository;
 import com.capstone.confms.service.PaperCheckLogService;
-import com.capstone.confms.service.PaperService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class PaperCheckLogServiceImpl implements PaperCheckLogService {
 
     private final PaperCheckLogRepository paperCheckLogRepository;
+    private final PaperFileRepository paperFileRepository;
 
     @Override
     public List<PaperCheckLogResponseDTO> getAllPaperCheckLogs() {
@@ -64,7 +67,10 @@ public class PaperCheckLogServiceImpl implements PaperCheckLogService {
     }
 
     private void mapDtoToPaperCheckLogEntity(PaperCheckLogDTO dto, PaperCheckLog entity) {
-        entity.setPaperFile(dto.getPaperFile());
+        PaperFile paperFile = paperFileRepository.findById(dto.getPaperFileId())
+                .orElseThrow(() -> new EntityNotFoundException("PaperFile not found with ID: " + dto.getPaperFileId()));
+
+        entity.setPaperFile(paperFile);
         entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());

@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class PaperConflictDTO {
-    private Paper paper;
-    private User user;
+    private Integer paperId;
+    private Integer userId;
     private ConflictType conflictType;
 }

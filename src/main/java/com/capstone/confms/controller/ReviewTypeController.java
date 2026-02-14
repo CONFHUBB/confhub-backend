@@ -14,38 +14,38 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/review")
+@RequestMapping("/api/v1/review-type")
 @RequiredArgsConstructor
 @Tag(name = "Review Type Management", description = "Operations related to Review Type setup and related entities")
 public class ReviewTypeController {
 
     private final ReviewTypeService reviewTypeService;
 
-    @PostMapping("/types")
+    @PostMapping
     @Operation(summary = "Create a new Review Type")
     public ResponseEntity<ReviewTypeResponseDTO> createReviewType(@Valid @RequestBody ReviewTypeDTO dto) {
         return new ResponseEntity<>(reviewTypeService.createReviewType(dto), HttpStatus.CREATED);
     }
 
-    @GetMapping("/types")
+    @GetMapping
     @Operation(summary = "Get all Review Types")
     public ResponseEntity<List<ReviewTypeResponseDTO>> getAllReviewTypes() {
         return ResponseEntity.ok(reviewTypeService.getAllReviewTypes());
     }
 
-    @GetMapping("/types/{id}")
+    @GetMapping("/{id}")
     @Operation(summary = "Get Review Type by ID")
     public ResponseEntity<ReviewTypeResponseDTO> getReviewTypeById(@PathVariable Integer id) {
         return ResponseEntity.ok(reviewTypeService.getReviewTypeById(id));
     }
 
-    @PutMapping("/types/{id}")
+    @PutMapping("/{id}")
     @Operation(summary = "Update Review Type details")
     public ResponseEntity<ReviewTypeResponseDTO> updateReviewType(@Valid @PathVariable Integer id, @RequestBody ReviewTypeDTO dto) {
         return ResponseEntity.ok(reviewTypeService.updateReviewType(id, dto));
     }
 
-    @DeleteMapping("/types/{id}")
+    @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Review Type")
     public ResponseEntity<Void> deleteReviewType(@PathVariable Integer id) {
         reviewTypeService.deleteReviewType(id);

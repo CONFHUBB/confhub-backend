@@ -1,12 +1,16 @@
 package com.capstone.confms.service.impl;
 
-import com.capstone.confms.dto.*;
-import com.capstone.confms.dto.response.*;
-import com.capstone.confms.entity.*;
+import com.capstone.confms.dto.ReviewScoreDTO;
+import com.capstone.confms.dto.response.ReviewScoreResponseDTO;
+import com.capstone.confms.entity.Review;
+import com.capstone.confms.entity.ReviewCriterion;
+import com.capstone.confms.entity.ReviewScore;
 import com.capstone.confms.exception.ResourceNotFoundException;
-import com.capstone.confms.repository.*;
+import com.capstone.confms.repository.ReviewCriterionRepository;
+import com.capstone.confms.repository.ReviewRepository;
+import com.capstone.confms.repository.ReviewScoreRepository;
 import com.capstone.confms.service.ReviewScoreService;
-import com.capstone.confms.service.ReviewService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,8 @@ import java.util.stream.Collectors;
 public class ReviewScoreServiceImpl implements ReviewScoreService {
 
     private final ReviewScoreRepository reviewScoreRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReviewCriterionRepository reviewCriterionRepository;
 
     @Override
     public List<ReviewScoreResponseDTO> getAllReviewScores() {
@@ -64,8 +70,14 @@ public class ReviewScoreServiceImpl implements ReviewScoreService {
     }
 
     private void mapDtoToReviewScoreEntity(ReviewScoreDTO dto, ReviewScore entity) {
-        entity.setReview(dto.getReview());
-        entity.setReviewCriteria(dto.getReviewCriteria());
+        Review review = reviewRepository.findById(dto.getReviewId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getReviewId()));
+
+        ReviewCriterion reviewCriterion = reviewCriterionRepository.findById(dto.getReviewCriteriaId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewCriteriaId()));
+
+        entity.setReview(review);
+        entity.setReviewCriteria(reviewCriterion);
         entity.setScore(dto.getScore());
         entity.setComment(dto.getComment());
         if (entity.getId() == null) {

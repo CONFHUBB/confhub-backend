@@ -31,7 +31,7 @@ public class Conference extends BaseEntity {
     @Column(name = "description", nullable = false)
     private String description;
 
-    @Column(name = "website_url", nullable = false)
+    @Column(name = "website_url")
     private String websiteUrl;
 
     @Column(name = "location", nullable = false)

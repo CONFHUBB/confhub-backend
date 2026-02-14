@@ -52,4 +52,5 @@ public class PaperConflictController {
         paperConflictService.deletePaperConflict(id);
         return ResponseEntity.noContent().build();
     }
+
 }

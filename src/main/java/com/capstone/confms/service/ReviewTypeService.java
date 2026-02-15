@@ -1,8 +1,18 @@
 package com.capstone.confms.service;
 
+import com.capstone.confms.dto.ReviewTypeDTO;
 import com.capstone.confms.dto.request.CreateReviewTypeRequest;
 import com.capstone.confms.dto.response.ReviewTypeResponseDTO;
+import java.util.List;
 
 public interface ReviewTypeService {
-    ReviewTypeResponseDTO configureReviewType(CreateReviewTypeRequest request);
+    ReviewTypeResponseDTO createReviewType(ReviewTypeDTO dto);
+
+    ReviewTypeResponseDTO updateReviewType(Integer id, ReviewTypeDTO dto);
+
+    List<ReviewTypeResponseDTO> getAllReviewTypes();
+
+    ReviewTypeResponseDTO getReviewTypeById(Integer id);
+
+    void deleteReviewType(Integer id);
 }

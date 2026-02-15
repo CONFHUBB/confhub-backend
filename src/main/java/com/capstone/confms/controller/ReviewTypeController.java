@@ -1,11 +1,12 @@
 package com.capstone.confms.controller;
 
-import com.capstone.confms.dto.request.CreateReviewTypeRequest;
+import com.capstone.confms.dto.ReviewTypeDTO;
 import com.capstone.confms.dto.response.ReviewTypeResponseDTO;
 import com.capstone.confms.service.ReviewTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +20,33 @@ public class ReviewTypeController {
     private final ReviewTypeService reviewTypeService;
 
     @PostMapping
-    @Operation(summary = "Create a new review type for a conference")
-    public ResponseEntity<ReviewTypeResponseDTO> configureReviewType(@Valid @RequestBody CreateReviewTypeRequest request) {
-        ReviewTypeResponseDTO response = reviewTypeService.configureReviewType(request);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    @Operation(summary = "Create a new Review Type")
+    public ResponseEntity<ReviewTypeResponseDTO> createReviewType(@Valid @RequestBody ReviewTypeDTO dto) {
+        return new ResponseEntity<>(reviewTypeService.createReviewType(dto), HttpStatus.CREATED);
+    }
+
+    @GetMapping
+    @Operation(summary = "Get all Review Types")
+    public ResponseEntity<List<ReviewTypeResponseDTO>> getAllReviewTypes() {
+        return ResponseEntity.ok(reviewTypeService.getAllReviewTypes());
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get Review Type by ID")
+    public ResponseEntity<ReviewTypeResponseDTO> getReviewTypeById(@PathVariable Integer id) {
+        return ResponseEntity.ok(reviewTypeService.getReviewTypeById(id));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update Review Type details")
+    public ResponseEntity<ReviewTypeResponseDTO> updateReviewType(@Valid @PathVariable Integer id, @RequestBody ReviewTypeDTO dto) {
+        return ResponseEntity.ok(reviewTypeService.updateReviewType(id, dto));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a Review Type")
+    public ResponseEntity<Void> deleteReviewType(@PathVariable Integer id) {
+        reviewTypeService.deleteReviewType(id);
+        return ResponseEntity.noContent().build();
     }
 }

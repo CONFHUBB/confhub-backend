@@ -24,7 +24,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     @Transactional
-    public ConferenceResponseDTO create(ConferenceDTO dto) {
+    public ConferenceResponseDTO createConference(ConferenceDTO dto) {
         log.info("Creating conference: {}", dto.getName());
         Conference conference = new Conference();
         mapDtoToEntity(dto, conference);
@@ -33,7 +33,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ConferenceResponseDTO> findAll() {
+    public List<ConferenceResponseDTO> getAllConferences() {
         return repository.findAll().stream()
                          .map(this::mapToResponseDTO)
                          .collect(Collectors.toList());
@@ -41,7 +41,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public ConferenceResponseDTO findById(Integer id) {
+    public ConferenceResponseDTO getByIdConference(Integer id) {
         return repository.findById(id)
                          .map(this::mapToResponseDTO)
                          .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
@@ -49,7 +49,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     @Transactional
-    public ConferenceResponseDTO update(Integer id, ConferenceDTO dto) {
+    public ConferenceResponseDTO updateConference(Integer id, ConferenceDTO dto) {
         Conference existing = repository.findById(id)
                                         .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
@@ -59,7 +59,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     @Transactional
-    public void delete(Integer id) {
+    public void deleteConference(Integer id) {
         log.warn("Deleting conference ID: {}", id);
         if (!repository.existsById(id)) {
             throw new ResourceNotFoundException("Cannot delete. Conference not found with id " + id);
@@ -76,6 +76,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setEndDate(dto.getEndDate());
         entity.setStatus(dto.getStatus());
         entity.setCreatedAt(LocalDateTime.now());
+        entity.setWebsiteUrl(dto.getWebsiteUrl());
     }
 
     private ConferenceResponseDTO mapToResponseDTO(Conference entity) {

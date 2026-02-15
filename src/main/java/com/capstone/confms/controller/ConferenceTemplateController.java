@@ -2,6 +2,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.ConferenceTemplateDTO;
 import com.capstone.confms.service.ConferenceTemplateService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/conference-templates")
 @RequiredArgsConstructor
+@Tag(name = "Conference Template Management", description = "Operations related to Conference Template setup")
 public class ConferenceTemplateController {
 
     private final ConferenceTemplateService templateService;

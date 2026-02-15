@@ -51,4 +51,11 @@ public class ConferenceController {
         conferenceService.deleteConference(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}/open-submissions")
+    @Operation(summary = "Open submissions for a conference by setting status to ONGOING")
+    public ResponseEntity<ConferenceResponseDTO> openSubmissions(@PathVariable Integer id) {
+        ConferenceResponseDTO response = conferenceService.openSubmissions(id);
+        return ResponseEntity.ok(response);
+    }
 }

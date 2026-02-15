@@ -1,14 +1,12 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.entity.Conference;
-import lombok.Builder;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Data
-@Builder
 public class ReviewTypeResponseDTO {
-    private Integer id;
-    private Conference conference;
+    private Integer conferenceId;
     private Boolean isBlind;
     private Boolean isRebuttal;
+    private LocalDateTime createdAt;
 }

@@ -6,6 +6,7 @@ import com.capstone.confms.entity.Conference;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.service.ConferenceService;
+import com.capstone.confms.utils.enums.ConferenceStatus;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +66,17 @@ public class ConferenceServiceImpl implements ConferenceService {
             throw new ResourceNotFoundException("Cannot delete. Conference not found with id " + id);
         }
         repository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO openSubmissions(Integer id) {
+        log.info("Opening submissions for conference ID: {}", id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+        conference.setStatus(ConferenceStatus.ONGOING);
+        Conference saved = repository.save(conference);
+        return mapToResponseDTO(saved);
     }
 
     private void mapDtoToEntity(ConferenceDTO dto, Conference entity) {

@@ -1,24 +1,22 @@
 package com.capstone.confms.controller;
 
-import com.capstone.confms.dto.*;
-import com.capstone.confms.dto.response.*;
+import com.capstone.confms.dto.ReviewTypeDTO;
+import com.capstone.confms.dto.response.ReviewTypeResponseDTO;
 import com.capstone.confms.service.ReviewTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1/review-type")
+@RequestMapping("/api/v1/review-types")
 @RequiredArgsConstructor
-@Tag(name = "Review Type Management", description = "Operations related to Review Type setup and related entities")
+@Tag(name = "Review Type Management", description = "Operations related to Review Type configuration")
 public class ReviewTypeController {
-
     private final ReviewTypeService reviewTypeService;
 
     @PostMapping

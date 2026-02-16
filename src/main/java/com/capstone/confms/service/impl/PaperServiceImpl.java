@@ -50,6 +50,15 @@ public class PaperServiceImpl implements PaperService {
     }
 
     @Override
+    @Transactional
+    public PaperResponseDTO updatePaperStatus(Integer id, PaperUpdateStatusDTO dto) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+        mapDtoToEntity(dto, paper);
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    @Override
     public PaperResponseDTO getPaperById(Integer id) {
         return paperRepository.findById(id)
                 .map(this::mapToResponseDTO)
@@ -81,6 +90,14 @@ public class PaperServiceImpl implements PaperService {
         entity.setSubmissionTime(dto.getSubmissionTime());
         entity.setTrack(conferenceTrack);
         // Handling auditing fields if not automatically handled by JPA Auditing
+        if (entity.getId() == null) {
+            entity.setCreatedAt(LocalDateTime.now());
+        }
+        entity.setUpdatedAt(LocalDateTime.now());
+    }
+
+    private void mapDtoToEntity(PaperUpdateStatusDTO dto, Paper entity) {
+        entity.setStatus(dto.getStatus());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }

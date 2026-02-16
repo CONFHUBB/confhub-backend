@@ -40,6 +40,12 @@ public class ConferenceTrackController {
         return ResponseEntity.ok(conferenceTrackService.getTrackById(id));
     }
 
+    @GetMapping("/conferenceId/{conferenceId}")
+    @Operation(summary = "Get conference track by conference ID")
+    public ResponseEntity<List<ConferenceTrackResponseDTO>> getTracksByConferenceId(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(conferenceTrackService.getTracksByConferenceId(conferenceId));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update conference track details")
     public ResponseEntity<ConferenceTrackResponseDTO> updateConferenceTrack(@Valid @PathVariable Integer id, @RequestBody ConferenceTrackDTO dto) {

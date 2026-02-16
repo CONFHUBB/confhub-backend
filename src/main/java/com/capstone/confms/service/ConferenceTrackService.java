@@ -13,5 +13,7 @@ public interface ConferenceTrackService {
 
     List<ConferenceTrackResponseDTO> getAllTracks();
 
+    List<ConferenceTrackResponseDTO> getTracksByConferenceId(Integer conferenceId);
+
     void deleteTrack(Integer id);
 }

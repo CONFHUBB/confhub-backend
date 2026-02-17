@@ -45,6 +45,12 @@ public class PaperController {
         return ResponseEntity.ok(paperService.updatePaper(id, dto));
     }
 
+    @PutMapping("/status/{id}")
+    @Operation(summary = "Update Paper Status details")
+    public ResponseEntity<PaperResponseDTO> updatePaperStatus(@Valid @PathVariable Integer id, @RequestBody PaperUpdateStatusDTO dto) {
+        return ResponseEntity.ok(paperService.updatePaperStatus(id, dto));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Paper")
     public ResponseEntity<Void> deletePaper(@PathVariable Integer id) {

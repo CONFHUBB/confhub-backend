@@ -74,6 +74,17 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
     }
 
     @Override
+    public List<ConferenceTrackResponseDTO> getTracksByConferenceId(Integer conferenceId){
+        if(!conferenceRepository.existsById(conferenceId)) {
+            throw new EntityNotFoundException("Track not found with Conference ID: " + conferenceId);
+        }
+
+        return trackRepository.findByConferenceId(conferenceId).stream()
+                .map(this::mapEntityToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public void deleteTrack(Integer id) {
         if (!trackRepository.existsById(id)) {

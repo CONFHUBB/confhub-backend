@@ -11,6 +11,8 @@ public interface PaperService {
 
     PaperResponseDTO updatePaper(Integer id, PaperDTO dto);
 
+    PaperResponseDTO updatePaperStatus(Integer id, PaperUpdateStatusDTO dto);
+
     List<PaperResponseDTO> getAllPapers();
 
     PaperResponseDTO getPaperById(Integer id);

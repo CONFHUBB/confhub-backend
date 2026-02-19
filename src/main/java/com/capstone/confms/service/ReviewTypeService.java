@@ -1,7 +1,6 @@
 package com.capstone.confms.service;
 
 import com.capstone.confms.dto.ReviewTypeDTO;
-import com.capstone.confms.dto.request.CreateReviewTypeRequest;
 import com.capstone.confms.dto.response.ReviewTypeResponseDTO;
 import java.util.List;
 

@@ -1,5 +1,6 @@
 package com.capstone.confms.entity;
 
+import com.capstone.confms.utils.enums.ReviewOption;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -25,8 +26,8 @@ public class ReviewType extends BaseEntity {
     @JoinColumn(name = "conference_id", nullable = false)
     private Conference conference;
 
-    @Column(name = "is_blind", nullable = false)
-    private Boolean isBlind = false;
+    @Column(name = "review_option", nullable = false)
+    private ReviewOption reviewOption;
 
     @Column(name = "is_rebuttal", nullable = false)
     private Boolean isRebuttal = false;

@@ -44,7 +44,7 @@ public class ReviewTypeServiceImpl implements ReviewTypeService {
     @Transactional
     public ReviewTypeResponseDTO updateReviewType(Integer id, ReviewTypeDTO dto) {
         ReviewType entity = reviewTypeRepository.findById(id)
-                                                .orElseThrow(() -> new ResourceNotFoundException("ReviewType not found with id " + id));
+                                                .orElseThrow(() -> new ResourceNotFoundException("ReviewOption not found with id " + id));
         mapDtoToReviewTypeEntity(dto, entity);
         return mapToReviewTypeResponseDTO(reviewTypeRepository.save(entity));
     }
@@ -53,14 +53,14 @@ public class ReviewTypeServiceImpl implements ReviewTypeService {
     public ReviewTypeResponseDTO getReviewTypeById(Integer id) {
         return reviewTypeRepository.findById(id)
                                    .map(this::mapToReviewTypeResponseDTO)
-                                   .orElseThrow(() -> new ResourceNotFoundException("ReviewType not found with id " + id));
+                                   .orElseThrow(() -> new ResourceNotFoundException("ReviewOption not found with id " + id));
     }
 
     @Override
     @Transactional
     public void deleteReviewType(Integer id) {
         if (!reviewTypeRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Cannot delete. ReviewType not found with id " + id);
+            throw new ResourceNotFoundException("Cannot delete. ReviewOption not found with id " + id);
         }
         reviewTypeRepository.deleteById(id);
     }
@@ -70,7 +70,7 @@ public class ReviewTypeServiceImpl implements ReviewTypeService {
                                                     .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
 
         entity.setConference(conference);
-        entity.setIsBlind(dto.getIsBlind());
+        entity.setReviewOption(dto.getReviewOption());
         entity.setIsRebuttal(dto.getIsRebuttal());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
@@ -82,7 +82,7 @@ public class ReviewTypeServiceImpl implements ReviewTypeService {
         return ReviewTypeResponseDTO.builder()
                                     .id(entity.getId())
                                     .conference(entity.getConference())
-                                    .isBlind(entity.getIsBlind())
+                                    .reviewOption(entity.getReviewOption())
                                     .isRebuttal(entity.getIsRebuttal())
                                     .build();
     }

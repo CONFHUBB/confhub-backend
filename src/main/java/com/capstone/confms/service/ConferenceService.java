@@ -11,4 +11,7 @@ public interface ConferenceService {
     ConferenceResponseDTO updateConference(Integer id, ConferenceDTO dto);
     void deleteConference(Integer id);
     ConferenceResponseDTO openSubmissions(Integer id);
+    ConferenceResponseDTO approveConference(Integer id);
+
+
 }

@@ -38,9 +38,6 @@ public class ConferenceDTO {
     @Future(message = "End date must be in the future")
     private LocalDateTime endDate;
 
-    @NotNull(message = "Status is required")
-    private ConferenceStatus status;
-
     @NotNull(message = "Website Url is required")
     private String websiteUrl;
 }

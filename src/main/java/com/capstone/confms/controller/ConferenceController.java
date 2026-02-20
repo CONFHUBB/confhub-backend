@@ -58,4 +58,11 @@ public class ConferenceController {
         ConferenceResponseDTO response = conferenceService.openSubmissions(id);
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/{id}/approve-conference")
+    @Operation(summary = "Approve for a conference by setting status to SCHEDULED")
+    public ResponseEntity<ConferenceResponseDTO> approveConference(@PathVariable Integer id) {
+        ConferenceResponseDTO response = conferenceService.approveConference(id);
+        return ResponseEntity.ok(response);
+    }
 }

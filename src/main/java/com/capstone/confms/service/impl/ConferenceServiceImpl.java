@@ -79,6 +79,20 @@ public class ConferenceServiceImpl implements ConferenceService {
         return mapToResponseDTO(saved);
     }
 
+    @Override
+    @Transactional
+    public ConferenceResponseDTO approveConference(Integer id) {
+        log.info("ApprovingConference for conference ID: {}", id);
+        Conference conference = repository.findById(id)
+                                          .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+        if(conference.getStatus() != ConferenceStatus.PENDING) {
+            throw new IllegalStateException("Only conferences with PENDING status can be approved.");
+        }
+        conference.setStatus(ConferenceStatus.SCHEDULED);
+        Conference saved = repository.save(conference);
+        return mapToResponseDTO(saved);
+    }
+
     private void mapDtoToEntity(ConferenceDTO dto, Conference entity) {
         entity.setName(dto.getName());
         entity.setAcronym(dto.getAcronym());
@@ -86,7 +100,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setLocation(dto.getLocation());
         entity.setStartDate(dto.getStartDate());
         entity.setEndDate(dto.getEndDate());
-        entity.setStatus(dto.getStatus());
+        entity.setStatus(ConferenceStatus.PENDING);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setWebsiteUrl(dto.getWebsiteUrl());
     }

@@ -47,11 +47,6 @@ public class ConferenceSubmissionFormController {
         return ResponseEntity.ok(submissionFormService.getSubmissionFormsByTrackId(trackId));
     }
 
-    @GetMapping("/topic/{topicId}")
-    public ResponseEntity<List<ConferenceSubmissionFormResponseDTO>> getSubmissionFormsByTopicId(@PathVariable Integer topicId) {
-        return ResponseEntity.ok(submissionFormService.getSubmissionFormsByTopicId(topicId));
-    }
-
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSubmissionForm(@PathVariable Integer id) {
         submissionFormService.deleteSubmissionForm(id);

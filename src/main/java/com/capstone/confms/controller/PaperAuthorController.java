@@ -45,6 +45,12 @@ public class PaperAuthorController {
         return ResponseEntity.ok(paperAuthorService.updatePaperAuthor(id, dto));
     }
 
+    @GetMapping("/paper/{paperId}")
+    @Operation(summary = "Get all authors associated with a specific paper")
+    public ResponseEntity<List<PaperAuthorResponseDTO>> getAuthorsByPaper(@PathVariable Integer paperId) {
+        return ResponseEntity.ok(paperAuthorService.getAuthorsByPaper(paperId));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Paper Author")
     public ResponseEntity<Void> deletePaperAuthor(@PathVariable Integer id) {

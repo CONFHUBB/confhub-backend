@@ -16,7 +16,5 @@ public interface ConferenceSubmissionFormService {
 
     List<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId);
 
-    List<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTopicId(Integer trackId);
-
     void deleteSubmissionForm(Integer id);
 }

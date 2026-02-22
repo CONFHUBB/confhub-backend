@@ -7,5 +7,4 @@ import java.util.List;
 
 public interface ConferenceSubmissionFormRepository extends JpaRepository<ConferenceSubmissionForm, Integer> {
     List<ConferenceSubmissionForm> findByTrackId(Integer trackId);
-    List<ConferenceSubmissionForm> findByTopicId(Integer trackId);
 }

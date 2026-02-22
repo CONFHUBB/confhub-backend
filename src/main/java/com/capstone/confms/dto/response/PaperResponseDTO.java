@@ -1,19 +1,19 @@
 package com.capstone.confms.dto.response;
 
 import com.capstone.confms.entity.ConferenceTrack;
-import com.capstone.confms.utils.enums.ConferenceStatus;
+import com.capstone.confms.entity.ConferenceTrackTopic;
 import com.capstone.confms.utils.enums.PaperStatus;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 @Data
 @Builder
 public class PaperResponseDTO {
     private Integer id;
     private ConferenceTrack track;
+    private ConferenceTrackTopic topic;
     private String title;
     private String abstractField;
     private String keyword1;

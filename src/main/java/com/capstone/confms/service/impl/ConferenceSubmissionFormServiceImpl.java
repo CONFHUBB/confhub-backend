@@ -23,19 +23,15 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
 
     private final ConferenceSubmissionFormRepository submissionFormRepository;
     private final ConferenceTrackRepository trackRepository;
-    private final ConferenceTrackTopicRepository topicRepository;
 
     @Override
     @Transactional
     public ConferenceSubmissionFormResponseDTO createSubmissionForm(ConferenceSubmissionFormDTO dto) {
-        ConferenceTrackTopic topic = topicRepository.findById(dto.getTopicId())
-                .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
-
-        ConferenceTrack track = topic.getTrack();
+        ConferenceTrack track = trackRepository.findById(dto.getTrackId())
+                .orElseThrow(() -> new EntityNotFoundException("Track not found with ID: " + dto.getTrackId()));
 
         ConferenceSubmissionForm form = new ConferenceSubmissionForm();
         form.setTrack(track);
-        form.setTopic(topic);
         mapDtoToEntity(dto, form);
 
         ConferenceSubmissionForm savedForm = submissionFormRepository.save(form);
@@ -47,16 +43,6 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
     public ConferenceSubmissionFormResponseDTO updateSubmissionForm(Integer id, ConferenceSubmissionFormDTO dto) {
         ConferenceSubmissionForm form = submissionFormRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Submission Form not found with ID: " + id));
-
-        if (dto.getTopicId() != null && !dto.getTopicId().equals(form.getTopic().getId())) {
-            ConferenceTrackTopic newTopic = topicRepository.findById(dto.getTopicId())
-                    .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
-
-            if (!newTopic.getTrack().getId().equals(form.getTrack().getId())) {
-                 throw new IllegalArgumentException("The selected Topic does not belong to the selected Track.");
-            }
-            form.setTopic(newTopic);
-        }
 
         mapDtoToEntity(dto, form);
         ConferenceSubmissionForm updatedForm = submissionFormRepository.save(form);
@@ -89,17 +75,6 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
     }
 
     @Override
-    public List<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTopicId(Integer topicId) {
-        if(!topicRepository.existsById(topicId)) {
-            throw new EntityNotFoundException("Submission not found with Topic ID: " + topicId);
-        }
-
-        return submissionFormRepository.findByTopicId(topicId).stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     @Transactional
     public void deleteSubmissionForm(Integer id) {
         if (!submissionFormRepository.existsById(id)) {
@@ -121,7 +96,6 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
         ConferenceSubmissionFormResponseDTO response = new ConferenceSubmissionFormResponseDTO();
         response.setId(entity.getId());
         response.setTrack(entity.getTrack());
-        response.setTopic(entity.getTopic());
         response.setTitle(entity.getTitle());
         response.setAbstractField(entity.getAbstractField());
         response.setKeyword1(entity.getKeyword1());

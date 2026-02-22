@@ -19,4 +19,10 @@ public interface PaperService {
 
     void deletePaper(Integer id);
 
+    // ==================== additional queries ====================
+    /**
+     * Retrieve all papers associated with a specific author (user) by their ID.
+     */
+    List<PaperResponseDTO> getPapersByAuthor(Integer authorId);
+
 }

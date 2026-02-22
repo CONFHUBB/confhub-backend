@@ -37,6 +37,13 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     }
 
     @Override
+    public List<PaperAuthorResponseDTO> getAuthorsByPaper(Integer paperId) {
+        return paperAuthorRepository.findByPaperId(paperId).stream()
+                .map(this::mapToPaperAuthorResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public PaperAuthorResponseDTO createPaperAuthor(PaperAuthorDTO dto) {
         PaperAuthor entity = new PaperAuthor();

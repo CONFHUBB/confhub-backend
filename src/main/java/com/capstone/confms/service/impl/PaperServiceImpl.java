@@ -23,6 +23,8 @@ public class PaperServiceImpl implements PaperService {
 
     private final PaperRepository paperRepository;
     private final ConferenceTrackRepository conferenceTrackRepository;
+    private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
+    private final com.capstone.confms.repository.PaperAuthorRepository paperAuthorRepository;
 
     @Override
     public List<PaperResponseDTO> getAllPapers() {
@@ -74,10 +76,18 @@ public class PaperServiceImpl implements PaperService {
         paperRepository.deleteById(id);
     }
 
-    private void mapDtoToEntity(PaperDTO dto, Paper entity) {
+    @Override
+    public List<PaperResponseDTO> getPapersByAuthor(Integer authorId) {
+        return paperAuthorRepository.findByUserId(authorId).stream()
+                .map(pa -> mapToResponseDTO(pa.getPaper()))
+                .collect(Collectors.toList());
+    }
 
+    private void mapDtoToEntity(PaperDTO dto, Paper entity) {
         ConferenceTrack conferenceTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
-                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getConferenceTrackId()));
+                .orElseThrow(() -> new EntityNotFoundException("Track not found with ID: " + dto.getConferenceTrackId()));
+        ConferenceTrackTopic topic = conferenceTrackTopicRepository.findById(dto.getTopicId())
+                .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
 
         entity.setAbstractField(dto.getAbstractField());
         entity.setStatus(dto.getStatus());
@@ -89,6 +99,7 @@ public class PaperServiceImpl implements PaperService {
         entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
         entity.setSubmissionTime(dto.getSubmissionTime());
         entity.setTrack(conferenceTrack);
+        entity.setTopic(topic);
         // Handling auditing fields if not automatically handled by JPA Auditing
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
@@ -108,6 +119,7 @@ public class PaperServiceImpl implements PaperService {
         return PaperResponseDTO.builder()
                 .id(entity.getId())
                 .track(entity.getTrack())
+                .topic(entity.getTopic())
                 .title(entity.getTitle())
                 .abstractField(entity.getAbstractField())
                 .keyword1(entity.getKeyword1())

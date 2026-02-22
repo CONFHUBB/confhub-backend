@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class ConferenceSubmissionFormDTO {
-    private Integer topicId;
+    private Integer trackId;
     private String title;
     private String abstractField;
     private String keyword1;

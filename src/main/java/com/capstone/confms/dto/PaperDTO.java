@@ -15,6 +15,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class PaperDTO {
     private Integer conferenceTrackId;
+    private Integer topicId;
     private String title;
     private String abstractField;
     private String keyword1;

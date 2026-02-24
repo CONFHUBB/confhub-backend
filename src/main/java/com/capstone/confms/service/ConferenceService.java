@@ -5,9 +5,13 @@ import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import java.util.List;
 
 public interface ConferenceService {
-    ConferenceResponseDTO create(ConferenceDTO dto);
-    List<ConferenceResponseDTO> findAll();
-    ConferenceResponseDTO findById(Integer id);
-    ConferenceResponseDTO update(Integer id, ConferenceDTO dto);
-    void delete(Integer id);
+    ConferenceResponseDTO createConference(ConferenceDTO dto);
+    List<ConferenceResponseDTO> getAllConferences();
+    ConferenceResponseDTO getByIdConference(Integer id);
+    ConferenceResponseDTO updateConference(Integer id, ConferenceDTO dto);
+    void deleteConference(Integer id);
+    ConferenceResponseDTO openSubmissions(Integer id);
+    ConferenceResponseDTO approveConference(Integer id);
+
+
 }

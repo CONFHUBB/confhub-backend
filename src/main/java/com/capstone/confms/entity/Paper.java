@@ -29,6 +29,10 @@ public class Paper extends BaseEntity {
     @JoinColumn(name = "track_id", nullable = false)
     private ConferenceTrack track;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private ConferenceTrackTopic topic;
+
     @Column(name = "title", nullable = false)
     private String title;
 

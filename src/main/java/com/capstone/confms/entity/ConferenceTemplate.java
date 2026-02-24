@@ -31,7 +31,7 @@ public class ConferenceTemplate extends BaseEntity {
     @Column(name = "subject", nullable = false)
     private String subject;
 
-    @Column(name = "body", nullable = false)
+    @Column(name = "body", nullable = false, columnDefinition = "TEXT")
     private String body;
 
     @Column(name = "is_default", nullable = false)

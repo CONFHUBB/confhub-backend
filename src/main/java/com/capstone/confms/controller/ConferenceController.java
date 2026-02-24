@@ -23,32 +23,46 @@ public class ConferenceController {
 
     @PostMapping
     @Operation(summary = "Create a new conference")
-    public ResponseEntity<ConferenceResponseDTO> create(@Valid @RequestBody ConferenceDTO dto) {
-        return new ResponseEntity<>(conferenceService.create(dto), HttpStatus.CREATED);
+    public ResponseEntity<ConferenceResponseDTO> createConference(@Valid @RequestBody ConferenceDTO dto) {
+        return new ResponseEntity<>(conferenceService.createConference(dto), HttpStatus.CREATED);
     }
 
     @GetMapping
     @Operation(summary = "Get all conferences")
-    public ResponseEntity<List<ConferenceResponseDTO>> getAll() {
-        return ResponseEntity.ok(conferenceService.findAll());
+    public ResponseEntity<List<ConferenceResponseDTO>> getAllConferences() {
+        return ResponseEntity.ok(conferenceService.getAllConferences());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get conference by ID")
-    public ResponseEntity<ConferenceResponseDTO> getById(@PathVariable Integer id) {
-        return ResponseEntity.ok(conferenceService.findById(id));
+    public ResponseEntity<ConferenceResponseDTO> getByIdConference(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceService.getByIdConference(id));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update conference details")
-    public ResponseEntity<ConferenceResponseDTO> update(@Valid @PathVariable Integer id, @RequestBody ConferenceDTO dto) {
-        return ResponseEntity.ok(conferenceService.update(id, dto));
+    public ResponseEntity<ConferenceResponseDTO> updateConference(@Valid @PathVariable Integer id, @RequestBody ConferenceDTO dto) {
+        return ResponseEntity.ok(conferenceService.updateConference(id, dto));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a conference")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
-        conferenceService.delete(id);
+    public ResponseEntity<Void> deleteConference(@PathVariable Integer id) {
+        conferenceService.deleteConference(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/open-submissions")
+    @Operation(summary = "Open submissions for a conference by setting status to ONGOING")
+    public ResponseEntity<ConferenceResponseDTO> openSubmissions(@PathVariable Integer id) {
+        ConferenceResponseDTO response = conferenceService.openSubmissions(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/approve-conference")
+    @Operation(summary = "Approve for a conference by setting status to SCHEDULED")
+    public ResponseEntity<ConferenceResponseDTO> approveConference(@PathVariable Integer id) {
+        ConferenceResponseDTO response = conferenceService.approveConference(id);
+        return ResponseEntity.ok(response);
     }
 }

@@ -13,6 +13,7 @@ import com.capstone.confms.entity.UserRole;
 import com.capstone.confms.repository.RoleRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.repository.UserRoleRepository;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.security.jwt.JwtTokenProvider;
 import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.AuthService;
@@ -26,6 +27,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +45,9 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder encoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
+
+    private static final int OTP_LENGTH = 6;
+    private static final long OTP_TTL_MINUTES = 5;
 
     @Override
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
@@ -67,7 +73,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public MessageResponse registerUser(UserDTO signUpRequest) {
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            throw new RuntimeException("Error: Email is already in use!");
+            throw new BadRequestException("Email is already in use");
         }
 
         // Create new user's account
@@ -88,12 +94,12 @@ public class AuthServiceImpl implements AuthService {
         if (strRoles == null || strRoles.isEmpty()) {
             // Default role is AUTHOR
             Role authorRole = roleRepository.findByName("AUTHOR")
-                    .orElseThrow(() -> new RuntimeException("Error: Role AUTHOR is not found."));
+                    .orElseThrow(() -> new BadRequestException("Role AUTHOR is not found"));
             roles.add(authorRole);
         } else {
             strRoles.forEach(roleName -> {
                 Role foundRole = roleRepository.findByName(roleName.toUpperCase())
-                        .orElseThrow(() -> new RuntimeException("Error: Role " + roleName + " is not found."));
+                        .orElseThrow(() -> new BadRequestException("Role " + roleName + " is not found"));
                 roles.add(foundRole);
             });
         }
@@ -111,48 +117,20 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public MessageResponse requestOtp() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        User user = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new RuntimeException("Error: User not found."));
-
-        // Generate OTP
-        String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
-        user.setOtpCode(otp);
-        user.setOtpExpiration(java.time.LocalDateTime.now().plusMinutes(5));
-        userRepository.save(user);
-
-        // Send Email
-        emailService.sendSimpleMessage(
-                user.getEmail(),
-                "Change Password OTP",
-                "Your OTP for changing password is: " + otp + "\nThis OTP is valid for 5 minutes.");
+        User user = getCurrentAuthenticatedUser();
+        sendOtpEmail(user, "Change Password OTP", "Your OTP for changing password is: ");
 
         return new MessageResponse("OTP sent to your email!");
     }
 
     @Override
     public MessageResponse changePassword(ChangePasswordRequest changePasswordRequest) {
-        // Get current user from security context
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        User user = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new RuntimeException("Error: User not found."));
-
-        // Verify OTP
-        if (user.getOtpCode() == null || !user.getOtpCode().equals(changePasswordRequest.getOtp())) {
-            throw new RuntimeException("Error: Invalid OTP!");
-        }
-
-        if (user.getOtpExpiration().isBefore(java.time.LocalDateTime.now())) {
-            throw new RuntimeException("Error: OTP has expired!");
-        }
+        User user = getCurrentAuthenticatedUser();
+        validateOtp(user, changePasswordRequest.getOtp());
 
         // Verify current password
         if (!encoder.matches(changePasswordRequest.getCurrentPassword(), user.getPassword())) {
-            throw new RuntimeException("Error: Current password is incorrect!");
+            throw new BadRequestException("Current password is incorrect");
         }
 
         // Update password
@@ -167,19 +145,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public MessageResponse forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Error: User not found with email: " + request.getEmail()));
+                .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
 
-        // Generate OTP
-        String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
-        user.setOtpCode(otp);
-        user.setOtpExpiration(java.time.LocalDateTime.now().plusMinutes(5));
-        userRepository.save(user);
-
-        // Send Email
-        emailService.sendSimpleMessage(
-                user.getEmail(),
-                "Password Reset OTP",
-                "Your OTP for password reset is: " + otp + "\nThis OTP is valid for 5 minutes.");
+        sendOtpEmail(user, "Password Reset OTP", "Your OTP for password reset is: ");
 
         return new MessageResponse("OTP sent to your email!");
     }
@@ -188,15 +156,9 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public MessageResponse resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Error: User not found with email: " + request.getEmail()));
+                .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
 
-        if (user.getOtpCode() == null || !user.getOtpCode().equals(request.getOtp())) {
-            throw new RuntimeException("Error: Invalid OTP!");
-        }
-
-        if (user.getOtpExpiration().isBefore(java.time.LocalDateTime.now())) {
-            throw new RuntimeException("Error: OTP has expired!");
-        }
+        validateOtp(user, request.getOtp());
 
         // Update Password
         user.setPassword(encoder.encode(request.getNewPassword()));
@@ -205,5 +167,47 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
         return new MessageResponse("Password reset successfully!");
+    }
+
+    private User getCurrentAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("No authenticated user found");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new BadRequestException("User not found"));
+    }
+
+    private String generateOtp() {
+        SecureRandom secureRandom = new SecureRandom();
+        int bound = (int) Math.pow(10, OTP_LENGTH);
+        int min = (int) Math.pow(10, OTP_LENGTH - 1);
+        int otpValue = secureRandom.nextInt(bound - min) + min;
+        return String.valueOf(otpValue);
+    }
+
+    private void assignOtpToUser(User user, String otp) {
+        user.setOtpCode(otp);
+        user.setOtpExpiration(LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES));
+        userRepository.save(user);
+    }
+
+    private void sendOtpEmail(User user, String subject, String messagePrefix) {
+        String otp = generateOtp();
+        assignOtpToUser(user, otp);
+        emailService.sendSimpleMessage(
+                user.getEmail(),
+                subject,
+                messagePrefix + otp + "\nThis OTP is valid for " + OTP_TTL_MINUTES + " minutes.");
+    }
+
+    private void validateOtp(User user, String otp) {
+        if (user.getOtpCode() == null || !user.getOtpCode().equals(otp)) {
+            throw new BadRequestException("Invalid OTP");
+        }
+        if (user.getOtpExpiration() == null || user.getOtpExpiration().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("OTP has expired");
+        }
     }
 }

@@ -23,10 +23,9 @@ public class UserDTO {
     @NotBlank(message = "Password is required")
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
+    @NotBlank(message = "Phone number is required")
     @Pattern(regexp = "^\\d{10,15}$", message = "Phone number must be between 10 and 15 digits")
     private String phoneNumber;
     private String country;
-    private Boolean isActive;
-
     private java.util.Set<String> roles;
 }

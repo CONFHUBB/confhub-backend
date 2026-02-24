@@ -6,6 +6,8 @@ import com.capstone.confms.dto.request.ForgotPasswordRequest;
 import com.capstone.confms.dto.request.LoginRequest;
 import com.capstone.confms.dto.request.ResetPasswordRequest;
 import com.capstone.confms.service.AuthService;
+import com.capstone.confms.dto.response.JwtResponse;
+import com.capstone.confms.dto.response.MessageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,32 +22,32 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         return ResponseEntity.ok(authService.authenticateUser(loginRequest));
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody UserDTO signUpRequest) {
+    public ResponseEntity<MessageResponse> registerUser(@Valid @RequestBody UserDTO signUpRequest) {
         return ResponseEntity.ok(authService.registerUser(signUpRequest));
     }
 
     @PostMapping("/request-otp")
-    public ResponseEntity<?> requestOtp() {
+    public ResponseEntity<MessageResponse> requestOtp() {
         return ResponseEntity.ok(authService.requestOtp());
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
+    public ResponseEntity<MessageResponse> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
         return ResponseEntity.ok(authService.changePassword(changePasswordRequest));
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         return ResponseEntity.ok(authService.forgotPassword(request));
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(authService.resetPassword(request));
     }
 }

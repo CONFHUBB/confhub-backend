@@ -76,7 +76,9 @@ public class UserServiceImpl implements UserService {
         entity.setPassword(dto.getPassword());
         entity.setPhoneNumber(dto.getPhoneNumber());
         entity.setCountry(dto.getCountry());
-        entity.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : false);
+        if (entity.getIsActive() == null) {
+            entity.setIsActive(Boolean.TRUE);
+        }
         entity.setCreatedAt(LocalDateTime.now());
     }
 

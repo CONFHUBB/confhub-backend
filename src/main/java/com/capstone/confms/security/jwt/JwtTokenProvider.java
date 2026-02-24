@@ -1,5 +1,6 @@
 package com.capstone.confms.security.jwt;
 
+import com.capstone.confms.security.services.UserDetailsImpl;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -7,11 +8,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtTokenProvider {
@@ -28,14 +32,65 @@ public class JwtTokenProvider {
     }
 
     public String generateJwtToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        Object principal = authentication.getPrincipal();
 
-        return Jwts.builder()
-                .subject(userPrincipal.getUsername())
+        String username;
+        Integer id = null;
+        String fullName = null;
+        String email = null;
+        String phoneNumber = null;
+        String country = null;
+        Boolean isActive = null;
+        List<String> roles = null;
+
+        if (principal instanceof UserDetailsImpl userDetails) {
+            username = userDetails.getUsername();
+            id = userDetails.getId();
+            fullName = userDetails.getFullName();
+            email = userDetails.getEmail();
+            phoneNumber = userDetails.getPhoneNumber();
+            country = userDetails.getCountry();
+            isActive = userDetails.isEnabled();
+            roles = userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
+        } else if (principal instanceof UserDetails userDetails) {
+            username = userDetails.getUsername();
+            email = userDetails.getUsername();
+        } else {
+            username = authentication.getName();
+            email = authentication.getName();
+        }
+
+        JwtBuilder builder = Jwts.builder()
+                .subject(username)
                 .issuedAt(new Date())
                 .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(key())
-                .compact();
+                .signWith(key());
+
+        if (id != null) {
+            builder.claim("id", id);
+        }
+        if (fullName != null) {
+            builder.claim("fullName", fullName);
+        }
+        if (email != null) {
+            builder.claim("email", email);
+        }
+        if (phoneNumber != null) {
+            builder.claim("phoneNumber", phoneNumber);
+        }
+        if (country != null) {
+            builder.claim("country", country);
+        }
+        if (isActive != null) {
+            builder.claim("isActive", isActive);
+        }
+        if (roles != null) {
+            builder.claim("roles", roles);
+        }
+
+        return builder.compact();
     }
 
     public String getUserNameFromJwtToken(String token) {

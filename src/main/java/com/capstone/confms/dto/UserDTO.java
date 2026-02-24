@@ -27,4 +27,6 @@ public class UserDTO {
     private String phoneNumber;
     private String country;
     private Boolean isActive;
+
+    private java.util.Set<String> roles;
 }

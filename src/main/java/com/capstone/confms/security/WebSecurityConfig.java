@@ -61,7 +61,9 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password",
-                                "/api/v1/auth/request-otp")
+                                "/api/v1/auth/request-otp",
+                                "/api/v1/email/accept/**",
+                                "/api/v1/email/decline/**")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated());

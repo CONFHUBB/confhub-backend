@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ReviewScoreDTO;
 import com.capstone.confms.dto.response.ReviewScoreResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Review;
 import com.capstone.confms.entity.ReviewCriterion;
 import com.capstone.confms.entity.ReviewScore;
@@ -10,15 +11,18 @@ import com.capstone.confms.repository.ReviewCriterionRepository;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.ReviewScoreRepository;
 import com.capstone.confms.service.ReviewScoreService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -30,10 +34,11 @@ public class ReviewScoreServiceImpl implements ReviewScoreService {
     private final ReviewCriterionRepository reviewCriterionRepository;
 
     @Override
-    public List<ReviewScoreResponseDTO> getAllReviewScores() {
-        return reviewScoreRepository.findAll().stream()
-                .map(this::mapToReviewScoreResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ReviewScoreResponseDTO> getAllReviewScores(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ReviewScore> reviewScores = reviewScoreRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(reviewScores, this::mapToReviewScoreResponseDTO);
     }
 
     @Override

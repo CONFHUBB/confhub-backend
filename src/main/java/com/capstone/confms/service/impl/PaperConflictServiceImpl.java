@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.PaperConflictDTO;
 import com.capstone.confms.dto.response.PaperConflictResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.PaperConflict;
 import com.capstone.confms.entity.User;
@@ -10,15 +11,18 @@ import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.PaperConflictService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -30,10 +34,11 @@ public class PaperConflictServiceImpl implements PaperConflictService {
     private final UserRepository userRepository;
 
     @Override
-    public List<PaperConflictResponseDTO> getAllPaperConflicts() {
-        return paperConflictRepository.findAll().stream()
-                .map(this::mapToPaperConflictResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperConflictResponseDTO> getAllPaperConflicts(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperConflict> paperConflicts = paperConflictRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(paperConflicts, this::mapToPaperConflictResponseDTO);
     }
 
     @Override

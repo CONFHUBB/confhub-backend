@@ -2,11 +2,12 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.ReviewTypeDTO;
 import com.capstone.confms.dto.response.ReviewTypeResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ReviewTypeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +28,13 @@ public class ReviewTypeController {
 
     @GetMapping
     @Operation(summary = "Get all Review Types")
-    public ResponseEntity<List<ReviewTypeResponseDTO>> getAllReviewTypes() {
-        return ResponseEntity.ok(reviewTypeService.getAllReviewTypes());
+    public ResponseEntity<PagedResponse<ReviewTypeResponseDTO>> getAllReviewTypes(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(reviewTypeService.getAllReviewTypes(page, size));
     }
 
     @GetMapping("/{id}")
@@ -39,7 +45,8 @@ public class ReviewTypeController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Review Type details")
-    public ResponseEntity<ReviewTypeResponseDTO> updateReviewType(@Valid @PathVariable Integer id, @RequestBody ReviewTypeDTO dto) {
+    public ResponseEntity<ReviewTypeResponseDTO> updateReviewType(@Valid @PathVariable Integer id,
+            @RequestBody ReviewTypeDTO dto) {
         return ResponseEntity.ok(reviewTypeService.updateReviewType(id, dto));
     }
 

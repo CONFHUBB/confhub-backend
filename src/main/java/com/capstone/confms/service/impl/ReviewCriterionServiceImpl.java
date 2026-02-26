@@ -6,30 +6,32 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewCriterionService;
-import com.capstone.confms.service.ReviewService;
+import com.capstone.confms.utils.PaginationUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ReviewCriterionServiceImpl implements ReviewCriterionService {
 
-
     private final ReviewCriterionRepository reviewCriterionRepository;
     private final ConferenceReviewFormRepository conferenceReviewFormRepository;
 
     @Override
-    public List<ReviewCriterionResponseDTO> getAllReviewCriteria() {
-        return reviewCriterionRepository.findAll().stream()
-                .map(this::mapToReviewCriterionResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ReviewCriterionResponseDTO> getAllReviewCriteria(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ReviewCriterion> reviewCriteria = reviewCriterionRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(reviewCriteria, this::mapToReviewCriterionResponseDTO);
     }
 
     @Override
@@ -67,8 +69,10 @@ public class ReviewCriterionServiceImpl implements ReviewCriterionService {
 
     private void mapDtoToReviewCriterionEntity(ReviewCriterionDTO dto, ReviewCriterion entity) {
 
-        ConferenceReviewForm conferenceReviewForm = conferenceReviewFormRepository.findById(dto.getConferenceReviewFormId())
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + dto.getConferenceReviewFormId()));
+        ConferenceReviewForm conferenceReviewForm = conferenceReviewFormRepository
+                .findById(dto.getConferenceReviewFormId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Paper not found with id " + dto.getConferenceReviewFormId()));
 
         entity.setConferenceReviewForm(conferenceReviewForm);
         entity.setName(dto.getName());

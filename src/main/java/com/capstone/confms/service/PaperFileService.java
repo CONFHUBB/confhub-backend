@@ -3,14 +3,12 @@ package com.capstone.confms.service;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 
-import java.util.List;
-
 public interface PaperFileService {
     PaperFileResponseDTO createPaperFile(PaperFileDTO dto);
 
     PaperFileResponseDTO updatePaperFile(Integer id, PaperFileDTO dto);
 
-    List<PaperFileResponseDTO> getAllPaperFiles();
+    PagedResponse<PaperFileResponseDTO> getAllPaperFiles(int page, int size);
 
     PaperFileResponseDTO getPaperFileById(Integer id);
 

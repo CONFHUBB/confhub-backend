@@ -2,18 +2,21 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceReviewFormDTO;
 import com.capstone.confms.dto.response.ConferenceReviewFormResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.ConferenceReviewForm;
 import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.repository.ConferenceReviewFormRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.service.ConferenceReviewFormService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +31,8 @@ public class ConferenceReviewFormServiceImpl implements ConferenceReviewFormServ
         validateScores(dto);
 
         ConferenceTrack track = conferenceTrackRepository.findById(dto.getConferenceTrackId())
-                .orElseThrow(() -> new EntityNotFoundException("Conference Track not found with ID: " + dto.getConferenceTrackId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Conference Track not found with ID: " + dto.getConferenceTrackId()));
 
         ConferenceReviewForm form = new ConferenceReviewForm();
         form.setConferenceTrack(track);
@@ -46,9 +50,11 @@ public class ConferenceReviewFormServiceImpl implements ConferenceReviewFormServ
         ConferenceReviewForm form = reviewFormRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Review Form not found with ID: " + id));
 
-        if (dto.getConferenceTrackId() != null && !dto.getConferenceTrackId().equals(form.getConferenceTrack().getId())) {
+        if (dto.getConferenceTrackId() != null
+                && !dto.getConferenceTrackId().equals(form.getConferenceTrack().getId())) {
             ConferenceTrack newTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
-                    .orElseThrow(() -> new EntityNotFoundException("Conference Track not found with ID: " + dto.getConferenceTrackId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Conference Track not found with ID: " + dto.getConferenceTrackId()));
             form.setConferenceTrack(newTrack);
         }
 
@@ -65,17 +71,19 @@ public class ConferenceReviewFormServiceImpl implements ConferenceReviewFormServ
     }
 
     @Override
-    public List<ConferenceReviewFormResponseDTO> getAllReviewForms() {
-        return reviewFormRepository.findAll().stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceReviewFormResponseDTO> getAllReviewForms(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceReviewForm> forms = reviewFormRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(forms, this::mapEntityToResponse);
     }
 
     @Override
-    public List<ConferenceReviewFormResponseDTO> getReviewFormsByTrackId(Integer trackId) {
-        return reviewFormRepository.findByConferenceTrackId(trackId).stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceReviewFormResponseDTO> getReviewFormsByTrackId(Integer trackId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceReviewForm> forms = reviewFormRepository.findByConferenceTrackId(trackId, pageable);
+        return PaginationUtils.toPagedResponse(forms, this::mapEntityToResponse);
     }
 
     @Override

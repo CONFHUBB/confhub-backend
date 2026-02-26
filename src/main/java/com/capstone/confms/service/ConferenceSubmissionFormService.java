@@ -2,8 +2,7 @@ package com.capstone.confms.service;
 
 import com.capstone.confms.dto.ConferenceSubmissionFormDTO;
 import com.capstone.confms.dto.response.ConferenceSubmissionFormResponseDTO;
-
-import java.util.List;
+import com.capstone.confms.dto.response.PagedResponse;
 
 public interface ConferenceSubmissionFormService {
     ConferenceSubmissionFormResponseDTO createSubmissionForm(ConferenceSubmissionFormDTO dto);
@@ -12,9 +11,9 @@ public interface ConferenceSubmissionFormService {
 
     ConferenceSubmissionFormResponseDTO getSubmissionFormById(Integer id);
 
-    List<ConferenceSubmissionFormResponseDTO> getAllSubmissionForms();
+    PagedResponse<ConferenceSubmissionFormResponseDTO> getAllSubmissionForms(int page, int size);
 
-    List<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId);
+    PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId, int page, int size);
 
     void deleteSubmissionForm(Integer id);
 }

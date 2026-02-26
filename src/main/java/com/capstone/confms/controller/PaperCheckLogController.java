@@ -2,6 +2,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.PaperCheckLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,8 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/paper-check-log")
 @RequiredArgsConstructor
@@ -20,7 +19,6 @@ import java.util.List;
 public class PaperCheckLogController {
 
     private final PaperCheckLogService paperCheckLogService;
-
 
     @PostMapping
     @Operation(summary = "Create a new Paper Check Log")
@@ -30,8 +28,13 @@ public class PaperCheckLogController {
 
     @GetMapping
     @Operation(summary = "Get all Paper Check Logs")
-    public ResponseEntity<List<PaperCheckLogResponseDTO>> getAllPaperCheckLogs() {
-        return ResponseEntity.ok(paperCheckLogService.getAllPaperCheckLogs());
+    public ResponseEntity<PagedResponse<PaperCheckLogResponseDTO>> getAllPaperCheckLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(paperCheckLogService.getAllPaperCheckLogs(page, size));
     }
 
     @GetMapping("/{id}")
@@ -42,7 +45,8 @@ public class PaperCheckLogController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Paper Check Log details")
-    public ResponseEntity<PaperCheckLogResponseDTO> updatePaperCheckLog(@Valid @PathVariable Integer id, @RequestBody PaperCheckLogDTO dto) {
+    public ResponseEntity<PaperCheckLogResponseDTO> updatePaperCheckLog(@Valid @PathVariable Integer id,
+            @RequestBody PaperCheckLogDTO dto) {
         return ResponseEntity.ok(paperCheckLogService.updatePaperCheckLog(id, dto));
     }
 

@@ -2,6 +2,8 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.ReviewScoreDTO;
 import com.capstone.confms.dto.response.ReviewScoreResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ReviewScoreService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,8 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/review-controller")
@@ -29,8 +29,13 @@ public class ReviewScoreController {
 
     @GetMapping
     @Operation(summary = "Get all Review Scores")
-    public ResponseEntity<List<ReviewScoreResponseDTO>> getAllReviewScores() {
-        return ResponseEntity.ok(reviewScoreService.getAllReviewScores());
+    public ResponseEntity<PagedResponse<ReviewScoreResponseDTO>> getAllReviewScores(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(reviewScoreService.getAllReviewScores(page, size));
     }
 
     @GetMapping("/{id}")
@@ -41,7 +46,8 @@ public class ReviewScoreController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Review Score details")
-    public ResponseEntity<ReviewScoreResponseDTO> updateReviewScore(@Valid @PathVariable Integer id, @RequestBody ReviewScoreDTO dto) {
+    public ResponseEntity<ReviewScoreResponseDTO> updateReviewScore(@Valid @PathVariable Integer id,
+            @RequestBody ReviewScoreDTO dto) {
         return ResponseEntity.ok(reviewScoreService.updateReviewScore(id, dto));
     }
 

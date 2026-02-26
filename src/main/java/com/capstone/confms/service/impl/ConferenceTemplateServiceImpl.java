@@ -1,18 +1,21 @@
 package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceTemplateDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceTemplate;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTemplateRepository;
 import com.capstone.confms.service.ConferenceTemplateService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +28,8 @@ public class ConferenceTemplateServiceImpl implements ConferenceTemplateService 
     @Transactional
     public ConferenceTemplateDTO createTemplate(ConferenceTemplateDTO dto) {
         Conference conference = conferenceRepository.findById(dto.getConferenceId())
-                .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
 
         ConferenceTemplate template = new ConferenceTemplate();
         mapDtoToEntity(dto, template);
@@ -44,7 +48,8 @@ public class ConferenceTemplateServiceImpl implements ConferenceTemplateService 
 
         if (dto.getConferenceId() != null && !dto.getConferenceId().equals(template.getConference().getId())) {
             Conference newConference = conferenceRepository.findById(dto.getConferenceId())
-                    .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Conference not found with ID: " + dto.getConferenceId()));
             template.setConference(newConference);
         }
 
@@ -62,17 +67,19 @@ public class ConferenceTemplateServiceImpl implements ConferenceTemplateService 
     }
 
     @Override
-    public List<ConferenceTemplateDTO> getAllTemplates() {
-        return templateRepository.findAll().stream()
-                .map(this::mapEntityToDto)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTemplateDTO> getAllTemplates(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTemplate> templates = templateRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(templates, this::mapEntityToDto);
     }
 
     @Override
-    public List<ConferenceTemplateDTO> getTemplatesByConferenceId(Integer conferenceId) {
-        return templateRepository.findByConferenceId(conferenceId).stream()
-                .map(this::mapEntityToDto)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTemplateDTO> getTemplatesByConferenceId(Integer conferenceId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTemplate> templates = templateRepository.findByConferenceId(conferenceId, pageable);
+        return PaginationUtils.toPagedResponse(templates, this::mapEntityToDto);
     }
 
     @Override

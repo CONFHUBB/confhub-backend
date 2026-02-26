@@ -2,8 +2,7 @@ package com.capstone.confms.service;
 
 import com.capstone.confms.dto.ConferenceReviewFormDTO;
 import com.capstone.confms.dto.response.ConferenceReviewFormResponseDTO;
-
-import java.util.List;
+import com.capstone.confms.dto.response.PagedResponse;
 
 public interface ConferenceReviewFormService {
     ConferenceReviewFormResponseDTO createReviewForm(ConferenceReviewFormDTO dto);
@@ -12,9 +11,9 @@ public interface ConferenceReviewFormService {
 
     ConferenceReviewFormResponseDTO getReviewFormById(Integer id);
 
-    List<ConferenceReviewFormResponseDTO> getAllReviewForms();
+    PagedResponse<ConferenceReviewFormResponseDTO> getAllReviewForms(int page, int size);
 
-    List<ConferenceReviewFormResponseDTO> getReviewFormsByTrackId(Integer trackId);
+    PagedResponse<ConferenceReviewFormResponseDTO> getReviewFormsByTrackId(Integer trackId, int page, int size);
 
     void deleteReviewForm(Integer id);
 }

@@ -2,6 +2,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.PaperRebuttalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/paper-rebuttal")
@@ -29,8 +28,13 @@ public class PaperRebuttalController {
 
     @GetMapping
     @Operation(summary = "Get all Paper Rebuttals")
-    public ResponseEntity<List<PaperRebuttalResponseDTO>> getAllPaperRebuttals() {
-        return ResponseEntity.ok(paperRebuttalService.getAllPaperRebuttals());
+    public ResponseEntity<PagedResponse<PaperRebuttalResponseDTO>> getAllPaperRebuttals(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(paperRebuttalService.getAllPaperRebuttals(page, size));
     }
 
     @GetMapping("/{id}")
@@ -41,7 +45,8 @@ public class PaperRebuttalController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Paper Rebuttal details")
-    public ResponseEntity<PaperRebuttalResponseDTO> updatePaperRebuttal(@Valid @PathVariable Integer id, @RequestBody PaperRebuttalDTO dto) {
+    public ResponseEntity<PaperRebuttalResponseDTO> updatePaperRebuttal(@Valid @PathVariable Integer id,
+            @RequestBody PaperRebuttalDTO dto) {
         return ResponseEntity.ok(paperRebuttalService.updatePaperRebuttal(id, dto));
     }
 

@@ -2,18 +2,21 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceTrackDTO;
 import com.capstone.confms.dto.response.ConferenceTrackResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.service.ConferenceTrackService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +31,8 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         validateDates(dto);
 
         Conference conference = conferenceRepository.findById(dto.getConferenceId())
-                .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
 
         ConferenceTrack track = new ConferenceTrack();
         mapRequestDtoToEntity(dto, track);
@@ -49,12 +53,13 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
 
         if (dto.getConferenceId() != null && !dto.getConferenceId().equals(track.getConference().getId())) {
             Conference newConference = conferenceRepository.findById(dto.getConferenceId())
-                    .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Conference not found with ID: " + dto.getConferenceId()));
             track.setConference(newConference);
         }
 
         mapRequestDtoToEntity(dto, track);
-        
+
         ConferenceTrack updatedTrack = trackRepository.save(track);
         return mapEntityToResponse(updatedTrack);
     }
@@ -67,21 +72,23 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
     }
 
     @Override
-    public List<ConferenceTrackResponseDTO> getAllTracks() {
-        return trackRepository.findAll().stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTrackResponseDTO> getAllTracks(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTrack> tracks = trackRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(tracks, this::mapEntityToResponse);
     }
 
     @Override
-    public List<ConferenceTrackResponseDTO> getTracksByConferenceId(Integer conferenceId){
-        if(!conferenceRepository.existsById(conferenceId)) {
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTrackResponseDTO> getTracksByConferenceId(Integer conferenceId, int page, int size) {
+        if (!conferenceRepository.existsById(conferenceId)) {
             throw new EntityNotFoundException("Track not found with Conference ID: " + conferenceId);
         }
 
-        return trackRepository.findByConferenceId(conferenceId).stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTrack> tracks = trackRepository.findByConferenceId(conferenceId, pageable);
+        return PaginationUtils.toPagedResponse(tracks, this::mapEntityToResponse);
     }
 
     @Override
@@ -93,10 +100,9 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         trackRepository.deleteById(id);
     }
 
-
     private void validateDates(ConferenceTrackDTO dto) {
-        if (dto.getSubmissionStart() != null && dto.getSubmissionEnd() != null 
-            && dto.getSubmissionStart().isAfter(dto.getSubmissionEnd())) {
+        if (dto.getSubmissionStart() != null && dto.getSubmissionEnd() != null
+                && dto.getSubmissionStart().isAfter(dto.getSubmissionEnd())) {
             throw new IllegalArgumentException("Submission Start date cannot be after End date");
         }
     }

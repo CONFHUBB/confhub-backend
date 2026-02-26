@@ -6,16 +6,18 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.PaperRebuttalService;
-import com.capstone.confms.service.PaperService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -28,10 +30,11 @@ public class PaperRebuttalServiceImpl implements PaperRebuttalService {
     private final ReviewRepository reviewRepository;
 
     @Override
-    public List<PaperRebuttalResponseDTO> getAllPaperRebuttals() {
-        return paperRebuttalRepository.findAll().stream()
-                .map(this::mapToPaperRebuttalResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperRebuttalResponseDTO> getAllPaperRebuttals(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperRebuttal> paperRebuttals = paperRebuttalRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(paperRebuttals, this::mapToPaperRebuttalResponseDTO);
     }
 
     @Override

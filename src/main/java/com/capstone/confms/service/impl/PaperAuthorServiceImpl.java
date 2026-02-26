@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.PaperAuthorDTO;
 import com.capstone.confms.dto.response.PaperAuthorResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.PaperAuthor;
 import com.capstone.confms.entity.User;
@@ -10,15 +11,18 @@ import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.PaperAuthorService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -30,17 +34,19 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     private final UserRepository userRepository;
 
     @Override
-    public List<PaperAuthorResponseDTO> getAllPaperAuthors() {
-        return paperAuthorRepository.findAll().stream()
-                .map(this::mapToPaperAuthorResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperAuthorResponseDTO> getAllPaperAuthors(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperAuthor> paperAuthors = paperAuthorRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(paperAuthors, this::mapToPaperAuthorResponseDTO);
     }
 
     @Override
-    public List<PaperAuthorResponseDTO> getAuthorsByPaper(Integer paperId) {
-        return paperAuthorRepository.findByPaperId(paperId).stream()
-                .map(this::mapToPaperAuthorResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperAuthorResponseDTO> getAuthorsByPaper(Integer paperId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperAuthor> paperAuthors = paperAuthorRepository.findByPaperId(paperId, pageable);
+        return PaginationUtils.toPagedResponse(paperAuthors, this::mapToPaperAuthorResponseDTO);
     }
 
     @Override

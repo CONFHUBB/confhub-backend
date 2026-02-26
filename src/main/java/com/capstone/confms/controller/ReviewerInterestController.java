@@ -2,6 +2,8 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.ReviewerInterestDTO;
 import com.capstone.confms.dto.response.ReviewerInterestResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ReviewerInterestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,8 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/reviewer-interest")
@@ -23,14 +23,20 @@ public class ReviewerInterestController {
 
     @PostMapping
     @Operation(summary = "Create a new Reviewer Interest")
-    public ResponseEntity<ReviewerInterestResponseDTO> createReviewerInterest(@Valid @RequestBody ReviewerInterestDTO dto) {
+    public ResponseEntity<ReviewerInterestResponseDTO> createReviewerInterest(
+            @Valid @RequestBody ReviewerInterestDTO dto) {
         return new ResponseEntity<>(reviewerInterestService.createReviewerInterest(dto), HttpStatus.CREATED);
     }
 
     @GetMapping
     @Operation(summary = "Get all Reviewer Interests")
-    public ResponseEntity<List<ReviewerInterestResponseDTO>> getAllReviewerInterests() {
-        return ResponseEntity.ok(reviewerInterestService.getAllReviewerInterests());
+    public ResponseEntity<PagedResponse<ReviewerInterestResponseDTO>> getAllReviewerInterests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(reviewerInterestService.getAllReviewerInterests(page, size));
     }
 
     @GetMapping("/{id}")
@@ -41,7 +47,8 @@ public class ReviewerInterestController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Reviewer Interest details")
-    public ResponseEntity<ReviewerInterestResponseDTO> updateReviewerInterest(@Valid @PathVariable Integer id, @RequestBody ReviewerInterestDTO dto) {
+    public ResponseEntity<ReviewerInterestResponseDTO> updateReviewerInterest(@Valid @PathVariable Integer id,
+            @RequestBody ReviewerInterestDTO dto) {
         return ResponseEntity.ok(reviewerInterestService.updateReviewerInterest(id, dto));
     }
 

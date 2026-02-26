@@ -3,8 +3,6 @@ package com.capstone.confms.service;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 
-import java.util.List;
-
 public interface PaperService {
 
     PaperResponseDTO createPaper(PaperDTO dto);
@@ -13,7 +11,7 @@ public interface PaperService {
 
     PaperResponseDTO updatePaperStatus(Integer id, PaperUpdateStatusDTO dto);
 
-    List<PaperResponseDTO> getAllPapers();
+    PagedResponse<PaperResponseDTO> getAllPapers(int page, int size);
 
     PaperResponseDTO getPaperById(Integer id);
 
@@ -23,6 +21,6 @@ public interface PaperService {
     /**
      * Retrieve all papers associated with a specific author (user) by their ID.
      */
-    List<PaperResponseDTO> getPapersByAuthor(Integer authorId);
+    PagedResponse<PaperResponseDTO> getPapersByAuthor(Integer authorId, int page, int size);
 
 }

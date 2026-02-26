@@ -2,18 +2,21 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceTrackTopicDTO;
 import com.capstone.confms.dto.response.ConferenceTrackTopicResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.entity.ConferenceTrackTopic;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.repository.ConferenceTrackTopicRepository;
 import com.capstone.confms.service.ConferenceTrackTopicService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +29,8 @@ public class ConferenceTrackTopicServiceImpl implements ConferenceTrackTopicServ
     @Transactional
     public ConferenceTrackTopicResponseDTO createTopic(ConferenceTrackTopicDTO dto) {
         ConferenceTrack track = trackRepository.findById(dto.getTrackId())
-                .orElseThrow(() -> new EntityNotFoundException("Conference Track not found with ID: " + dto.getTrackId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Conference Track not found with ID: " + dto.getTrackId()));
 
         ConferenceTrackTopic topic = new ConferenceTrackTopic();
         topic.setTrack(track);
@@ -45,7 +49,8 @@ public class ConferenceTrackTopicServiceImpl implements ConferenceTrackTopicServ
         // Update Track relationship if changed
         if (dto.getTrackId() != null && !dto.getTrackId().equals(topic.getTrack().getId())) {
             ConferenceTrack newTrack = trackRepository.findById(dto.getTrackId())
-                    .orElseThrow(() -> new EntityNotFoundException("Conference Track not found with ID: " + dto.getTrackId()));
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Conference Track not found with ID: " + dto.getTrackId()));
             topic.setTrack(newTrack);
         }
 
@@ -62,21 +67,23 @@ public class ConferenceTrackTopicServiceImpl implements ConferenceTrackTopicServ
     }
 
     @Override
-    public List<ConferenceTrackTopicResponseDTO> getAllTopics() {
-        return topicRepository.findAll().stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTrackTopicResponseDTO> getAllTopics(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTrackTopic> topics = topicRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(topics, this::mapEntityToResponse);
     }
 
     @Override
-    public List<ConferenceTrackTopicResponseDTO> getTopicsByTrackId(Integer trackId) {
-        if(!trackRepository.existsById(trackId)) {
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceTrackTopicResponseDTO> getTopicsByTrackId(Integer trackId, int page, int size) {
+        if (!trackRepository.existsById(trackId)) {
             throw new EntityNotFoundException("Topic not found with Track ID: " + trackId);
         }
 
-        return topicRepository.findByTrackId(trackId).stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceTrackTopic> topics = topicRepository.findByTrackId(trackId, pageable);
+        return PaginationUtils.toPagedResponse(topics, this::mapEntityToResponse);
     }
 
     @Override

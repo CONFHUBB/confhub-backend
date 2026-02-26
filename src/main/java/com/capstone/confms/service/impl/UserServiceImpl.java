@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.UserDTO;
 import com.capstone.confms.dto.response.UserResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.UserRepository;
@@ -12,8 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.capstone.confms.utils.PaginationUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @Service
 @Slf4j
@@ -23,10 +27,11 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
-    public List<UserResponseDTO> getAllUsers() {
-        return userRepository.findAll().stream()
-                             .map(this::mapToResponseDTO)
-                             .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<UserResponseDTO> getAllUsers(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<User> users = userRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(users, this::mapToResponseDTO);
     }
 
     @Override

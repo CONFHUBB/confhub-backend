@@ -2,20 +2,21 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceSubmissionFormDTO;
 import com.capstone.confms.dto.response.ConferenceSubmissionFormResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.ConferenceSubmissionForm;
 import com.capstone.confms.entity.ConferenceTrack;
-import com.capstone.confms.entity.ConferenceTrackTopic;
 import com.capstone.confms.repository.ConferenceSubmissionFormRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
-import com.capstone.confms.repository.ConferenceTrackTopicRepository;
 import com.capstone.confms.service.ConferenceSubmissionFormService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -57,21 +58,24 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
     }
 
     @Override
-    public List<ConferenceSubmissionFormResponseDTO> getAllSubmissionForms() {
-        return submissionFormRepository.findAll().stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceSubmissionFormResponseDTO> getAllSubmissionForms(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceSubmissionForm> forms = submissionFormRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(forms, this::mapEntityToResponse);
     }
 
     @Override
-    public List<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId) {
-        if(!trackRepository.existsById(trackId)) {
+    @Transactional(readOnly = true)
+    public PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId, int page,
+            int size) {
+        if (!trackRepository.existsById(trackId)) {
             throw new EntityNotFoundException("Submission not found with Track ID: " + trackId);
         }
 
-        return submissionFormRepository.findByTrackId(trackId).stream()
-                .map(this::mapEntityToResponse)
-                .collect(Collectors.toList());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ConferenceSubmissionForm> forms = submissionFormRepository.findByTrackId(trackId, pageable);
+        return PaginationUtils.toPagedResponse(forms, this::mapEntityToResponse);
     }
 
     @Override

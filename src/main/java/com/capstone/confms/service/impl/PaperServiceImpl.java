@@ -6,15 +6,18 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.PaperService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -27,10 +30,11 @@ public class PaperServiceImpl implements PaperService {
     private final com.capstone.confms.repository.PaperAuthorRepository paperAuthorRepository;
 
     @Override
-    public List<PaperResponseDTO> getAllPapers() {
-        return paperRepository.findAll().stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperResponseDTO> getAllPapers(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Paper> papers = paperRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(papers, this::mapToResponseDTO);
     }
 
     @Override
@@ -77,15 +81,17 @@ public class PaperServiceImpl implements PaperService {
     }
 
     @Override
-    public List<PaperResponseDTO> getPapersByAuthor(Integer authorId) {
-        return paperAuthorRepository.findByUserId(authorId).stream()
-                .map(pa -> mapToResponseDTO(pa.getPaper()))
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperResponseDTO> getPapersByAuthor(Integer authorId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperAuthor> paperAuthors = paperAuthorRepository.findByUserId(authorId, pageable);
+        return PaginationUtils.toPagedResponse(paperAuthors, pa -> mapToResponseDTO(pa.getPaper()));
     }
 
     private void mapDtoToEntity(PaperDTO dto, Paper entity) {
         ConferenceTrack conferenceTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
-                .orElseThrow(() -> new EntityNotFoundException("Track not found with ID: " + dto.getConferenceTrackId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Track not found with ID: " + dto.getConferenceTrackId()));
         ConferenceTrackTopic topic = conferenceTrackTopicRepository.findById(dto.getTopicId())
                 .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
 

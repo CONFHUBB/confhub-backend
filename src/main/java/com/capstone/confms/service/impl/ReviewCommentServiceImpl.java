@@ -6,15 +6,17 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewCommentService;
-import com.capstone.confms.service.ReviewService;
+import com.capstone.confms.utils.PaginationUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -25,10 +27,11 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
     private final ReviewRepository reviewRepository;
 
     @Override
-    public List<ReviewCommentResponseDTO> getAllReviewComments() {
-        return reviewCommentRepository.findAll().stream()
-                .map(this::mapToReviewCommentResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ReviewCommentResponseDTO> getAllReviewComments(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ReviewComment> reviewComments = reviewCommentRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(reviewComments, this::mapToReviewCommentResponseDTO);
     }
 
     @Override

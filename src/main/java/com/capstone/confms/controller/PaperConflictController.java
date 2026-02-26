@@ -2,8 +2,8 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.PaperConflictService;
-import com.capstone.confms.service.PaperService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/paper-conflict")
@@ -30,8 +28,13 @@ public class PaperConflictController {
 
     @GetMapping
     @Operation(summary = "Get all Paper Conflicts")
-    public ResponseEntity<List<PaperConflictResponseDTO>> getAllPaperConflicts() {
-        return ResponseEntity.ok(paperConflictService.getAllPaperConflicts());
+    public ResponseEntity<PagedResponse<PaperConflictResponseDTO>> getAllPaperConflicts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(paperConflictService.getAllPaperConflicts(page, size));
     }
 
     @GetMapping("/{id}")
@@ -42,7 +45,8 @@ public class PaperConflictController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Paper Conflict details")
-    public ResponseEntity<PaperConflictResponseDTO> updatePaperConflict(@Valid @PathVariable Integer id, @RequestBody PaperConflictDTO dto) {
+    public ResponseEntity<PaperConflictResponseDTO> updatePaperConflict(@Valid @PathVariable Integer id,
+            @RequestBody PaperConflictDTO dto) {
         return ResponseEntity.ok(paperConflictService.updatePaperConflict(id, dto));
     }
 

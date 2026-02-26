@@ -2,6 +2,8 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.PaperFileDTO;
 import com.capstone.confms.dto.response.PaperFileResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.PaperFileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,8 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/paper-file")
@@ -29,8 +29,13 @@ public class PaperFileController {
 
     @GetMapping
     @Operation(summary = "Get all Paper Files")
-    public ResponseEntity<List<PaperFileResponseDTO>> getAllPaperFiles() {
-        return ResponseEntity.ok(paperFileService.getAllPaperFiles());
+    public ResponseEntity<PagedResponse<PaperFileResponseDTO>> getAllPaperFiles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(paperFileService.getAllPaperFiles(page, size));
     }
 
     @GetMapping("/{id}")
@@ -41,7 +46,8 @@ public class PaperFileController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update Paper File details")
-    public ResponseEntity<PaperFileResponseDTO> updatePaperFile(@Valid @PathVariable Integer id, @RequestBody PaperFileDTO dto) {
+    public ResponseEntity<PaperFileResponseDTO> updatePaperFile(@Valid @PathVariable Integer id,
+            @RequestBody PaperFileDTO dto) {
         return ResponseEntity.ok(paperFileService.updatePaperFile(id, dto));
     }
 

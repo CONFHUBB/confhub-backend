@@ -2,7 +2,7 @@ package com.capstone.confms.service;
 
 import com.capstone.confms.dto.ConferenceTrackTopicDTO;
 import com.capstone.confms.dto.response.ConferenceTrackTopicResponseDTO;
-import java.util.List;
+import com.capstone.confms.dto.response.PagedResponse;
 
 public interface ConferenceTrackTopicService {
     ConferenceTrackTopicResponseDTO createTopic(ConferenceTrackTopicDTO dto);
@@ -11,9 +11,9 @@ public interface ConferenceTrackTopicService {
 
     ConferenceTrackTopicResponseDTO getTopicById(Integer id);
 
-    List<ConferenceTrackTopicResponseDTO> getAllTopics();
+    PagedResponse<ConferenceTrackTopicResponseDTO> getAllTopics(int page, int size);
 
-    List<ConferenceTrackTopicResponseDTO> getTopicsByTrackId(Integer trackId);
+    PagedResponse<ConferenceTrackTopicResponseDTO> getTopicsByTrackId(Integer trackId, int page, int size);
 
     void deleteTopic(Integer id);
 }

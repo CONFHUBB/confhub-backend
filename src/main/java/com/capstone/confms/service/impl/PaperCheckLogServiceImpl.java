@@ -2,21 +2,25 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.PaperCheckLogDTO;
 import com.capstone.confms.dto.response.PaperCheckLogResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.PaperCheckLog;
 import com.capstone.confms.entity.PaperFile;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.PaperCheckLogRepository;
 import com.capstone.confms.repository.PaperFileRepository;
 import com.capstone.confms.service.PaperCheckLogService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -27,10 +31,11 @@ public class PaperCheckLogServiceImpl implements PaperCheckLogService {
     private final PaperFileRepository paperFileRepository;
 
     @Override
-    public List<PaperCheckLogResponseDTO> getAllPaperCheckLogs() {
-        return paperCheckLogRepository.findAll().stream()
-                .map(this::mapToPaperCheckLogResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperCheckLogResponseDTO> getAllPaperCheckLogs(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<PaperCheckLog> paperCheckLogs = paperCheckLogRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(paperCheckLogs, this::mapToPaperCheckLogResponseDTO);
     }
 
     @Override

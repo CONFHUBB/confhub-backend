@@ -6,15 +6,18 @@ import com.capstone.confms.entity.*;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewerInterestService;
+import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -26,10 +29,11 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
     private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
 
     @Override
-    public List<ReviewerInterestResponseDTO> getAllReviewerInterests() {
-        return reviewerInterestRepository.findAll().stream()
-                .map(this::mapToReviewerInterestResponseDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PagedResponse<ReviewerInterestResponseDTO> getAllReviewerInterests(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ReviewerInterest> reviewerInterests = reviewerInterestRepository.findAll(pageable);
+        return PaginationUtils.toPagedResponse(reviewerInterests, this::mapToReviewerInterestResponseDTO);
     }
 
     @Override
@@ -69,8 +73,10 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
         User reviewer = userRepository.findById(dto.getReviewerId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewerId()));
 
-        ConferenceTrackTopic conferenceTrackTopic = conferenceTrackTopicRepository.findById(dto.getConferenceTrackTopicId())
-                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getConferenceTrackTopicId()));
+        ConferenceTrackTopic conferenceTrackTopic = conferenceTrackTopicRepository
+                .findById(dto.getConferenceTrackTopicId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Paper not found with ID: " + dto.getConferenceTrackTopicId()));
 
         entity.setReviewer(reviewer);
         entity.setTrackTopic(conferenceTrackTopic);

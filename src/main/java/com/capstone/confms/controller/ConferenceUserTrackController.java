@@ -1,11 +1,14 @@
 package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.request.AssignConferenceUserTrackRequest;
+import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
+import com.capstone.confms.dto.response.UserResponseDTO;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,5 +26,17 @@ public class ConferenceUserTrackController {
     public ResponseEntity<ConferenceUserTrackResponseDTO> assignRole(@Valid @RequestBody AssignConferenceUserTrackRequest request) {
         ConferenceUserTrackResponseDTO result = conferenceUserTrackService.assignRoleToUserTrack(request);
         return new ResponseEntity<>(result, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/conferences/{conferenceId}/track-chairs")
+    @Operation(summary = "Get all users with TRACK_CHAIR role for a conference")
+    public ResponseEntity<List<UserResponseDTO>> getTrackChairsByConferenceId(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(conferenceUserTrackService.getTrackChairsByConferenceId(conferenceId));
+    }
+
+    @GetMapping("/users/{userId}/chaired-conferences")
+    @Operation(summary = "Get all conferences where user is assigned as TRACK_CHAIR")
+    public ResponseEntity<List<ConferenceResponseDTO>> getChairedConferencesByUserId(@PathVariable Integer userId) {
+        return ResponseEntity.ok(conferenceUserTrackService.getChairedConferencesByUserId(userId));
     }
 }

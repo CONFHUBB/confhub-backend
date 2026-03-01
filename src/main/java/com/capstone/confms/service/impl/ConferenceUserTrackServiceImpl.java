@@ -96,6 +96,28 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         return mapToResponseDTO(saved);
     }
 
+    @Override
+    @Transactional
+    public ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId) {
+        ConferenceUserTrack cut = conferenceUserTrackRepository
+                .findByUser_IdAndConference_Id(userId, conferenceId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "ConferenceUserTrack not found for userId=" + userId + " conferenceId=" + conferenceId));
+        cut.setIsAccepted(true);
+        return mapToResponseDTO(conferenceUserTrackRepository.save(cut));
+    }
+
+    @Override
+    @Transactional
+    public ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId) {
+        ConferenceUserTrack cut = conferenceUserTrackRepository
+                .findByUser_IdAndConference_Id(userId, conferenceId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "ConferenceUserTrack not found for userId=" + userId + " conferenceId=" + conferenceId));
+        cut.setIsAccepted(false);
+        return mapToResponseDTO(conferenceUserTrackRepository.save(cut));
+    }
+
     private ConferenceUserTrackResponseDTO mapToResponseDTO(ConferenceUserTrack entity) {
         ConferenceUserTrackResponseDTO dto = new ConferenceUserTrackResponseDTO();
         dto.setId(entity.getId());

@@ -3,12 +3,13 @@ package com.capstone.confms.controller;
 import com.capstone.confms.dto.request.AssignConferenceUserTrackRequest;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,13 +31,25 @@ public class ConferenceUserTrackController {
 
     @GetMapping("/conferences/{conferenceId}/track-chairs")
     @Operation(summary = "Get all users with TRACK_CHAIR role for a conference")
-    public ResponseEntity<List<UserResponseDTO>> getTrackChairsByConferenceId(@PathVariable Integer conferenceId) {
-        return ResponseEntity.ok(conferenceUserTrackService.getTrackChairsByConferenceId(conferenceId));
+    public ResponseEntity<PagedResponse<UserResponseDTO>> getTrackChairsByConferenceId(
+            @PathVariable Integer conferenceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(conferenceUserTrackService.getTrackChairsByConferenceId(conferenceId, page, size));
     }
 
     @GetMapping("/users/{userId}/chaired-conferences")
     @Operation(summary = "Get all conferences where user is assigned as TRACK_CHAIR")
-    public ResponseEntity<List<ConferenceResponseDTO>> getChairedConferencesByUserId(@PathVariable Integer userId) {
-        return ResponseEntity.ok(conferenceUserTrackService.getChairedConferencesByUserId(userId));
+    public ResponseEntity<PagedResponse<ConferenceResponseDTO>> getChairedConferencesByUserId(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(conferenceUserTrackService.getChairedConferencesByUserId(userId, page, size));
     }
 }

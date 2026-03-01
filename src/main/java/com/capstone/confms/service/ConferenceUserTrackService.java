@@ -3,13 +3,14 @@ package com.capstone.confms.service;
 import com.capstone.confms.dto.request.AssignConferenceUserTrackRequest;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
-import java.util.List;
 
 public interface ConferenceUserTrackService {
+
     ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request);
 
-    List<UserResponseDTO> getTrackChairsByConferenceId(Integer conferenceId);
+    PagedResponse<UserResponseDTO> getTrackChairsByConferenceId(Integer conferenceId, int page, int size);
 
-    List<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId);
+    PagedResponse<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId, int page, int size);
 }

@@ -3,6 +3,7 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.request.AssignConferenceUserTrackRequest;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
 import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.Conference;
@@ -34,7 +35,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> getTrackChairsByConferenceId(Integer conferenceId) {
+    public PagedResponse<UserResponseDTO> getTrackChairsByConferenceId(Integer conferenceId, int page, int size) {
         conferenceRepository.findById(conferenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
 
@@ -47,14 +48,16 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 .values().stream()
                 .toList();
 
-        return distinctUsers.stream()
+        List<UserResponseDTO> all = distinctUsers.stream()
                 .map(this::mapUserToResponseDTO)
                 .toList();
+
+        return paginateList(all, page, size);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId) {
+    public PagedResponse<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId, int page, int size) {
         userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
@@ -67,9 +70,11 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 .values().stream()
                 .toList();
 
-        return distinctConferences.stream()
+        List<ConferenceResponseDTO> all = distinctConferences.stream()
                 .map(this::mapConferenceToResponseDTO)
                 .toList();
+
+        return paginateList(all, page, size);
     }
 
     @Override
@@ -129,6 +134,26 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 .endDate(entity.getEndDate())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
+                .build();
+    }
+
+    private <T> PagedResponse<T> paginateList(List<T> items, int page, int size) {
+        int totalElements = items.size();
+        int fromIndex = Math.min(page * size, totalElements);
+        int toIndex = Math.min(fromIndex + size, totalElements);
+
+        List<T> content = items.subList(fromIndex, toIndex);
+
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
+        boolean last = totalPages == 0 || page >= totalPages - 1;
+
+        return PagedResponse.<T>builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .last(last)
                 .build();
     }
 }

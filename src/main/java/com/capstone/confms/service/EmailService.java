@@ -36,20 +36,23 @@ public class EmailService {
     }
 
     @Async
-    public void sendAdvancedEmail(String to, String doctorName, String acceptLink, String declineLink, ByteArrayResource fileData, String fileName) throws MessagingException {
+    public void sendInvitationEmail(String to, String recipientName, String subject, String conferenceName,
+                                    String acceptLink, String declineLink,
+                                    ByteArrayResource fileData, String fileName) throws MessagingException {
         MimeMessage message = emailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
         helper.setFrom(fromEmail);
         helper.setTo(to);
-        helper.setSubject("[Khẩn] Yêu cầu xác nhận kết quả chẩn đoán bệnh truyền nhiễm");
+        helper.setSubject(subject);
 
         Context context = new Context();
-        context.setVariable("doctorName", doctorName);
+        context.setVariable("recipientName", recipientName);
+        context.setVariable("conferenceName", conferenceName);
         context.setVariable("acceptLink", acceptLink);
         context.setVariable("declineLink", declineLink);
 
-        String htmlBody = templateEngine.process("diagnosis-report", context);
+        String htmlBody = templateEngine.process("invitation", context);
         helper.setText(htmlBody, true);
 
         if (fileData != null && fileData.contentLength() > 0 && fileName != null && !fileName.isEmpty()) {

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Conference Invitation</title>
+</head>
+<body>
+<h2 style="color: #2c3e50;">Conference Management System</h2>
+
+<p>Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,</p>
+
+<p>You have been invited to participate in the conference: <strong th:text="${conferenceName}">[Conference Name]</strong>.</p>
+
+<p>Please review the invitation and confirm your participation by clicking one of the buttons below.</p>
+
+<div style="margin-top: 20px;">
+    <a th:href="${acceptLink}"
+       style="padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+        Accept Invitation
+    </a>
+
+    <a th:href="${declineLink}"
+       style="padding: 10px 20px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">
+        Decline Invitation
+    </a>
+</div>
+</body>
+</html>

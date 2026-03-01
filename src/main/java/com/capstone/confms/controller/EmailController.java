@@ -49,23 +49,26 @@ public class EmailController {
     }
 
     @PostMapping(value = "/invite", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Send an HTML email report with optional file attachment", description = "Send an email with HTML content and optional file attachment. The email includes Accept and Decline links for user interaction.")
-    public ResponseEntity<String> sendAdvancedEmail(
+    @Operation(summary = "Send a conference invitation email", description = "Send an HTML invitation email with Accept and Decline links, and an optional file attachment.")
+    public ResponseEntity<String> sendInvitationEmail(
             @RequestParam("to") String to,
-            @RequestParam("doctorName") String doctorName,
+            @RequestParam("recipientName") String recipientName,
+            @RequestParam("subject") String subject,
+            @RequestParam("conferenceName") String conferenceName,
             @RequestPart(value = "file", required = false) MultipartFile file) {
 
         try {
             ByteArrayResource fileData = null;
             String fileName = null;
 
-            if(file != null && !file.isEmpty()) {
+            if (file != null && !file.isEmpty()) {
                 fileData = new ByteArrayResource(file.getBytes());
                 fileName = file.getOriginalFilename();
             }
 
-            emailService.sendAdvancedEmail(to, doctorName, acceptRedirectUrl, declineRedirectUrl, fileData, fileName);
-            return ResponseEntity.ok("Email sent successfully to: " + to);
+            emailService.sendInvitationEmail(to, recipientName, subject, conferenceName,
+                    acceptRedirectUrl, declineRedirectUrl, fileData, fileName);
+            return ResponseEntity.ok("Invitation email sent successfully to: " + to);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Send email unsuccessfully. Internal mail server error: " + e.getMessage());
         }

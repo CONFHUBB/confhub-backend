@@ -1,15 +1,26 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Infectious Disease Diagnosis System</title>
+</head>
 <body>
-<h2 style="color: #2c3e50;">Hệ thống chẩn đoán bệnh truyền nhiễm nhiệt đới</h2>
-<p>Xin chào Bác sĩ <strong th:text="${doctorName}">[Tên Bác sĩ]</strong>,</p>
+<h2 style="color: #2c3e50;">Tropical Infectious Disease Diagnosis System</h2>
 
-<p>Hệ thống vừa hoàn tất phân tích mẫu bệnh phẩm mới. Vui lòng xem thông tin chi tiết và xác nhận kết quả chẩn đoán.</p>
+<p>Dear Dr. <strong th:text="${doctorName}">[Doctor Name]</strong>,</p>
+
+<p>The system has completed the analysis of a new specimen. Please review the details and confirm the diagnostic results.</p>
 
 <div style="margin-top: 20px;">
-    <a th:href="${acceptLink}" style="padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">Xác nhận Kết quả</a>
+    <a th:href="${acceptLink}"
+       style="padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+        Confirm Results
+    </a>
 
-    <a th:href="${declineLink}" style="padding: 10px 20px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">Yêu cầu Xét nghiệm lại</a>
+    <a th:href="${declineLink}"
+       style="padding: 10px 20px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">
+        Request Re-test
+    </a>
 </div>
 </body>
 </html>

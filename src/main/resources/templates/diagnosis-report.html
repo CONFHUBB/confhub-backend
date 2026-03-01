@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Infectious Disease Diagnosis System</title>
+</head>
+<body>
+<h2 style="color: #2c3e50;">Tropical Infectious Disease Diagnosis System</h2>
+
+<p>Dear Dr. <strong th:text="${doctorName}">[Doctor Name]</strong>,</p>
+
+<p>The system has completed the analysis of a new specimen. Please review the details and confirm the diagnostic results.</p>
+
+<div style="margin-top: 20px;">
+    <a th:href="${acceptLink}"
+       style="padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+        Confirm Results
+    </a>
+
+    <a th:href="${declineLink}"
+       style="padding: 10px 20px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">
+        Request Re-test
+    </a>
+</div>
+</body>
+</html>

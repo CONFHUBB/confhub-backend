@@ -52,4 +52,23 @@ public class ConferenceUserTrackController {
         }
         return ResponseEntity.ok(conferenceUserTrackService.getChairedConferencesByUserId(userId, page, size));
     }
+
+    @PutMapping("/accept")
+    @Operation(summary = "Accept conference invitation",
+            description = "Update isAccepted = true for the ConferenceUserTrack record matching userId and conferenceId")
+    public ResponseEntity<ConferenceUserTrackResponseDTO> acceptInvitation(
+            @RequestParam Integer userId,
+            @RequestParam Integer conferenceId) {
+        return ResponseEntity.ok(conferenceUserTrackService.acceptInvitation(userId, conferenceId));
+    }
+
+    @PutMapping("/decline")
+    @Operation(summary = "Decline conference invitation",
+            description = "Update isAccepted = false for the ConferenceUserTrack record matching userId and conferenceId")
+    public ResponseEntity<ConferenceUserTrackResponseDTO> declineInvitation(
+            @RequestParam Integer userId,
+            @RequestParam Integer conferenceId) {
+        return ResponseEntity.ok(conferenceUserTrackService.declineInvitation(userId, conferenceId));
+    }
+
 }

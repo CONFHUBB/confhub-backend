@@ -25,7 +25,7 @@ public class PaperFile extends BaseEntity {
     @JoinColumn(name = "paper_id", nullable = false)
     private Paper paper;
 
-    @Column(name = "url", nullable = false)
+    @Column(name = "url", columnDefinition = "TEXT", nullable = false)
     private String url;
 
     @Column(name = "is_active", nullable = false)

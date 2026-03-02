@@ -17,10 +17,10 @@ public class FirebaseConfig {
     @PostConstruct
     public void initialize() throws IOException {
         FileInputStream serviceAccount =
-            new FileInputStream("./src/main/resources/swp391-1f20e-firebase-adminsdk-qa9da-e001b755fa.json");
+            new FileInputStream("./src/main/resources/filestorage-71871-firebase-adminsdk-fbsvc-7ba8487811.json");
 
         FirebaseOptions options = FirebaseOptions.builder()
-                                                 .setStorageBucket("swp391-1f20e.appspot.com")
+                                                 .setStorageBucket("filestorage-71871.firebasestorage.app")
                                                  .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                                                  .build();
 

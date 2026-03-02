@@ -4,58 +4,75 @@ import com.capstone.confms.service.FirebaseStorageService;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.firebase.cloud.StorageClient;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import org.json.simple.JSONObject;
-import org.springframework.web.client.RestTemplate;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
 public class FirebaseStorageServiceImpl implements FirebaseStorageService {
-    private StorageClient storageClient;
 
-    private final String BASE_URL = "https://firebasestorage.googleapis.com/v0/b/swp391-1f20e.appspot.com/o/";
+    private final StorageClient storageClient;
 
-    public String uploadFile(MultipartFile file) throws IOException {
+    private static final String BUCKET_NAME = "filestorage-71871.firebasestorage.app";
+    private static final String BASE_URL =
+            "https://firebasestorage.googleapis.com/v0/b/" + BUCKET_NAME + "/o/";
 
-        Bucket bucket = storageClient.bucket();
-        if (file == null || file.getOriginalFilename() == null || file.getOriginalFilename().isEmpty()) return "Fail to upload";
-
-        String[] split = file.getOriginalFilename().split("\\.");
-
-        if (!split[split.length - 1].equals("jpg")
-            && !split[split.length - 1].equals("jpeg")
-            && !split[split.length - 1].equals("png")
-        ) return "Fail to upload";
-
-        String fileName = UUID.randomUUID().toString() + "." + split[split.length - 1];
-        Blob blob = bucket.create(fileName, file.getBytes(), file.getContentType());
-
-        return fileName;
-    }
-
-    public List<String> getImagesURL(String listImages) {
-        List<String> response = new ArrayList<>();
-
-        if (listImages == null || listImages.isEmpty()) return response;
-
-        String[] split = listImages.split(",");
-
-        for (String s : split) {
-
-            String url = BASE_URL + s;
-            RestTemplate restTemplate = new RestTemplate();
-
-            try {
-                JSONObject json = restTemplate.getForObject(url, JSONObject.class);
-                String token = (String) Objects.requireNonNull(json).get("downloadTokens");
-
-                if (token != null) response.add(url + "?alt=media&token=" +token);
-            } catch (Exception ignored) {}
+    @Override
+    public String uploadFile(MultipartFile file, Integer conferenceId, Integer paperId) throws IOException {
+        if (file == null || file.isEmpty() || file.getOriginalFilename() == null) {
+            throw new IllegalArgumentException("File must not be null or empty");
         }
 
-        return response;
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = originalFilename.substring(dotIndex);
+        }
+
+        String storagePath = "conferences/" + conferenceId + "/papers/" + paperId
+                + "/" + UUID.randomUUID() + extension;
+
+        Bucket bucket = storageClient.bucket();
+        Blob blob = bucket.create(storagePath, file.getBytes(), file.getContentType());
+
+        String downloadToken = getDownloadToken(blob);
+        String encodedPath = URLEncoder.encode(storagePath, StandardCharsets.UTF_8);
+        String downloadUrl = BASE_URL + encodedPath + "?alt=media&token=" + downloadToken;
+
+        log.info("Uploaded file to Firebase Storage path '{}'. URL: {}", storagePath, downloadUrl);
+        return downloadUrl;
+    }
+
+    @Override
+    public String getFileUrl(String storagePath) {
+        Bucket bucket = storageClient.bucket();
+        Blob blob = bucket.get(storagePath);
+        if (blob == null || !blob.exists()) {
+            log.warn("File not found in Firebase Storage: {}", storagePath);
+            return null;
+        }
+
+        String downloadToken = getDownloadToken(blob);
+        String encodedPath = URLEncoder.encode(storagePath, StandardCharsets.UTF_8);
+        return BASE_URL + encodedPath + "?alt=media&token=" + downloadToken;
+    }
+
+    private String getDownloadToken(Blob blob) {
+        Map<String, String> metadata = blob.getMetadata();
+        if (metadata != null && metadata.containsKey("firebaseStorageDownloadTokens")) {
+            return metadata.get("firebaseStorageDownloadTokens");
+        }
+        return blob.getMediaLink();
     }
 }
+

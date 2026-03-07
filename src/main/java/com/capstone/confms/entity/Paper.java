@@ -61,4 +61,11 @@ public class Paper extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private PaperStatus status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "submission_form_id")
+    private ConferenceSubmissionForm submissionForm;
+
+    @Column(name = "extra_answers", columnDefinition = "TEXT")
+    private String extraAnswersJson;
+
 }

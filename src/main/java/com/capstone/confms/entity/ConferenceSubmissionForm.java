@@ -22,25 +22,9 @@ public class ConferenceSubmissionForm extends BaseEntity {
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "track_id", nullable = false)
-    private ConferenceTrack track;
+    @JoinColumn(name = "conference_id", nullable = false)
+    private Conference conference;
 
-    @Column(name = "title", nullable = false)
-    private String title;
-
-    @Column(name = "abstract", nullable = false)
-    private String abstractField;
-
-    @Column(name = "keyword_1", nullable = false)
-    private String keyword1;
-
-    @Column(name = "keyword_2")
-    private String keyword2;
-
-    @Column(name = "keyword_3")
-    private String keyword3;
-
-    @Column(name = "keyword_4")
-    private String keyword4;
-
+    @Column(name = "definition_json", nullable = false, columnDefinition = "TEXT")
+    private String definitionJson;
 }

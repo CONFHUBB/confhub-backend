@@ -3,10 +3,10 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.ConferenceSubmissionFormDTO;
 import com.capstone.confms.dto.response.ConferenceSubmissionFormResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceSubmissionForm;
-import com.capstone.confms.entity.ConferenceTrack;
+import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceSubmissionFormRepository;
-import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.service.ConferenceSubmissionFormService;
 import com.capstone.confms.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,16 +23,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmissionFormService {
 
     private final ConferenceSubmissionFormRepository submissionFormRepository;
-    private final ConferenceTrackRepository trackRepository;
+    private final ConferenceRepository conferenceRepository;
 
     @Override
     @Transactional
     public ConferenceSubmissionFormResponseDTO createSubmissionForm(ConferenceSubmissionFormDTO dto) {
-        ConferenceTrack track = trackRepository.findById(dto.getTrackId())
-                .orElseThrow(() -> new EntityNotFoundException("Track not found with ID: " + dto.getTrackId()));
+        Conference conference = conferenceRepository.findById(dto.getConferenceId())
+                .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
 
         ConferenceSubmissionForm form = new ConferenceSubmissionForm();
-        form.setTrack(track);
+        form.setConference(conference);
         mapDtoToEntity(dto, form);
 
         ConferenceSubmissionForm savedForm = submissionFormRepository.save(form);
@@ -67,14 +67,14 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
 
     @Override
     @Transactional(readOnly = true)
-    public PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId, int page,
+    public PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByConferenceId(Integer conferenceId, int page,
             int size) {
-        if (!trackRepository.existsById(trackId)) {
-            throw new EntityNotFoundException("Submission not found with Track ID: " + trackId);
+        if (!conferenceRepository.existsById(conferenceId)) {
+            throw new EntityNotFoundException("Submission not found with Conference ID: " + conferenceId);
         }
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<ConferenceSubmissionForm> forms = submissionFormRepository.findByTrackId(trackId, pageable);
+        Page<ConferenceSubmissionForm> forms = submissionFormRepository.findByConferenceId(conferenceId, pageable);
         return PaginationUtils.toPagedResponse(forms, this::mapEntityToResponse);
     }
 
@@ -88,24 +88,14 @@ public class ConferenceSubmissionFormServiceImpl implements ConferenceSubmission
     }
 
     private void mapDtoToEntity(ConferenceSubmissionFormDTO dto, ConferenceSubmissionForm entity) {
-        entity.setTitle(dto.getTitle());
-        entity.setAbstractField(dto.getAbstractField());
-        entity.setKeyword1(dto.getKeyword1());
-        entity.setKeyword2(dto.getKeyword2());
-        entity.setKeyword3(dto.getKeyword3());
-        entity.setKeyword4(dto.getKeyword4());
+        entity.setDefinitionJson(dto.getDefinitionJson());
     }
 
     private ConferenceSubmissionFormResponseDTO mapEntityToResponse(ConferenceSubmissionForm entity) {
         ConferenceSubmissionFormResponseDTO response = new ConferenceSubmissionFormResponseDTO();
         response.setId(entity.getId());
-        response.setTrack(entity.getTrack());
-        response.setTitle(entity.getTitle());
-        response.setAbstractField(entity.getAbstractField());
-        response.setKeyword1(entity.getKeyword1());
-        response.setKeyword2(entity.getKeyword2());
-        response.setKeyword3(entity.getKeyword3());
-        response.setKeyword4(entity.getKeyword4());
+        response.setConference(entity.getConference());
+        response.setDefinitionJson(entity.getDefinitionJson());
         return response;
     }
 }

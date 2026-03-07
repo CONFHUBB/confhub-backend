@@ -21,6 +21,8 @@ public class PaperResponseDTO {
     private String keyword3;
     private String keyword4;
     private Instant submissionTime;
-    private Boolean isPassedPlagiarism = false;
+    private Boolean isPassedPlagiarism;
     private PaperStatus status;
+    private Integer submissionFormId;
+    private String extraAnswersJson;
 }

@@ -28,6 +28,7 @@ public class PaperServiceImpl implements PaperService {
     private final ConferenceTrackRepository conferenceTrackRepository;
     private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
     private final com.capstone.confms.repository.PaperAuthorRepository paperAuthorRepository;
+    private final ConferenceSubmissionFormRepository conferenceSubmissionFormRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -95,6 +96,13 @@ public class PaperServiceImpl implements PaperService {
         ConferenceTrackTopic topic = conferenceTrackTopicRepository.findById(dto.getTopicId())
                 .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
 
+        ConferenceSubmissionForm submissionForm = null;
+        if (dto.getSubmissionFormId() != null) {
+            submissionForm = conferenceSubmissionFormRepository.findById(dto.getSubmissionFormId())
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Submission Form not found with ID: " + dto.getSubmissionFormId()));
+        }
+
         entity.setAbstractField(dto.getAbstractField());
         entity.setStatus(dto.getStatus());
         entity.setTitle(dto.getTitle());
@@ -102,6 +110,8 @@ public class PaperServiceImpl implements PaperService {
         entity.setKeyword2(dto.getKeyword2());
         entity.setKeyword3(dto.getKeyword3());
         entity.setKeyword4(dto.getKeyword4());
+        entity.setSubmissionForm(submissionForm);
+        entity.setExtraAnswersJson(dto.getExtraAnswersJson());
         entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
         entity.setSubmissionTime(dto.getSubmissionTime());
         entity.setTrack(conferenceTrack);
@@ -135,6 +145,8 @@ public class PaperServiceImpl implements PaperService {
                 .isPassedPlagiarism(entity.getIsPassedPlagiarism())
                 .submissionTime(entity.getSubmissionTime())
                 .status(entity.getStatus())
+                .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)
+                .extraAnswersJson(entity.getExtraAnswersJson())
                 .build();
     }
 }

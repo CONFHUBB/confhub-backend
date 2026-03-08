@@ -52,16 +52,16 @@ public class ConferenceSubmissionFormController {
         return ResponseEntity.ok(conferenceSubmissionFormService.updateSubmissionForm(id, dto));
     }
 
-    @GetMapping("/track/{trackId}")
-    @Operation(summary = "Get Conference Submission Forms by Track ID")
-    public ResponseEntity<PagedResponse<ConferenceSubmissionFormResponseDTO>> getSubmissionFormsByTrackId(
-            @PathVariable Integer trackId,
+    @GetMapping("/conference/{conferenceId}")
+    @Operation(summary = "Get Conference Submission Forms by Conference ID")
+    public ResponseEntity<PagedResponse<ConferenceSubmissionFormResponseDTO>> getSubmissionFormsByConferenceId(
+            @PathVariable Integer conferenceId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (page < 0 || size <= 0 || size > 100) {
             throw new BadRequestException("Invalid pagination parameters");
         }
-        return ResponseEntity.ok(conferenceSubmissionFormService.getSubmissionFormsByTrackId(trackId, page, size));
+        return ResponseEntity.ok(conferenceSubmissionFormService.getSubmissionFormsByConferenceId(conferenceId, page, size));
     }
 
     @DeleteMapping("/{id}")

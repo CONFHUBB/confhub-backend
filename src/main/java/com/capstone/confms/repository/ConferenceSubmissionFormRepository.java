@@ -1,14 +1,14 @@
 package com.capstone.confms.repository;
 
 import com.capstone.confms.entity.ConferenceSubmissionForm;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
-
 public interface ConferenceSubmissionFormRepository extends JpaRepository<ConferenceSubmissionForm, Integer> {
-    List<ConferenceSubmissionForm> findByTrackId(Integer trackId);
 
-    Page<ConferenceSubmissionForm> findByTrackId(Integer trackId, Pageable pageable);
+    List<ConferenceSubmissionForm> findByConferenceId(Integer conferenceId);
+
+    Page<ConferenceSubmissionForm> findByConferenceId(Integer conferenceId, Pageable pageable);
 }

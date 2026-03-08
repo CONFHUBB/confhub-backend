@@ -13,7 +13,7 @@ public interface ConferenceSubmissionFormService {
 
     PagedResponse<ConferenceSubmissionFormResponseDTO> getAllSubmissionForms(int page, int size);
 
-    PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByTrackId(Integer trackId, int page, int size);
+    PagedResponse<ConferenceSubmissionFormResponseDTO> getSubmissionFormsByConferenceId(Integer conferenceId, int page, int size);
 
     void deleteSubmissionForm(Integer id);
 }

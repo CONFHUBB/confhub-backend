@@ -4,21 +4,29 @@ import com.capstone.confms.dto.ConferenceDTO;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Conference;
+import com.capstone.confms.entity.ConferenceUserTrack;
+import com.capstone.confms.entity.User;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ConferenceRepository;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.UserRepository;
+import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.ConferenceService;
+import com.capstone.confms.utils.PaginationUtils;
 import com.capstone.confms.utils.enums.ConferenceStatus;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.capstone.confms.utils.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
@@ -26,6 +34,8 @@ import org.springframework.data.domain.Sort;
 public class ConferenceServiceImpl implements ConferenceService {
 
     private final ConferenceRepository repository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -33,7 +43,20 @@ public class ConferenceServiceImpl implements ConferenceService {
         log.info("Creating conference: {}", dto.getName());
         Conference conference = new Conference();
         mapDtoToEntity(dto, conference);
-        return mapToResponseDTO(repository.save(conference));
+        Conference savedConference = repository.save(conference);
+
+        User currentUser = getCurrentAuthenticatedUser();
+
+        ConferenceUserTrack organizerTrack = new ConferenceUserTrack();
+        organizerTrack.setUser(currentUser);
+        organizerTrack.setConference(savedConference);
+        organizerTrack.setAssignedRole(ConferenceTrackRole.ORGANIZER);
+        organizerTrack.setInvitedAt(LocalDateTime.now());
+        organizerTrack.setIsAccepted(true);
+        organizerTrack.setIsRegistered(true);
+        conferenceUserTrackRepository.save(organizerTrack);
+
+        return mapToResponseDTO(savedConference);
     }
 
     @Override
@@ -96,6 +119,16 @@ public class ConferenceServiceImpl implements ConferenceService {
         conference.setStatus(ConferenceStatus.SCHEDULED);
         Conference saved = repository.save(conference);
         return mapToResponseDTO(saved);
+    }
+
+    private User getCurrentAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("No authenticated user found");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new BadRequestException("User not found"));
     }
 
     private void mapDtoToEntity(ConferenceDTO dto, Conference entity) {

@@ -14,6 +14,8 @@ public interface ConferenceUserTrackService {
 
     PagedResponse<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId, int page, int size);
 
+    PagedResponse<ConferenceResponseDTO> getOrganizedConferencesByUserId(Integer userId, int page, int size);
+
     ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId);
 
     ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId);

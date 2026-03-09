@@ -36,9 +36,9 @@ public class JwtTokenProvider {
 
         String username;
         Integer id = null;
-        String fullName = null;
+        String firstName = null;
+        String lastName = null;
         String email = null;
-        String phoneNumber = null;
         String country = null;
         Boolean isActive = null;
         List<String> roles = null;
@@ -46,9 +46,9 @@ public class JwtTokenProvider {
         if (principal instanceof UserDetailsImpl userDetails) {
             username = userDetails.getUsername();
             id = userDetails.getId();
-            fullName = userDetails.getFullName();
+            firstName = userDetails.getFirstName();
+            lastName = userDetails.getLastName();
             email = userDetails.getEmail();
-            phoneNumber = userDetails.getPhoneNumber();
             country = userDetails.getCountry();
             isActive = userDetails.isEnabled();
             roles = userDetails.getAuthorities().stream()
@@ -71,14 +71,14 @@ public class JwtTokenProvider {
         if (id != null) {
             builder.claim("id", id);
         }
-        if (fullName != null) {
-            builder.claim("fullName", fullName);
+        if (firstName != null) {
+            builder.claim("firstName", firstName);
+        }
+        if (lastName != null) {
+            builder.claim("lastName", lastName);
         }
         if (email != null) {
             builder.claim("email", email);
-        }
-        if (phoneNumber != null) {
-            builder.claim("phoneNumber", phoneNumber);
         }
         if (country != null) {
             builder.claim("country", country);

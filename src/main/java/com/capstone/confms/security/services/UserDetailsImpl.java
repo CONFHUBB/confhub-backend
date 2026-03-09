@@ -17,8 +17,8 @@ public class UserDetailsImpl implements UserDetails {
 
     private Integer id;
     private String email;
-    private String fullName;
-    private String phoneNumber;
+    private String firstName;
+    private String lastName;
     private String country;
 
     @JsonIgnore
@@ -27,12 +27,12 @@ public class UserDetailsImpl implements UserDetails {
     private Boolean isActive;
     private Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Integer id, String email, String fullName, String phoneNumber, String country, String password,
+    public UserDetailsImpl(Integer id, String email, String firstName, String lastName, String country, String password,
             Boolean isActive, Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.email = email;
-        this.fullName = fullName;
-        this.phoneNumber = phoneNumber;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.country = country;
         this.password = password;
         this.isActive = isActive;
@@ -47,8 +47,8 @@ public class UserDetailsImpl implements UserDetails {
         return new UserDetailsImpl(
                 user.getId(),
                 user.getEmail(),
-                user.getFullName(),
-                user.getPhoneNumber(),
+                user.getFirstName(),
+                user.getLastName(),
                 user.getCountry(),
                 user.getPassword(),
                 user.getIsActive(),
@@ -68,12 +68,16 @@ public class UserDetailsImpl implements UserDetails {
         return email;
     }
 
-    public String getFullName() {
-        return fullName;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
+    public String getLastName() {
+        return lastName;
+    }
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
     }
 
     public String getCountry() {

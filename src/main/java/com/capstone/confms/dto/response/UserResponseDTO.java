@@ -8,9 +8,11 @@ import lombok.Data;
 @Builder
 public class UserResponseDTO {
     private Integer id;
-    private String fullName;
+    private String title;
+    private String firstName;
+    private String lastName;
+    private String gender;
     private String email;
-    private String phoneNumber;
     private String country;
     private Boolean isActive;
     private LocalDateTime createdAt;

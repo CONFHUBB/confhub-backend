@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDTO updateUser(Integer id, UserDTO dto) {
         User user = userRepository.findById(id)
-                                  .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
         mapDtoToEntity(dto, user);
         return mapToResponseDTO(userRepository.save(user));
     }
@@ -55,15 +55,15 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponseDTO getUserById(Integer id) {
         return userRepository.findById(id)
-                             .map(this::mapToResponseDTO)
-                             .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
+                .map(this::mapToResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
     }
 
     @Override
     public UserResponseDTO getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                             .map(this::mapToResponseDTO)
-                             .orElseThrow(() -> new ResourceNotFoundException("User not found with email " + email));
+                .map(this::mapToResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email " + email));
     }
 
     @Override
@@ -76,10 +76,12 @@ public class UserServiceImpl implements UserService {
     }
 
     private void mapDtoToEntity(UserDTO dto, User entity) {
-        entity.setFullName(dto.getFullName());
+        entity.setTitle(dto.getTitle());
+        entity.setFirstName(dto.getFirstName());
+        entity.setLastName(dto.getLastName());
+        entity.setGender(dto.getGender());
         entity.setEmail(dto.getEmail());
         entity.setPassword(dto.getPassword());
-        entity.setPhoneNumber(dto.getPhoneNumber());
         entity.setCountry(dto.getCountry());
         if (entity.getIsActive() == null) {
             entity.setIsActive(Boolean.TRUE);
@@ -89,13 +91,15 @@ public class UserServiceImpl implements UserService {
 
     private UserResponseDTO mapToResponseDTO(User entity) {
         return UserResponseDTO.builder()
-                              .id(entity.getId())
-                              .fullName(entity.getFullName())
-                              .email(entity.getEmail())
-                              .phoneNumber(entity.getPhoneNumber())
-                              .country(entity.getCountry())
-                              .isActive(entity.getIsActive())
-                              .createdAt(entity.getCreatedAt())
-                              .build();
+                .id(entity.getId())
+                .title(entity.getTitle())
+                .firstName(entity.getFirstName())
+                .lastName(entity.getLastName())
+                .gender(entity.getGender())
+                .email(entity.getEmail())
+                .country(entity.getCountry())
+                .isActive(entity.getIsActive())
+                .createdAt(entity.getCreatedAt())
+                .build();
     }
 }

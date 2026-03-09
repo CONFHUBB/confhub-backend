@@ -9,8 +9,10 @@ import com.capstone.confms.dto.response.JwtResponse;
 import com.capstone.confms.dto.response.MessageResponse;
 import com.capstone.confms.entity.Role;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.entity.UserProfile;
 import com.capstone.confms.entity.UserRole;
 import com.capstone.confms.repository.RoleRepository;
+import com.capstone.confms.repository.UserProfileRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.repository.UserRoleRepository;
 import com.capstone.confms.exception.BadRequestException;
@@ -42,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final UserProfileRepository userProfileRepository;
     private final PasswordEncoder encoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
@@ -65,7 +68,8 @@ public class AuthServiceImpl implements AuthService {
         return new JwtResponse(jwt,
                 userDetails.getId(),
                 userDetails.getEmail(),
-                userDetails.getFullName(),
+                userDetails.getFirstName(),
+                userDetails.getLastName(),
                 roles);
     }
 
@@ -78,10 +82,10 @@ public class AuthServiceImpl implements AuthService {
 
         // Create new user's account
         User user = new User();
-        user.setFullName(signUpRequest.getFullName());
+        user.setFirstName(signUpRequest.getFirstName());
+        user.setLastName(signUpRequest.getLastName());
         user.setEmail(signUpRequest.getEmail());
         user.setPassword(encoder.encode(signUpRequest.getPassword()));
-        user.setPhoneNumber(signUpRequest.getPhoneNumber());
         user.setCountry(signUpRequest.getCountry());
         user.setIsActive(true);
 
@@ -111,6 +115,11 @@ public class AuthServiceImpl implements AuthService {
             userRole.setRole(role);
             userRoleRepository.save(userRole);
         }
+
+        // Create empty UserProfile
+        UserProfile profile = new UserProfile();
+        profile.setUser(user);
+        userProfileRepository.save(profile);
 
         return new MessageResponse("User registered successfully!");
     }

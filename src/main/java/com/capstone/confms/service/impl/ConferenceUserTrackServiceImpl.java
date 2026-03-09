@@ -166,9 +166,11 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         private UserResponseDTO mapUserToResponseDTO(User entity) {
                 return UserResponseDTO.builder()
                                 .id(entity.getId())
-                                .fullName(entity.getFullName())
+                                .title(entity.getTitle())
+                                .firstName(entity.getFirstName())
+                                .lastName(entity.getLastName())
+                                .gender(entity.getGender())
                                 .email(entity.getEmail())
-                                .phoneNumber(entity.getPhoneNumber())
                                 .country(entity.getCountry())
                                 .isActive(entity.getIsActive())
                                 .createdAt(entity.getCreatedAt())

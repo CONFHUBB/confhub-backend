@@ -21,17 +21,23 @@ public class User extends BaseEntity {
     @Column(name = "id", nullable = false)
     private Integer id;
 
-    @Column(name = "full_name", nullable = false)
-    private String fullName;
+    @Column(name = "title")
+    private String title;
+
+    @Column(name = "first_name", nullable = false)
+    private String firstName;
+
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
+
+    @Column(name = "gender", length = 10)
+    private String gender;
 
     @Column(name = "password", nullable = false)
     private String password;
 
     @Column(name = "email", nullable = false)
     private String email;
-
-    @Column(name = "phone_number", nullable = false)
-    private String phoneNumber;
 
     @Column(name = "country", length = 50)
     private String country;

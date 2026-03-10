@@ -47,4 +47,34 @@ public class Conference extends BaseEntity {
     @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
+    @Column(name = "area")
+    private String area;
+
+    @Column(name = "society_sponsor")
+    private String societySponsor;
+
+    @Column(name = "conference_id_number")
+    private String conferenceIdNumber;
+
+    @Column(name = "country")
+    private String country;
+
+    @Column(name = "province")
+    private String province;
+
+    @Column(name = "banner_image_url")
+    private String bannerImageUrl;
+
+    @Column(name = "contact_information")
+    private String contactInformation;
+
+    @Column(name = "paper_deadline")
+    private LocalDateTime paperDeadline;
+
+    @Column(name = "camera_ready_deadline")
+    private LocalDateTime cameraReadyDeadline;
+
+    @Column(name = "chair_emails", columnDefinition = "TEXT")
+    private String chairEmails;
+
 }

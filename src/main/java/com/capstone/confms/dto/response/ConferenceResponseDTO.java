@@ -17,4 +17,15 @@ public class ConferenceResponseDTO {
     private LocalDateTime endDate;
     private ConferenceStatus status;
     private LocalDateTime createdAt;
+
+    private String area;
+    private String societySponsor;
+    private String conferenceIdNumber;
+    private String country;
+    private String province;
+    private String bannerImageUrl;
+    private String contactInformation;
+    private LocalDateTime paperDeadline;
+    private LocalDateTime cameraReadyDeadline;
+    private String chairEmails;
 }

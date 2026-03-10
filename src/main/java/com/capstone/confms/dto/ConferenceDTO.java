@@ -40,4 +40,15 @@ public class ConferenceDTO {
 
     @NotNull(message = "Website Url is required")
     private String websiteUrl;
+
+    private String area;
+    private String societySponsor;
+    private String conferenceIdNumber;
+    private String country;
+    private String province;
+    private String bannerImageUrl;
+    private String contactInformation;
+    private LocalDateTime paperDeadline;
+    private LocalDateTime cameraReadyDeadline;
+    private String chairEmails;
 }

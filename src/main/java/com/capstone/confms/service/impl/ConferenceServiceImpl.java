@@ -72,15 +72,15 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Transactional(readOnly = true)
     public ConferenceResponseDTO getByIdConference(Integer id) {
         return repository.findById(id)
-                         .map(this::mapToResponseDTO)
-                         .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+                .map(this::mapToResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
     }
 
     @Override
     @Transactional
     public ConferenceResponseDTO updateConference(Integer id, ConferenceDTO dto) {
         Conference existing = repository.findById(id)
-                                        .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
         mapDtoToEntity(dto, existing);
         return mapToResponseDTO(repository.save(existing));
@@ -112,8 +112,8 @@ public class ConferenceServiceImpl implements ConferenceService {
     public ConferenceResponseDTO approveConference(Integer id) {
         log.info("ApprovingConference for conference ID: {}", id);
         Conference conference = repository.findById(id)
-                                          .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
-        if(conference.getStatus() != ConferenceStatus.PENDING) {
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+        if (conference.getStatus() != ConferenceStatus.PENDING) {
             throw new IllegalStateException("Only conferences with PENDING status can be approved.");
         }
         conference.setStatus(ConferenceStatus.SCHEDULED);
@@ -141,19 +141,39 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setStatus(ConferenceStatus.PENDING);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setWebsiteUrl(dto.getWebsiteUrl());
+        entity.setArea(dto.getArea());
+        entity.setSocietySponsor(dto.getSocietySponsor());
+        entity.setConferenceIdNumber(dto.getConferenceIdNumber());
+        entity.setCountry(dto.getCountry());
+        entity.setProvince(dto.getProvince());
+        entity.setBannerImageUrl(dto.getBannerImageUrl());
+        entity.setContactInformation(dto.getContactInformation());
+        entity.setPaperDeadline(dto.getPaperDeadline());
+        entity.setCameraReadyDeadline(dto.getCameraReadyDeadline());
+        entity.setChairEmails(dto.getChairEmails());
     }
 
     private ConferenceResponseDTO mapToResponseDTO(Conference entity) {
         return ConferenceResponseDTO.builder()
-                                    .id(entity.getId())
-                                    .name(entity.getName())
-                                    .acronym(entity.getAcronym())
-                                    .description(entity.getDescription())
-                                    .location(entity.getLocation())
-                                    .startDate(entity.getStartDate())
-                                    .endDate(entity.getEndDate())
-                                    .status(entity.getStatus())
-                                    .createdAt(entity.getCreatedAt())
-                                    .build();
+                .id(entity.getId())
+                .name(entity.getName())
+                .acronym(entity.getAcronym())
+                .description(entity.getDescription())
+                .location(entity.getLocation())
+                .startDate(entity.getStartDate())
+                .endDate(entity.getEndDate())
+                .status(entity.getStatus())
+                .createdAt(entity.getCreatedAt())
+                .area(entity.getArea())
+                .societySponsor(entity.getSocietySponsor())
+                .conferenceIdNumber(entity.getConferenceIdNumber())
+                .country(entity.getCountry())
+                .province(entity.getProvince())
+                .bannerImageUrl(entity.getBannerImageUrl())
+                .contactInformation(entity.getContactInformation())
+                .paperDeadline(entity.getPaperDeadline())
+                .cameraReadyDeadline(entity.getCameraReadyDeadline())
+                .chairEmails(entity.getChairEmails())
+                .build();
     }
 }

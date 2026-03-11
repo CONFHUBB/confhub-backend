@@ -14,6 +14,5 @@ public interface ConferenceTrackService {
     PagedResponse<ConferenceTrackResponseDTO> getAllTracks(int page, int size);
 
     PagedResponse<ConferenceTrackResponseDTO> getTracksByConferenceId(Integer conferenceId, int page, int size);
-
     void deleteTrack(Integer id);
 }

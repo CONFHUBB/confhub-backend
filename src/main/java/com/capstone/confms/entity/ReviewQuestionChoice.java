@@ -1,6 +1,5 @@
 package com.capstone.confms.entity;
 
-import com.capstone.confms.utils.enums.ReviewOption;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,20 +15,23 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "review_types")
-public class ReviewType extends BaseEntity {
+@Table(name = "review_question_choices")
+public class ReviewQuestionChoice {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "conference_id", nullable = false)
-    private Conference conference;
+    @JoinColumn(name = "question_id", nullable = false)
+    private ReviewQuestion question;
 
-    @Column(name = "review_option", nullable = false)
-    private ReviewOption reviewOption;
+    @Column(name = "text", nullable = false)
+    private String text;
 
-    @Column(name = "is_rebuttal", nullable = false)
-    private Boolean isRebuttal = false;
+    @Column(name = "value")
+    private Integer value;
 
+    @Column(name = "order_index", nullable = false)
+    private Integer orderIndex;
 }

@@ -68,12 +68,6 @@ public class Conference extends BaseEntity {
     @Column(name = "contact_information")
     private String contactInformation;
 
-    @Column(name = "paper_deadline")
-    private LocalDateTime paperDeadline;
-
-    @Column(name = "camera_ready_deadline")
-    private LocalDateTime cameraReadyDeadline;
-
     @Column(name = "chair_emails", columnDefinition = "TEXT")
     private String chairEmails;
 

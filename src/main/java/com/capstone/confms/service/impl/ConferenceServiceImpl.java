@@ -13,6 +13,7 @@ import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.ConferenceService;
+import com.capstone.confms.service.ConferenceActivityService;
 import com.capstone.confms.utils.PaginationUtils;
 import com.capstone.confms.utils.enums.ConferenceStatus;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
@@ -36,6 +37,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     private final ConferenceRepository repository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final UserRepository userRepository;
+    private final ConferenceActivityService conferenceActivityService;
 
     @Override
     @Transactional
@@ -55,6 +57,9 @@ public class ConferenceServiceImpl implements ConferenceService {
         organizerTrack.setIsAccepted(true);
         organizerTrack.setIsRegistered(true);
         conferenceUserTrackRepository.save(organizerTrack);
+        
+        // Auto-initialize standard timeline activities
+        conferenceActivityService.initializeDefaultActivitiesForConference(savedConference.getId());
 
         return mapToResponseDTO(savedConference);
     }
@@ -148,8 +153,6 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setProvince(dto.getProvince());
         entity.setBannerImageUrl(dto.getBannerImageUrl());
         entity.setContactInformation(dto.getContactInformation());
-        entity.setPaperDeadline(dto.getPaperDeadline());
-        entity.setCameraReadyDeadline(dto.getCameraReadyDeadline());
         entity.setChairEmails(dto.getChairEmails());
     }
 
@@ -171,8 +174,6 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .province(entity.getProvince())
                 .bannerImageUrl(entity.getBannerImageUrl())
                 .contactInformation(entity.getContactInformation())
-                .paperDeadline(entity.getPaperDeadline())
-                .cameraReadyDeadline(entity.getCameraReadyDeadline())
                 .chairEmails(entity.getChairEmails())
                 .build();
     }

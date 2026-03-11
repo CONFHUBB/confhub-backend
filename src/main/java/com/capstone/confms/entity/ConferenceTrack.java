@@ -1,5 +1,6 @@
 package com.capstone.confms.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,10 +9,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,37 +38,13 @@ public class ConferenceTrack extends BaseEntity {
     @JoinColumn(name = "conference_id", nullable = false)
     private Conference conference;
 
-    @Column(name = "submission_start", nullable = false)
-    private LocalDateTime submissionStart;
-
-    @Column(name = "submission_end", nullable = false)
-    private LocalDateTime submissionEnd;
-
-    @Column(name = "registration_start", nullable = false)
-    private LocalDateTime registrationStart;
-
-    @Column(name = "registration_end", nullable = false)
-    private LocalDateTime registrationEnd;
-
-    @Column(name = "camera_ready_start", nullable = false)
-    private LocalDateTime cameraReadyStart;
-
-    @Column(name = "camera_ready_end", nullable = false)
-    private LocalDateTime cameraReadyEnd;
-
-    @Column(name = "bidding_start", nullable = false)
-    private LocalDateTime biddingStart;
-
-    @Column(name = "bidding_end", nullable = false)
-    private LocalDateTime biddingEnd;
-
-    @Column(name = "review_start", nullable = false)
-    private LocalDateTime reviewStart;
-
-    @Column(name = "review_end", nullable = false)
-    private LocalDateTime reviewEnd;
+    @OneToOne(mappedBy = "track", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private TrackReviewSetting trackReviewSetting;
 
     @Column(name = "max_submissions", nullable = false)
     private Integer maxSubmissions;
 
-}
+    @OneToMany(mappedBy = "track", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("orderIndex ASC")
+    private List<ReviewQuestion> reviewQuestions = new ArrayList<>();
+}

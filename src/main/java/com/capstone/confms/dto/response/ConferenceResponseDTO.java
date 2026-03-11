@@ -25,7 +25,5 @@ public class ConferenceResponseDTO {
     private String province;
     private String bannerImageUrl;
     private String contactInformation;
-    private LocalDateTime paperDeadline;
-    private LocalDateTime cameraReadyDeadline;
     private String chairEmails;
 }

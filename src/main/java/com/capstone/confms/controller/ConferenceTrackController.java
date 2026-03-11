@@ -62,7 +62,6 @@ public class ConferenceTrackController {
         }
         return ResponseEntity.ok(conferenceTrackService.getTracksByConferenceId(id, page, size));
     }
-
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Conference Track")
     public ResponseEntity<Void> deleteTrack(@PathVariable Integer id) {

@@ -105,7 +105,7 @@ public class ConferenceTrackTopicServiceImpl implements ConferenceTrackTopicServ
         response.setId(entity.getId());
         response.setTitle(entity.getTitle());
         response.setDescription(entity.getDescription());
-        response.setTrack(entity.getTrack());
+        response.setTrackId(entity.getTrack().getId());
         return response;
     }
 }

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -26,7 +28,7 @@ public class PaperServiceImpl implements PaperService {
 
     private final PaperRepository paperRepository;
     private final ConferenceTrackRepository conferenceTrackRepository;
-    private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
+    private final SubjectAreaRepository subjectAreaRepository;
     private final com.capstone.confms.repository.PaperAuthorRepository paperAuthorRepository;
     private final ConferenceSubmissionFormRepository conferenceSubmissionFormRepository;
 
@@ -93,8 +95,21 @@ public class PaperServiceImpl implements PaperService {
         ConferenceTrack conferenceTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
                 .orElseThrow(
                         () -> new EntityNotFoundException("Track not found with ID: " + dto.getConferenceTrackId()));
-        ConferenceTrackTopic topic = conferenceTrackTopicRepository.findById(dto.getTopicId())
-                .orElseThrow(() -> new EntityNotFoundException("Topic not found with ID: " + dto.getTopicId()));
+
+        SubjectArea primarySA = null;
+        if (dto.getPrimarySubjectAreaId() != null) {
+            primarySA = subjectAreaRepository.findById(dto.getPrimarySubjectAreaId())
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Subject Area not found with ID: " + dto.getPrimarySubjectAreaId()));
+        }
+
+        List<SubjectArea> secondarySAs = new ArrayList<>();
+        if (dto.getSecondarySubjectAreaIds() != null && !dto.getSecondarySubjectAreaIds().isEmpty()) {
+            secondarySAs = subjectAreaRepository.findAllById(dto.getSecondarySubjectAreaIds());
+            if (secondarySAs.size() != dto.getSecondarySubjectAreaIds().size()) {
+                throw new EntityNotFoundException("One or more secondary Subject Area IDs not found");
+            }
+        }
 
         ConferenceSubmissionForm submissionForm = null;
         if (dto.getSubmissionFormId() != null) {
@@ -115,7 +130,8 @@ public class PaperServiceImpl implements PaperService {
         entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
         entity.setSubmissionTime(dto.getSubmissionTime());
         entity.setTrack(conferenceTrack);
-        entity.setTopic(topic);
+        entity.setPrimarySubjectArea(primarySA);
+        entity.setSecondarySubjectAreas(secondarySAs);
         // Handling auditing fields if not automatically handled by JPA Auditing
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
@@ -132,10 +148,16 @@ public class PaperServiceImpl implements PaperService {
     }
 
     private PaperResponseDTO mapToResponseDTO(Paper entity) {
+        List<Integer> secondaryIds = entity.getSecondarySubjectAreas() != null
+                ? entity.getSecondarySubjectAreas().stream().map(SubjectArea::getId).toList()
+                : List.of();
+
         return PaperResponseDTO.builder()
                 .id(entity.getId())
-                .track(entity.getTrack())
-                .topic(entity.getTopic())
+                .trackId(entity.getTrack().getId())
+                .primarySubjectAreaId(
+                        entity.getPrimarySubjectArea() != null ? entity.getPrimarySubjectArea().getId() : null)
+                .secondarySubjectAreaIds(secondaryIds)
                 .title(entity.getTitle())
                 .abstractField(entity.getAbstractField())
                 .keyword1(entity.getKeyword1())

@@ -5,6 +5,7 @@ import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
+import com.capstone.confms.dto.response.UserWithRolesResponseDTO;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,6 +81,25 @@ public class ConferenceUserTrackController {
             @RequestParam Integer userId,
             @RequestParam Integer conferenceId) {
         return ResponseEntity.ok(conferenceUserTrackService.declineInvitation(userId, conferenceId));
+    }
+
+    @GetMapping("/conferences/{conferenceId}/users-roles")
+    @Operation(summary = "Get all users with their roles in a conference")
+    public ResponseEntity<PagedResponse<UserWithRolesResponseDTO>> getConferenceUsersWithRoles(
+            @PathVariable Integer conferenceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(conferenceUserTrackService.getConferenceUsersWithRoles(conferenceId, page, size));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Remove a role assignment from a user")
+    public ResponseEntity<Void> removeRoleFromUser(@PathVariable Integer id) {
+        conferenceUserTrackService.removeRoleFromUser(id);
+        return ResponseEntity.noContent().build();
     }
 
 }

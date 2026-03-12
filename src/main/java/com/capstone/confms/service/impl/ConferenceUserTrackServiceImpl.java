@@ -5,6 +5,7 @@ import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
+import com.capstone.confms.dto.response.UserWithRolesResponseDTO;
 import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceTrack;
@@ -19,6 +20,8 @@ import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -108,11 +111,16 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         @Transactional
         public ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request) {
                 User user = userRepository.findById(request.getUserId())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + request.getUserId()));
                 Conference conference = conferenceRepository.findById(request.getConferenceId())
-                                .orElseThrow(() -> new RuntimeException("Conference not found"));
-                ConferenceTrack track = conferenceTrackRepository.findById(request.getTrackId())
-                                .orElseThrow(() -> new RuntimeException("Track not found"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + request.getConferenceId()));
+
+                ConferenceTrack track = null;
+                if (request.getTrackId() != null) {
+                        track = conferenceTrackRepository.findById(request.getTrackId())
+                                        .orElseThrow(() -> new ResourceNotFoundException("Track not found with id " + request.getTrackId()));
+                }
+
                 ConferenceUserTrack entity = new ConferenceUserTrack();
                 entity.setUser(user);
                 entity.setConference(conference);
@@ -145,6 +153,47 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                                                 + conferenceId));
                 cut.setIsAccepted(false);
                 return mapToResponseDTO(conferenceUserTrackRepository.save(cut));
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public PagedResponse<UserWithRolesResponseDTO> getConferenceUsersWithRoles(Integer conferenceId, int page, int size) {
+                conferenceRepository.findById(conferenceId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Conference not found with id " + conferenceId));
+
+                List<ConferenceUserTrack> allCuts = conferenceUserTrackRepository.findByConference_Id(conferenceId);
+
+                // Group by user, preserving insertion order
+                Map<Integer, List<ConferenceUserTrack>> grouped = new LinkedHashMap<>();
+                for (ConferenceUserTrack cut : allCuts) {
+                        grouped.computeIfAbsent(cut.getUser().getId(), k -> new ArrayList<>()).add(cut);
+                }
+
+                List<UserWithRolesResponseDTO> all = grouped.values().stream()
+                                .map(cuts -> {
+                                        User user = cuts.get(0).getUser();
+                                        List<ConferenceUserTrackResponseDTO> roleDtos = cuts.stream()
+                                                        .map(this::mapToResponseDTO)
+                                                        .toList();
+                                        return UserWithRolesResponseDTO.builder()
+                                                        .user(mapUserToResponseDTO(user))
+                                                        .roles(roleDtos)
+                                                        .build();
+                                })
+                                .toList();
+
+                return paginateList(all, page, size);
+        }
+
+        @Override
+        @Transactional
+        public void removeRoleFromUser(Integer conferenceUserTrackId) {
+                if (!conferenceUserTrackRepository.existsById(conferenceUserTrackId)) {
+                        throw new ResourceNotFoundException(
+                                        "ConferenceUserTrack not found with id " + conferenceUserTrackId);
+                }
+                conferenceUserTrackRepository.deleteById(conferenceUserTrackId);
         }
 
         private ConferenceUserTrackResponseDTO mapToResponseDTO(ConferenceUserTrack entity) {

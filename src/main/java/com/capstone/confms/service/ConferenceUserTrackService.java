@@ -5,6 +5,7 @@ import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.ConferenceUserTrackResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
+import com.capstone.confms.dto.response.UserWithRolesResponseDTO;
 
 public interface ConferenceUserTrackService {
 
@@ -19,4 +20,8 @@ public interface ConferenceUserTrackService {
     ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId);
 
     ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId);
+
+    PagedResponse<UserWithRolesResponseDTO> getConferenceUsersWithRoles(Integer conferenceId, int page, int size);
+
+    void removeRoleFromUser(Integer conferenceUserTrackId);
 }

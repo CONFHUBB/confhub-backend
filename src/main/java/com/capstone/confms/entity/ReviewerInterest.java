@@ -29,8 +29,8 @@ public class ReviewerInterest extends BaseEntity {
     private User reviewer;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "track_topic_id", nullable = false)
-    private ConferenceTrackTopic trackTopic;
+    @JoinColumn(name = "subject_area_id", nullable = false)
+    private SubjectArea subjectArea;
 
     @Column(name = "expertise", nullable = false)
     @Enumerated(EnumType.STRING)

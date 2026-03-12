@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -14,7 +15,8 @@ import java.time.Instant;
 @AllArgsConstructor
 public class PaperDTO {
     private Integer conferenceTrackId;
-    private Integer topicId;
+    private Integer primarySubjectAreaId;
+    private List<Integer> secondarySubjectAreaIds;
     private Integer submissionFormId;
     private String title;
     private String abstractField;

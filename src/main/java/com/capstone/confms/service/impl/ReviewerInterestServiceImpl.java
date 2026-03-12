@@ -26,7 +26,7 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
 
     private final ReviewerInterestRepository reviewerInterestRepository;
     private final UserRepository userRepository;
-    private final ConferenceTrackTopicRepository conferenceTrackTopicRepository;
+    private final SubjectAreaRepository subjectAreaRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -73,13 +73,13 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
         User reviewer = userRepository.findById(dto.getReviewerId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewerId()));
 
-        ConferenceTrackTopic conferenceTrackTopic = conferenceTrackTopicRepository
-                .findById(dto.getConferenceTrackTopicId())
+        SubjectArea subjectArea = subjectAreaRepository
+                .findById(dto.getSubjectAreaId())
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "Paper not found with ID: " + dto.getConferenceTrackTopicId()));
+                        "Subject Area not found with ID: " + dto.getSubjectAreaId()));
 
         entity.setReviewer(reviewer);
-        entity.setTrackTopic(conferenceTrackTopic);
+        entity.setSubjectArea(subjectArea);
         entity.setExpertise(dto.getExpertise());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
@@ -90,8 +90,8 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
     private ReviewerInterestResponseDTO mapToReviewerInterestResponseDTO(ReviewerInterest entity) {
         return ReviewerInterestResponseDTO.builder()
                 .id(entity.getId())
-                .reviewer(entity.getReviewer())
-                .trackTopic(entity.getTrackTopic())
+                .reviewerId(entity.getReviewer().getId())
+                .subjectAreaId(entity.getSubjectArea().getId())
                 .expertise(entity.getExpertise())
                 .build();
     }

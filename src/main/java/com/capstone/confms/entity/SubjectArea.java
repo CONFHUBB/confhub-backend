@@ -15,8 +15,8 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "conference_track_topics")
-public class ConferenceTrackTopic extends BaseEntity {
+@Table(name = "subject_areas")
+public class SubjectArea extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
@@ -25,10 +25,13 @@ public class ConferenceTrackTopic extends BaseEntity {
     @JoinColumn(name = "track_id")
     private ConferenceTrack track;
 
-    @Column(name = "title", nullable = false)
-    private String title;
+    @Column(name = "name", nullable = false)
+    private String name;
 
-    @Column(name = "description", nullable = false)
+    @Column(name = "description")
     private String description;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private SubjectArea parent;
 }

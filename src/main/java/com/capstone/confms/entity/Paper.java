@@ -10,9 +10,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -29,9 +33,17 @@ public class Paper extends BaseEntity {
     @JoinColumn(name = "track_id", nullable = false)
     private ConferenceTrack track;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "topic_id", nullable = false)
-    private ConferenceTrackTopic topic;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "primary_subject_area_id")
+    private SubjectArea primarySubjectArea;
+
+    @ManyToMany
+    @JoinTable(
+            name = "paper_secondary_subject_areas",
+            joinColumns = @JoinColumn(name = "paper_id"),
+            inverseJoinColumns = @JoinColumn(name = "subject_area_id")
+    )
+    private List<SubjectArea> secondarySubjectAreas = new ArrayList<>();
 
     @Column(name = "title", nullable = false)
     private String title;

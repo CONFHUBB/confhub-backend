@@ -1,11 +1,14 @@
 package com.capstone.confms.dto.response;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
-public class ConferenceTrackTopicResponseDTO {
+@Builder
+public class SubjectAreaResponseDTO {
     private Integer id;
     private Integer trackId;
-    private String title;
+    private String name;
     private String description;
+    private Integer parentId;
 }

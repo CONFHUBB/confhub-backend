@@ -1,8 +1,9 @@
 package com.capstone.confms.utils.enums;
 
 public enum ConferenceTrackRole {
-    ORGANIZER,
-    TRACK_CHAIR,
+    CONFERENCE_CHAIR,
+    PROGRAM_CHAIR,
     REVIEWER,
-    AUTHOR
+    AUTHOR,
+    ATTENDEE
 }

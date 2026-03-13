@@ -70,4 +70,16 @@ public class ConferenceController {
         ConferenceResponseDTO response = conferenceService.approveConference(id);
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/{id}/complete")
+    @Operation(summary = "Complete a conference (ONGOING → COMPLETED)")
+    public ResponseEntity<ConferenceResponseDTO> completeConference(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceService.completeConference(id));
+    }
+
+    @PutMapping("/{id}/cancel")
+    @Operation(summary = "Cancel a conference")
+    public ResponseEntity<ConferenceResponseDTO> cancelConference(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceService.cancelConference(id));
+    }
 }

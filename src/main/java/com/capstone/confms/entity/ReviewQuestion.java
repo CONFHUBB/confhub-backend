@@ -1,6 +1,6 @@
 package com.capstone.confms.entity;
 
-import com.capstone.confms.entity.enums.ReviewQuestionType;
+import com.capstone.confms.utils.enums.ReviewQuestionType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

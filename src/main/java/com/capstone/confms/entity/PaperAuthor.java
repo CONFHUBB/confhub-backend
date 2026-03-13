@@ -1,5 +1,6 @@
 package com.capstone.confms.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -28,4 +29,9 @@ public class PaperAuthor extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-}
+    @Column(name = "order_index", nullable = false)
+    private Integer orderIndex = 0;
+
+    @Column(name = "is_primary_contact", nullable = false)
+    private Boolean isPrimaryContact = false;
+}

@@ -2,6 +2,7 @@ package com.capstone.confms.dto.response;
 
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.utils.enums.ReviewStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,6 +14,6 @@ public class ReviewResponseDTO {
     private Integer id;
     private Paper paper;
     private User reviewer;
-    private String status;
+    private ReviewStatus status;
     private BigDecimal totalScore;
-}
+}

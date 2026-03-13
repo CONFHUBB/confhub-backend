@@ -23,4 +23,7 @@ public interface PaperService {
      */
     PagedResponse<PaperResponseDTO> getPapersByAuthor(Integer authorId, int page, int size);
 
+    // BR-2.15: Withdraw + Restore
+    PaperResponseDTO withdrawPaper(Integer id);
+    PaperResponseDTO restorePaper(Integer id);
 }

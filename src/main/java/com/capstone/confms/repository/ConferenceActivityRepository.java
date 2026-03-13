@@ -1,7 +1,7 @@
 package com.capstone.confms.repository;
 
 import com.capstone.confms.entity.ConferenceActivity;
-import com.capstone.confms.entity.enums.ActivityType;
+import com.capstone.confms.utils.enums.ActivityType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

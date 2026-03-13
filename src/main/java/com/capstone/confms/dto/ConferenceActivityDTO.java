@@ -1,6 +1,6 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.enums.ActivityType;
+import com.capstone.confms.utils.enums.ActivityType;
 import lombok.Data;
 
 import java.time.LocalDateTime;

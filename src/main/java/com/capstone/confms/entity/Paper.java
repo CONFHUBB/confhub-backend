@@ -51,17 +51,8 @@ public class Paper extends BaseEntity {
     @Column(name = "abstract", nullable = false)
     private String abstractField;
 
-    @Column(name = "keyword_1", nullable = false)
-    private String keyword1;
-
-    @Column(name = "keyword_2")
-    private String keyword2;
-
-    @Column(name = "keyword_3")
-    private String keyword3;
-
-    @Column(name = "keyword_4")
-    private String keyword4;
+    @Column(name = "keywords", columnDefinition = "TEXT")
+    private String keywordsJson;
 
     @Column(name = "submission_time", nullable = false)
     private Instant submissionTime;

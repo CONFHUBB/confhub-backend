@@ -1,6 +1,6 @@
 package com.capstone.confms.entity;
 
-import com.capstone.confms.entity.enums.ActivityType;
+import com.capstone.confms.utils.enums.ActivityType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

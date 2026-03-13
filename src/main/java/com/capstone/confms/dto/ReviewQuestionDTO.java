@@ -1,6 +1,6 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.enums.ReviewQuestionType;
+import com.capstone.confms.utils.enums.ReviewQuestionType;
 import lombok.Data;
 
 import java.util.List;

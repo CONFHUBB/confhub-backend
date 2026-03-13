@@ -3,15 +3,21 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.ConferenceActivityDTO;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceActivity;
-import com.capstone.confms.entity.enums.ActivityType;
+import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceActivityRepository;
+import com.capstone.confms.repository.ConferenceTrackRepository;
+import com.capstone.confms.repository.PaperRepository;
+import com.capstone.confms.repository.ReviewRepository;
+import com.capstone.confms.repository.SubjectAreaRepository;
 import com.capstone.confms.service.ConferenceActivityService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +29,10 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
 
     private final ConferenceActivityRepository activityRepository;
     private final ConferenceRepository conferenceRepository;
+    private final ConferenceTrackRepository conferenceTrackRepository;
+    private final SubjectAreaRepository subjectAreaRepository;
+    private final PaperRepository paperRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     @Transactional
@@ -63,6 +73,17 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             activities = activityRepository.findByConferenceId(conferenceId);
         }
 
+        // BR-1.6: Auto-close expired activities
+        LocalDateTime now = LocalDateTime.now();
+        for (ConferenceActivity activity : activities) {
+            if (Boolean.TRUE.equals(activity.getIsEnabled())
+                    && activity.getDeadline() != null
+                    && activity.getDeadline().isBefore(now)) {
+                activity.setIsEnabled(false);
+                activityRepository.save(activity);
+            }
+        }
+
         return activities.stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -87,6 +108,14 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         for (ConferenceActivityDTO dto : activityDTOs) {
             ConferenceActivity activity = activityMap.get(dto.getActivityType());
             if (activity != null) {
+                // BR-1.5 + BR-1.7: Validate dependencies khi bật activity
+                boolean isEnabling = Boolean.TRUE.equals(dto.getIsEnabled())
+                        && !Boolean.TRUE.equals(activity.getIsEnabled());
+
+                if (isEnabling) {
+                    validateActivityDependencies(conferenceId, dto.getActivityType());
+                }
+
                 if (dto.getIsEnabled() != null) {
                     activity.setIsEnabled(dto.getIsEnabled());
                 }
@@ -103,6 +132,55 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         return savedActivities.stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * BR-1.5 + BR-1.7: Kiểm tra ràng buộc trước khi bật activity.
+     */
+    private void validateActivityDependencies(Integer conferenceId, ActivityType activityType) {
+        switch (activityType) {
+            case PAPER_SUBMISSION -> {
+                // BR-1.5: Phải có ít nhất 1 track + subject areas
+                var tracks = conferenceTrackRepository.findByConferenceId(conferenceId);
+                if (tracks.isEmpty()) {
+                    throw new BadRequestException(
+                            "Cannot enable PAPER_SUBMISSION: conference must have at least 1 track");
+                }
+                boolean hasSubjectAreas = tracks.stream()
+                        .anyMatch(t -> !subjectAreaRepository.findByTrackId(t.getId()).isEmpty());
+                if (!hasSubjectAreas) {
+                    throw new BadRequestException(
+                            "Cannot enable PAPER_SUBMISSION: conference must have subject areas configured");
+                }
+            }
+            case REVIEWER_BIDDING -> {
+                // BR-1.7: Phải có papers đã submit
+                var papers = paperRepository.findByTrack_Conference_Id(conferenceId);
+                if (papers.isEmpty()) {
+                    throw new BadRequestException(
+                            "Cannot enable REVIEWER_BIDDING: no papers have been submitted yet");
+                }
+            }
+            case REVIEW_SUBMISSION -> {
+                // BR-1.7: Phải có reviewer assignments (reviews)
+                var reviews = reviewRepository.findByPaper_Track_Conference_Id(conferenceId);
+                if (reviews.isEmpty()) {
+                    throw new BadRequestException(
+                            "Cannot enable REVIEW_SUBMISSION: no reviewers have been assigned to papers");
+                }
+            }
+            case REVIEW_DISCUSSION -> {
+                // Phải có reviews đã submit
+                var reviews = reviewRepository.findByPaper_Track_Conference_Id(conferenceId);
+                if (reviews.isEmpty()) {
+                    throw new BadRequestException(
+                            "Cannot enable REVIEW_DISCUSSION: no reviews exist yet");
+                }
+            }
+            default -> {
+                // AUTHOR_NOTIFICATION và CAMERA_READY_SUBMISSION: không có ràng buộc đặc biệt
+            }
+        }
     }
 
     private String formatActivityName(ActivityType type) {
@@ -129,3 +207,4 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         return dto;
     }
 }
+

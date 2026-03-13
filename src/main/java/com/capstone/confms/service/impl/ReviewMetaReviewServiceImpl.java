@@ -3,10 +3,13 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 import com.capstone.confms.entity.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewMetaReviewService;
 import com.capstone.confms.utils.PaginationUtils;
+import com.capstone.confms.utils.enums.Decision;
+import com.capstone.confms.utils.enums.PaperStatus;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +44,12 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     public ReviewMetaReviewResponseDTO createReviewMetaReview(ReviewMetaReviewDTO dto) {
         ReviewMetaReview entity = new ReviewMetaReview();
         mapDtoToReviewMetaReviewEntity(dto, entity);
-        return mapToReviewMetaReviewResponseDTO(reviewMetaReviewRepository.save(entity));
+        ReviewMetaReview saved = reviewMetaReviewRepository.save(entity);
+
+        // BR-3.21: Khi tạo meta-review → update paper status dựa vào decision
+        updatePaperStatusFromDecision(saved.getPaper(), saved.getFinalDecision());
+
+        return mapToReviewMetaReviewResponseDTO(saved);
     }
 
     @Override
@@ -50,7 +58,12 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
         ReviewMetaReview entity = reviewMetaReviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ReviewMetaReview not found with id " + id));
         mapDtoToReviewMetaReviewEntity(dto, entity);
-        return mapToReviewMetaReviewResponseDTO(reviewMetaReviewRepository.save(entity));
+        ReviewMetaReview saved = reviewMetaReviewRepository.save(entity);
+
+        // BR-3.21: Update paper status on decision change
+        updatePaperStatusFromDecision(saved.getPaper(), saved.getFinalDecision());
+
+        return mapToReviewMetaReviewResponseDTO(saved);
     }
 
     @Override
@@ -67,6 +80,25 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
             throw new ResourceNotFoundException("Cannot delete. ReviewMetaReview not found with id " + id);
         }
         reviewMetaReviewRepository.deleteById(id);
+    }
+
+    /**
+     * BR-3.21: Map meta-review decision → paper status
+     */
+    private void updatePaperStatusFromDecision(Paper paper, Decision decision) {
+        PaperStatus newStatus = switch (decision) {
+            case APPROVE -> PaperStatus.ACCEPTED;
+            case REJECT -> PaperStatus.REJECTED;
+            case REVISION -> paper.getStatus(); // Giữ nguyên, cần revision flow riêng
+        };
+
+        if (newStatus != paper.getStatus()) {
+            log.info("Meta-review decision {} → updating paper {} status from {} to {}",
+                    decision, paper.getId(), paper.getStatus(), newStatus);
+            paper.setStatus(newStatus);
+            paper.setUpdatedAt(LocalDateTime.now());
+            paperRepository.save(paper);
+        }
     }
 
     private void mapDtoToReviewMetaReviewEntity(ReviewMetaReviewDTO dto, ReviewMetaReview entity) {

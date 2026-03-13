@@ -20,10 +20,7 @@ public class PaperDTO {
     private Integer submissionFormId;
     private String title;
     private String abstractField;
-    private String keyword1;
-    private String keyword2;
-    private String keyword3;
-    private String keyword4;
+    private List<String> keywords;
     // JSON string chứa câu trả lời động theo ConferenceSubmissionForm.definitionJson
     private String extraAnswersJson;
     private Instant submissionTime;

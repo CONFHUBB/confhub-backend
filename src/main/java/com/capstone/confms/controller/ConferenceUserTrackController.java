@@ -32,7 +32,7 @@ public class ConferenceUserTrackController {
     }
 
     @GetMapping("/conferences/{conferenceId}/track-chairs")
-    @Operation(summary = "Get all users with TRACK_CHAIR role for a conference")
+    @Operation(summary = "Get all users with PROGRAM_CHAIR role for a conference")
     public ResponseEntity<PagedResponse<UserResponseDTO>> getTrackChairsByConferenceId(
             @PathVariable Integer conferenceId,
             @RequestParam(defaultValue = "0") int page,
@@ -44,7 +44,7 @@ public class ConferenceUserTrackController {
     }
 
     @GetMapping("/users/{userId}/chaired-conferences")
-    @Operation(summary = "Get all conferences where user is assigned as TRACK_CHAIR")
+    @Operation(summary = "Get all conferences where user is assigned as PROGRAM_CHAIR")
     public ResponseEntity<PagedResponse<ConferenceResponseDTO>> getChairedConferencesByUserId(
             @PathVariable Integer userId,
             @RequestParam(defaultValue = "0") int page,
@@ -56,7 +56,7 @@ public class ConferenceUserTrackController {
     }
 
     @GetMapping("/users/{userId}/organized-conferences")
-    @Operation(summary = "Get all conferences where user is assigned as ORGANIZER")
+    @Operation(summary = "Get all conferences where user is assigned as CONFERENCE_CHAIR")
     public ResponseEntity<PagedResponse<ConferenceResponseDTO>> getOrganizedConferencesByUserId(
             @PathVariable Integer userId,
             @RequestParam(defaultValue = "0") int page,

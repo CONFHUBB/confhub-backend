@@ -3,10 +3,17 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 import com.capstone.confms.entity.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
+import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.PaperService;
 import com.capstone.confms.utils.PaginationUtils;
+import com.capstone.confms.utils.enums.ActivityType;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
+import com.capstone.confms.utils.enums.PaperStatus;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,12 +21,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -29,8 +38,102 @@ public class PaperServiceImpl implements PaperService {
     private final PaperRepository paperRepository;
     private final ConferenceTrackRepository conferenceTrackRepository;
     private final SubjectAreaRepository subjectAreaRepository;
-    private final com.capstone.confms.repository.PaperAuthorRepository paperAuthorRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
     private final ConferenceSubmissionFormRepository conferenceSubmissionFormRepository;
+    private final ConferenceActivityRepository conferenceActivityRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
+    private final ObjectMapper objectMapper;
+
+    // ==================== VALID STATUS TRANSITIONS (BR-2.16) ====================
+    private static final Map<PaperStatus, Set<PaperStatus>> VALID_TRANSITIONS = Map.of(
+            PaperStatus.DRAFT, Set.of(PaperStatus.SUBMITTED, PaperStatus.WITHDRAWN),
+            PaperStatus.SUBMITTED, Set.of(PaperStatus.UNDER_REVIEW, PaperStatus.WITHDRAWN),
+            PaperStatus.UNDER_REVIEW, Set.of(PaperStatus.ACCEPTED, PaperStatus.REJECTED, PaperStatus.WITHDRAWN),
+            PaperStatus.ACCEPTED, Set.of(PaperStatus.PUBLISHED),
+            PaperStatus.REJECTED, Set.of(),
+            PaperStatus.WITHDRAWN, Set.of(PaperStatus.SUBMITTED),
+            PaperStatus.PUBLISHED, Set.of()
+    );
+
+    // ==================== CREATE ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO createPaper(PaperDTO dto) {
+        log.info("Creating new Paper with title: {}", dto.getTitle());
+
+        ConferenceTrack track = conferenceTrackRepository.findById(dto.getConferenceTrackId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Track not found with ID: " + dto.getConferenceTrackId()));
+
+        // BR-2.1: Check PAPER_SUBMISSION enabled + deadline
+        validatePaperSubmissionActivity(track.getConference().getId());
+
+        Paper paper = new Paper();
+        mapDtoToEntity(dto, paper, track);
+
+        // BR-2.4: DRAFT if no status specified or explicitly DRAFT
+        if (dto.getStatus() == null) {
+            paper.setStatus(PaperStatus.SUBMITTED);
+        }
+        paper.setSubmissionTime(Instant.now());
+
+        Paper saved = paperRepository.save(paper);
+
+        // BR-2.2: Auto-assign AUTHOR role
+        autoAssignAuthorRole(track.getConference().getId());
+
+        return mapToResponseDTO(saved);
+    }
+
+    // ==================== UPDATE ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO updatePaper(Integer id, PaperDTO dto) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+
+        // BR-2.13: Check activity enabled before edit
+        validatePaperSubmissionActivity(paper.getTrack().getConference().getId());
+
+        // BR-2.17: Không cho edit khi UNDER_REVIEW
+        if (paper.getStatus() == PaperStatus.UNDER_REVIEW) {
+            throw new BadRequestException("Cannot edit paper while it is under review");
+        }
+        if (paper.getStatus() == PaperStatus.WITHDRAWN) {
+            throw new BadRequestException("Cannot edit a withdrawn paper");
+        }
+
+        ConferenceTrack track = conferenceTrackRepository.findById(dto.getConferenceTrackId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Track not found with ID: " + dto.getConferenceTrackId()));
+        mapDtoToEntity(dto, paper, track);
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== UPDATE STATUS ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO updatePaperStatus(Integer id, PaperUpdateStatusDTO dto) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+
+        // BR-2.16: Validate status transition
+        validateStatusTransition(paper.getStatus(), dto.getStatus());
+
+        paper.setStatus(dto.getStatus());
+        paper.setUpdatedAt(LocalDateTime.now());
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== GET ====================
+    @Override
+    public PaperResponseDTO getPaperById(Integer id) {
+        return paperRepository.findById(id)
+                .map(this::mapToResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -41,49 +144,6 @@ public class PaperServiceImpl implements PaperService {
     }
 
     @Override
-    @Transactional
-    public PaperResponseDTO createPaper(PaperDTO dto) {
-        log.info("Registering new Paper with title: {}", dto.getTitle());
-        Paper paper = new Paper();
-        mapDtoToEntity(dto, paper);
-        return mapToResponseDTO(paperRepository.save(paper));
-    }
-
-    @Override
-    @Transactional
-    public PaperResponseDTO updatePaper(Integer id, PaperDTO dto) {
-        Paper paper = paperRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
-        mapDtoToEntity(dto, paper);
-        return mapToResponseDTO(paperRepository.save(paper));
-    }
-
-    @Override
-    @Transactional
-    public PaperResponseDTO updatePaperStatus(Integer id, PaperUpdateStatusDTO dto) {
-        Paper paper = paperRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
-        mapDtoToEntity(dto, paper);
-        return mapToResponseDTO(paperRepository.save(paper));
-    }
-
-    @Override
-    public PaperResponseDTO getPaperById(Integer id) {
-        return paperRepository.findById(id)
-                .map(this::mapToResponseDTO)
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
-    }
-
-    @Override
-    @Transactional
-    public void deletePaper(Integer id) {
-        if (!paperRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Cannot delete. Paper not found with id " + id);
-        }
-        paperRepository.deleteById(id);
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public PagedResponse<PaperResponseDTO> getPapersByAuthor(Integer authorId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
@@ -91,11 +151,135 @@ public class PaperServiceImpl implements PaperService {
         return PaginationUtils.toPagedResponse(paperAuthors, pa -> mapToResponseDTO(pa.getPaper()));
     }
 
-    private void mapDtoToEntity(PaperDTO dto, Paper entity) {
-        ConferenceTrack conferenceTrack = conferenceTrackRepository.findById(dto.getConferenceTrackId())
-                .orElseThrow(
-                        () -> new EntityNotFoundException("Track not found with ID: " + dto.getConferenceTrackId()));
+    // ==================== DELETE ====================
+    @Override
+    @Transactional
+    public void deletePaper(Integer id) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cannot delete. Paper not found with id " + id));
 
+        // BR-2.14: Không xóa nếu đã có reviews
+        long reviewCount = reviewRepository.countByPaper_Id(id);
+        if (reviewCount > 0) {
+            throw new BadRequestException(
+                    "Cannot delete paper: it has " + reviewCount + " review(s). Use 'withdraw' instead.");
+        }
+
+        paperRepository.deleteById(id);
+    }
+
+    // ==================== WITHDRAW (BR-2.15) ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO withdrawPaper(Integer id) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+
+        // Chỉ withdraw từ SUBMITTED hoặc UNDER_REVIEW
+        if (paper.getStatus() != PaperStatus.SUBMITTED
+                && paper.getStatus() != PaperStatus.UNDER_REVIEW
+                && paper.getStatus() != PaperStatus.DRAFT) {
+            throw new BadRequestException(
+                    "Can only withdraw papers with status DRAFT, SUBMITTED, or UNDER_REVIEW. Current: "
+                            + paper.getStatus());
+        }
+
+        paper.setStatus(PaperStatus.WITHDRAWN);
+        paper.setUpdatedAt(LocalDateTime.now());
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== RESTORE (BR-2.15) ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO restorePaper(Integer id) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+
+        if (paper.getStatus() != PaperStatus.WITHDRAWN) {
+            throw new BadRequestException("Can only restore WITHDRAWN papers. Current: " + paper.getStatus());
+        }
+
+        paper.setStatus(PaperStatus.SUBMITTED);
+        paper.setUpdatedAt(LocalDateTime.now());
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== VALIDATION HELPERS ====================
+
+    /**
+     * BR-2.1 + BR-2.13: Check PAPER_SUBMISSION activity enabled + deadline
+     */
+    private void validatePaperSubmissionActivity(Integer conferenceId) {
+        ConferenceActivity activity = conferenceActivityRepository
+                .findByConferenceIdAndActivityType(conferenceId, ActivityType.PAPER_SUBMISSION)
+                .orElse(null);
+
+        if (activity == null || !Boolean.TRUE.equals(activity.getIsEnabled())) {
+            throw new BadRequestException("Paper submission is not currently open for this conference");
+        }
+
+        if (activity.getDeadline() != null && activity.getDeadline().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("Paper submission deadline has passed: " + activity.getDeadline());
+        }
+    }
+
+    /**
+     * BR-2.16: Validate paper status transition
+     */
+    private void validateStatusTransition(PaperStatus current, PaperStatus target) {
+        Set<PaperStatus> allowed = VALID_TRANSITIONS.get(current);
+        if (allowed == null || !allowed.contains(target)) {
+            throw new BadRequestException(
+                    "Invalid status transition: " + current + " → " + target);
+        }
+    }
+
+    /**
+     * BR-2.2: Auto-assign AUTHOR role khi submit paper
+     */
+    private void autoAssignAuthorRole(Integer conferenceId) {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl userDetails)) {
+                return;
+            }
+            Integer userId = userDetails.getId();
+
+            // Check if user already has AUTHOR role in this conference
+            List<ConferenceUserTrack> existing = conferenceUserTrackRepository
+                    .findAllByUser_IdAndConference_Id(userId, conferenceId);
+            boolean hasAuthorRole = existing.stream()
+                    .anyMatch(cut -> cut.getAssignedRole() == ConferenceTrackRole.AUTHOR);
+
+            if (!hasAuthorRole) {
+                User user = userRepository.findById(userId).orElse(null);
+                if (user == null) return;
+
+                Conference conference = conferenceTrackRepository.findByConferenceId(conferenceId)
+                        .stream().findFirst()
+                        .map(ConferenceTrack::getConference)
+                        .orElse(null);
+                if (conference == null) return;
+
+                ConferenceUserTrack authorTrack = new ConferenceUserTrack();
+                authorTrack.setUser(user);
+                authorTrack.setConference(conference);
+                authorTrack.setAssignedRole(ConferenceTrackRole.AUTHOR);
+                authorTrack.setInvitedAt(LocalDateTime.now());
+                authorTrack.setIsAccepted(true);
+                authorTrack.setIsRegistered(true);
+                conferenceUserTrackRepository.save(authorTrack);
+                log.info("Auto-assigned AUTHOR role to user {} in conference {}", userId, conferenceId);
+            }
+        } catch (Exception e) {
+            log.warn("Could not auto-assign AUTHOR role: {}", e.getMessage());
+        }
+    }
+
+    // ==================== MAPPING ====================
+
+    private void mapDtoToEntity(PaperDTO dto, Paper entity, ConferenceTrack track) {
         SubjectArea primarySA = null;
         if (dto.getPrimarySubjectAreaId() != null) {
             primarySA = subjectAreaRepository.findById(dto.getPrimarySubjectAreaId())
@@ -118,29 +302,23 @@ public class PaperServiceImpl implements PaperService {
                             "Submission Form not found with ID: " + dto.getSubmissionFormId()));
         }
 
-        entity.setAbstractField(dto.getAbstractField());
-        entity.setStatus(dto.getStatus());
         entity.setTitle(dto.getTitle());
-        entity.setKeyword1(dto.getKeyword1());
-        entity.setKeyword2(dto.getKeyword2());
-        entity.setKeyword3(dto.getKeyword3());
-        entity.setKeyword4(dto.getKeyword4());
+        entity.setAbstractField(dto.getAbstractField());
+        entity.setKeywordsJson(serializeKeywords(dto.getKeywords()));
         entity.setSubmissionForm(submissionForm);
         entity.setExtraAnswersJson(dto.getExtraAnswersJson());
-        entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism());
-        entity.setSubmissionTime(dto.getSubmissionTime());
-        entity.setTrack(conferenceTrack);
+        entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism() != null ? dto.getIsPassedPlagiarism() : false);
+        entity.setTrack(track);
         entity.setPrimarySubjectArea(primarySA);
         entity.setSecondarySubjectAreas(secondarySAs);
-        // Handling auditing fields if not automatically handled by JPA Auditing
-        if (entity.getId() == null) {
-            entity.setCreatedAt(LocalDateTime.now());
-        }
-        entity.setUpdatedAt(LocalDateTime.now());
-    }
 
-    private void mapDtoToEntity(PaperUpdateStatusDTO dto, Paper entity) {
-        entity.setStatus(dto.getStatus());
+        if (dto.getStatus() != null) {
+            entity.setStatus(dto.getStatus());
+        }
+        if (dto.getSubmissionTime() != null) {
+            entity.setSubmissionTime(dto.getSubmissionTime());
+        }
+
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
@@ -160,15 +338,31 @@ public class PaperServiceImpl implements PaperService {
                 .secondarySubjectAreaIds(secondaryIds)
                 .title(entity.getTitle())
                 .abstractField(entity.getAbstractField())
-                .keyword1(entity.getKeyword1())
-                .keyword2(entity.getKeyword2())
-                .keyword3(entity.getKeyword3())
-                .keyword4(entity.getKeyword4())
+                .keywords(deserializeKeywords(entity.getKeywordsJson()))
                 .isPassedPlagiarism(entity.getIsPassedPlagiarism())
                 .submissionTime(entity.getSubmissionTime())
                 .status(entity.getStatus())
                 .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)
                 .extraAnswersJson(entity.getExtraAnswersJson())
                 .build();
+    }
+
+    private String serializeKeywords(List<String> keywords) {
+        if (keywords == null || keywords.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(keywords);
+        } catch (JsonProcessingException e) {
+            return String.join(",", keywords);
+        }
+    }
+
+    private List<String> deserializeKeywords(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (JsonProcessingException e) {
+            return List.of(json.split(","));
+        }
     }
 }

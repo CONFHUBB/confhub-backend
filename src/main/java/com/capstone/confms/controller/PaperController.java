@@ -74,4 +74,16 @@ public class PaperController {
         paperService.deletePaper(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}/withdraw")
+    @Operation(summary = "Withdraw a submitted paper (BR-2.15)")
+    public ResponseEntity<PaperResponseDTO> withdrawPaper(@PathVariable Integer id) {
+        return ResponseEntity.ok(paperService.withdrawPaper(id));
+    }
+
+    @PutMapping("/{id}/restore")
+    @Operation(summary = "Restore a withdrawn paper (BR-2.15, Chair only)")
+    public ResponseEntity<PaperResponseDTO> restorePaper(@PathVariable Integer id) {
+        return ResponseEntity.ok(paperService.restorePaper(id));
+    }
 }

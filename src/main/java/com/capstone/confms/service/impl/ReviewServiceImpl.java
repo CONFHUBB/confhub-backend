@@ -3,10 +3,13 @@ package com.capstone.confms.service.impl;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 import com.capstone.confms.entity.*;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewService;
 import com.capstone.confms.utils.PaginationUtils;
+import com.capstone.confms.utils.enums.ActivityType;
+import com.capstone.confms.utils.enums.ReviewStatus;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +20,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -27,6 +35,17 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final PaperRepository paperRepository;
     private final UserRepository userRepository;
+    private final ConferenceActivityRepository activityRepository;
+    private final ReviewAnswerRepository reviewAnswerRepository;
+    private final ReviewQuestionRepository reviewQuestionRepository;
+
+    // BR-3.14: Valid review status transitions
+    private static final Map<ReviewStatus, Set<ReviewStatus>> VALID_TRANSITIONS = Map.of(
+            ReviewStatus.ASSIGNED, Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.DECLINED),
+            ReviewStatus.IN_PROGRESS, Set.of(ReviewStatus.COMPLETED),
+            ReviewStatus.COMPLETED, Set.of(),
+            ReviewStatus.DECLINED, Set.of()
+    );
 
     @Override
     @Transactional(readOnly = true)
@@ -39,7 +58,13 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewResponseDTO createReview(ReviewDTO dto) {
-        log.info("Registering new Review for paper ID: {}", dto.getPaperId() != null ? dto.getPaperId() : "Unknown");
+        log.info("Creating new Review for paper ID: {}", dto.getPaperId());
+
+        // BR-3.15: Check REVIEW_SUBMISSION activity enabled
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+        validateReviewActivity(paper.getTrack().getConference().getId());
+
         Review review = new Review();
         mapDtoToEntity(dto, review);
         return mapToResponseDTO(reviewRepository.save(review));
@@ -50,6 +75,20 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewResponseDTO updateReview(Integer id, ReviewDTO dto) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id " + id));
+
+        // BR-3.14: Validate status transition nếu status thay đổi
+        if (dto.getStatus() != null && dto.getStatus() != review.getStatus()) {
+            validateStatusTransition(review.getStatus(), dto.getStatus());
+
+            // BR-3.17: Nếu chuyển sang COMPLETED → validate required questions
+            if (dto.getStatus() == ReviewStatus.COMPLETED) {
+                validateRequiredQuestionsCompleted(review);
+                // BR-3.18: Tính totalScore từ answers
+                BigDecimal calculatedScore = calculateTotalScore(review.getId());
+                review.setTotalScore(calculatedScore);
+            }
+        }
+
         mapDtoToEntity(dto, review);
         return mapToResponseDTO(reviewRepository.save(review));
     }
@@ -70,6 +109,84 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.deleteById(id);
     }
 
+    // ==================== Validation Helpers ====================
+
+    /**
+     * BR-3.14: Validate review status transition
+     */
+    private void validateStatusTransition(ReviewStatus current, ReviewStatus target) {
+        Set<ReviewStatus> allowed = VALID_TRANSITIONS.get(current);
+        if (allowed == null || !allowed.contains(target)) {
+            throw new BadRequestException("Invalid review status transition: " + current + " → " + target);
+        }
+    }
+
+    /**
+     * BR-3.15: Check REVIEW_SUBMISSION activity enabled
+     */
+    private void validateReviewActivity(Integer conferenceId) {
+        Optional<ConferenceActivity> activity = activityRepository
+                .findByConferenceIdAndActivityType(conferenceId, ActivityType.REVIEW_SUBMISSION);
+        if (activity.isEmpty() || !Boolean.TRUE.equals(activity.get().getIsEnabled())) {
+            throw new BadRequestException("Review submission is not currently open for this conference");
+        }
+        if (activity.get().getDeadline() != null && activity.get().getDeadline().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("Review submission deadline has passed");
+        }
+    }
+
+    /**
+     * BR-3.17: Validate all required questions answered before completing
+     */
+    private void validateRequiredQuestionsCompleted(Review review) {
+        Integer trackId = review.getPaper().getTrack().getId();
+        List<ReviewQuestion> requiredQuestions = reviewQuestionRepository.findByTrackIdOrderByOrderIndexAsc(trackId)
+                .stream()
+                .filter(q -> Boolean.TRUE.equals(q.getIsRequired()))
+                .toList();
+
+        List<ReviewAnswer> answers = reviewAnswerRepository.findByReview_Id(review.getId());
+        Set<Integer> answeredQuestionIds = answers.stream()
+                .map(a -> a.getQuestion().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (ReviewQuestion rq : requiredQuestions) {
+            if (!answeredQuestionIds.contains(rq.getId())) {
+                throw new BadRequestException(
+                        "Cannot complete review: required question '" + rq.getText()
+                                + "' (ID: " + rq.getId() + ") has not been answered");
+            }
+        }
+    }
+
+    /**
+     * BR-3.18: Calculate totalScore from ReviewAnswers
+     * Score = average of all numeric answer values (from selectedChoice.scoreValue)
+     */
+    private BigDecimal calculateTotalScore(Integer reviewId) {
+        List<ReviewAnswer> answers = reviewAnswerRepository.findByReview_Id(reviewId);
+        if (answers.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        double totalScore = 0.0;
+        int scoredAnswers = 0;
+        for (ReviewAnswer answer : answers) {
+            if (answer.getSelectedChoice() != null && answer.getSelectedChoice().getValue() != null) {
+                totalScore += answer.getSelectedChoice().getValue().doubleValue();
+                scoredAnswers++;
+            }
+        }
+
+        if (scoredAnswers == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return BigDecimal.valueOf(totalScore / scoredAnswers).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    // ==================== Mapping ====================
+
     private void mapDtoToEntity(ReviewDTO dto, Review entity) {
         Paper paper = paperRepository.findById(dto.getPaperId())
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
@@ -79,8 +196,12 @@ public class ReviewServiceImpl implements ReviewService {
 
         entity.setPaper(paper);
         entity.setReviewer(reviewer);
-        entity.setStatus(dto.getStatus());
-        entity.setTotalScore(dto.getTotalScore());
+        if (dto.getStatus() != null) {
+            entity.setStatus(dto.getStatus());
+        }
+        if (dto.getTotalScore() != null) {
+            entity.setTotalScore(dto.getTotalScore());
+        }
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }

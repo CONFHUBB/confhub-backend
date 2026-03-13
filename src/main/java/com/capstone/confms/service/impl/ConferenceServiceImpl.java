@@ -52,7 +52,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         ConferenceUserTrack organizerTrack = new ConferenceUserTrack();
         organizerTrack.setUser(currentUser);
         organizerTrack.setConference(savedConference);
-        organizerTrack.setAssignedRole(ConferenceTrackRole.ORGANIZER);
+        organizerTrack.setAssignedRole(ConferenceTrackRole.CONFERENCE_CHAIR);
         organizerTrack.setInvitedAt(LocalDateTime.now());
         organizerTrack.setIsAccepted(true);
         organizerTrack.setIsRegistered(true);
@@ -87,6 +87,11 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference existing = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
+        // BR-1.3: Không cho sửa conference đã COMPLETED hoặc CANCELLED
+        if (existing.getStatus() == ConferenceStatus.COMPLETED || existing.getStatus() == ConferenceStatus.CANCELLED) {
+            throw new BadRequestException("Cannot update a conference with status " + existing.getStatus());
+        }
+
         mapDtoToEntity(dto, existing);
         return mapToResponseDTO(repository.save(existing));
     }
@@ -107,6 +112,13 @@ public class ConferenceServiceImpl implements ConferenceService {
         log.info("Opening submissions for conference ID: {}", id);
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        // BR-1.3: Chỉ SCHEDULED mới chuyển sang ONGOING
+        if (conference.getStatus() != ConferenceStatus.SCHEDULED) {
+            throw new BadRequestException(
+                    "Can only open submissions for SCHEDULED conferences. Current status: " + conference.getStatus());
+        }
+
         conference.setStatus(ConferenceStatus.ONGOING);
         Conference saved = repository.save(conference);
         return mapToResponseDTO(saved);
@@ -115,15 +127,50 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public ConferenceResponseDTO approveConference(Integer id) {
-        log.info("ApprovingConference for conference ID: {}", id);
+        log.info("Approving conference ID: {}", id);
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        // BR-1.3: Chỉ PENDING mới approve
         if (conference.getStatus() != ConferenceStatus.PENDING) {
-            throw new IllegalStateException("Only conferences with PENDING status can be approved.");
+            throw new BadRequestException("Only conferences with PENDING status can be approved.");
         }
         conference.setStatus(ConferenceStatus.SCHEDULED);
         Conference saved = repository.save(conference);
         return mapToResponseDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO completeConference(Integer id) {
+        log.info("Completing conference ID: {}", id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        // BR-1.3: Chỉ ONGOING mới complete
+        if (conference.getStatus() != ConferenceStatus.ONGOING) {
+            throw new BadRequestException(
+                    "Can only complete ONGOING conferences. Current status: " + conference.getStatus());
+        }
+        conference.setStatus(ConferenceStatus.COMPLETED);
+        return mapToResponseDTO(repository.save(conference));
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO cancelConference(Integer id) {
+        log.info("Cancelling conference ID: {}", id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        // BR-1.3: Không cancel nếu đã COMPLETED hoặc đã CANCELLED
+        if (conference.getStatus() == ConferenceStatus.COMPLETED
+                || conference.getStatus() == ConferenceStatus.CANCELLED) {
+            throw new BadRequestException(
+                    "Cannot cancel a conference with status " + conference.getStatus());
+        }
+        conference.setStatus(ConferenceStatus.CANCELLED);
+        return mapToResponseDTO(repository.save(conference));
     }
 
     private User getCurrentAuthenticatedUser() {

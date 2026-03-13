@@ -1,7 +1,6 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.Paper;
-import com.capstone.confms.entity.User;
+import com.capstone.confms.utils.enums.ReviewStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +15,6 @@ import java.math.BigDecimal;
 public class ReviewDTO {
     private Integer paperId;
     private Integer reviewerId;
-    private String status;
+    private ReviewStatus status;
     private BigDecimal totalScore;
-}
+}

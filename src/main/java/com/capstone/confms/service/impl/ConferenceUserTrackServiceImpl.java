@@ -10,7 +10,9 @@ import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
+import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
@@ -35,6 +37,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         private final UserRepository userRepository;
         private final ConferenceRepository conferenceRepository;
         private final ConferenceTrackRepository conferenceTrackRepository;
+        private final ReviewRepository reviewRepository;
 
         @Override
         @Transactional(readOnly = true)
@@ -44,7 +47,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                                 "Conference not found with id " + conferenceId));
 
                 List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
-                                .findByConference_IdAndAssignedRole(conferenceId, ConferenceTrackRole.TRACK_CHAIR);
+                                .findByConference_IdAndAssignedRole(conferenceId, ConferenceTrackRole.PROGRAM_CHAIR);
 
                 List<User> distinctUsers = cuts.stream()
                                 .map(ConferenceUserTrack::getUser)
@@ -67,7 +70,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
                 List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
-                                .findByUser_IdAndAssignedRole(userId, ConferenceTrackRole.TRACK_CHAIR);
+                                .findByUser_IdAndAssignedRole(userId, ConferenceTrackRole.PROGRAM_CHAIR);
 
                 List<Conference> distinctConferences = cuts.stream()
                                 .map(ConferenceUserTrack::getConference)
@@ -91,7 +94,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
                 List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
-                                .findByUser_IdAndAssignedRole(userId, ConferenceTrackRole.ORGANIZER);
+                                .findByUser_IdAndAssignedRole(userId, ConferenceTrackRole.CONFERENCE_CHAIR);
 
                 List<Conference> distinctConferences = cuts.stream()
                                 .map(ConferenceUserTrack::getConference)
@@ -189,10 +192,33 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         @Override
         @Transactional
         public void removeRoleFromUser(Integer conferenceUserTrackId) {
-                if (!conferenceUserTrackRepository.existsById(conferenceUserTrackId)) {
-                        throw new ResourceNotFoundException(
-                                        "ConferenceUserTrack not found with id " + conferenceUserTrackId);
+                ConferenceUserTrack cut = conferenceUserTrackRepository.findById(conferenceUserTrackId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "ConferenceUserTrack not found with id " + conferenceUserTrackId));
+
+                // BR-1.9a: Không xóa CONFERENCE_CHAIR cuối cùng
+                if (cut.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR) {
+                        long chairCount = conferenceUserTrackRepository
+                                        .findByConference_IdAndAssignedRole(
+                                                        cut.getConference().getId(), ConferenceTrackRole.CONFERENCE_CHAIR)
+                                        .size();
+                        if (chairCount <= 1) {
+                                throw new BadRequestException(
+                                                "Cannot remove the last Conference Chair. A conference must have at least one chair.");
+                        }
                 }
+
+                // BR-1.9b: Không gỡ REVIEWER nếu còn assignments
+                if (cut.getAssignedRole() == ConferenceTrackRole.REVIEWER) {
+                        long assignmentCount = reviewRepository.countByReviewer_IdAndPaper_Track_Conference_Id(
+                                        cut.getUser().getId(), cut.getConference().getId());
+                        if (assignmentCount > 0) {
+                                throw new BadRequestException(
+                                                "Cannot remove REVIEWER role: this reviewer still has " + assignmentCount
+                                                                + " paper assignment(s). Remove assignments first.");
+                        }
+                }
+
                 conferenceUserTrackRepository.deleteById(conferenceUserTrackId);
         }
 

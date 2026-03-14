@@ -379,15 +379,15 @@ ASSIGNED → IN_PROGRESS → COMPLETED
 ## 📝 Checklist cho FE team
 
 ### Ưu tiên cao (BREAKING — sẽ lỗi ngay)
-- [ ] Sửa `keyword1-4` → `keywords: string[]` ở tất cả files
-- [ ] Update `PaperStatus` type (thêm DRAFT, WITHDRAWN, CAMERA_READY, PUBLISHED)
-- [ ] Xóa `types/review-type.ts` và `review-type.tsx`
+- [x] Sửa `keyword1-4` → `keywords: string[]` ở tất cả files ✅
+- [x] Update `PaperStatus` type (thêm DRAFT, WITHDRAWN, CAMERA_READY, PUBLISHED) ✅
+- [x] Xóa `types/review-type.ts` và `review-type.tsx` ✅
 
 ### Ưu tiên trung bình (Missing features)
-- [ ] Thêm API functions: `withdrawPaper`, `restorePaper`
-- [ ] Thêm API functions: `completeConference`, `cancelConference`
-- [ ] Thêm buttons Withdraw/Restore trên paper detail page
-- [ ] Handle new 400 error messages (toast notifications)
+- [x] Thêm API functions: `withdrawPaper`, `restorePaper` ✅
+- [x] Thêm API functions: `completeConference`, `cancelConference` ✅
+- [x] Thêm buttons Withdraw/Restore trên paper detail page ✅
+- [x] Handle new 400 error messages (toast notifications) ✅
 
 ### Ưu tiên thấp (New features — Flow 3)
 - [ ] Tạo `types/bidding.ts`

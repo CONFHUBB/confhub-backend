@@ -1,6 +1,6 @@
 # 📋 MVP Functional Requirements — Checklist
 
-> **Ngày cập nhật:** 2026-03-14  
+> **Ngày cập nhật:** 2026-03-15  
 > **Dự án:** ConfMS — Conference Management System  
 > **Legend:**  
 > ✅ = Đã implement (BE + FE)  
@@ -61,12 +61,12 @@
 
 | # | Functional Requirement | Status | Chi tiết |
 |---|---|---|---|
-| 3.1 | Bid on papers (Yes/Maybe/No) | 🔧 | `BiddingController` full CRUD + relevance scoring (BR-3.1→3.4), chưa có FE |
+| 3.1 | Bid on papers (Yes/Maybe/No) | ✅ | `BiddingController` full CRUD + FE `/conference/[id]/reviewer/bidding` |
 | 3.2 | Download assigned papers | ❌ | `PaperFile` entity tồn tại, chưa có download API for reviewers |
-| 3.3 | Submit reviews (scores + comments) | 🔧 | `ReviewController` + `ReviewAnswerController` + `ReviewCommentController`. Chưa có FE |
+| 3.3 | Submit reviews (scores + comments) | ✅ | `ReviewController` + `ReviewAnswerController` + FE `/conference/[id]/reviewer/review/[reviewId]` |
 | 3.4 | Discussion phase with other reviewers | 🔧 | `ReviewComment` entity có, chưa có discussion thread FE |
-| 3.5 | Edit own reviews before deadline | 🔧 | `ReviewController.updateReview()` API có, chưa có FE |
-| 3.6 | See only assigned papers (double-blind) | 🔧 | `PaperForBiddingDTO.isDoubleBlind` + ẩn abstract. Chưa có reviewer dashboard FE |
+| 3.5 | Edit own reviews before deadline | ✅ | `ReviewController.updateReview()` + FE review page |
+| 3.6 | See only assigned papers (double-blind) | ✅ | `PaperForBiddingDTO.isDoubleBlind` + FE reviewer console |
 | 3.7 | Receive automatic reminders | ❌ | Chưa có scheduled reminder system |
 | 3.8 | Mobile app: read offline | ❌ | Chưa có mobile app |
 
@@ -81,13 +81,13 @@
 | 4.3 | Submit new paper + upload PDF | ✅ | `PaperController.create` + `PaperFileController.upload` + FE `track/[trackId]/submit/page.tsx` |
 | 4.4 | Add co-authors | ✅ | `PaperAuthorController` + FE "Add Authors" step |
 | 4.5 | Edit submission before deadline | ✅ | `PaperController.update()` + validation BR-2.13 + FE `paper/[paperId]/page.tsx` |
-| 4.6 | Withdraw submission | 🔧 | `PaperController.withdrawPaper()` API (BR-2.15), chưa có FE button |
-| 4.7 | Receive plagiarism & format-check reports | 📦 | `Paper.isPassedPlagiarism` flag, chưa có auto-check integration |
-| 4.8 | View real-time submission status | ✅ | FE `paper/page.tsx` "My Submissions" hiện status |
+| 4.6 | Withdraw submission | ✅ | `PaperController.withdrawPaper()` + FE button trong `paper/[paperId]/page.tsx` |
+| 4.7 | ~~Plagiarism & format-check~~ | 🚫 | Đã xóa `isPassedPlagiarism` — không thuộc MVP (2026-03-15) |
+| 4.8 | View real-time submission status | ✅ | FE `paper/page.tsx` redesigned: summary cards + card layout + status badges |
 | 4.9 | Upload rebuttal (if enabled) | ❌ | `PaperRebuttal` entity đã bị xóa. Cần tạo lại nếu enable |
 | 4.10 | Submit camera-ready version | ❌ | `PaperStatus.CAMERA_READY` có enum, chưa có upload flow riêng |
 | 4.11 | Register for conference & pay fee | 📦 | `Ticket` + `Payment` entities, VNPay basic. Chưa có FE registration flow |
-| 4.12 | Receive notifications (desktop + email + push) | 📦 | `Notification` entity (shell), `EmailController` basic. Chưa có push/desktop |
+| 4.12 | Receive notifications (desktop + email + push) | ✅ | `Notification` entity hoàn chỉnh + FE `notification-bell.tsx` real-time polling |
 | 4.13 | Download acceptance letter, invoice, visa support letter | ❌ | Chưa có document generation |
 
 ---
@@ -123,26 +123,24 @@
 
 | Status | Số lượng | % |
 |---|---|---|
-| ✅ Đã implement (BE + FE) | 14 | 30% |
-| 🔧 Có BE, chưa có FE | 15 | 32% |
-| 📦 Có entity, chưa có logic | 6 | 13% |
-| ❌ Chưa implement | 12 | 25% |
-| **Tổng (MVP)** | **47** | **100%** |
+| ✅ Đã implement (BE + FE) | 19 | 41% |
+| 🔧 Có BE, chưa có FE | 10 | 22% |
+| 📦 Có entity, chưa có logic | 5 | 11% |
+| ❌ Chưa implement | 11 | 24% |
+| 🚫 Không thuộc MVP | 1 | 2% |
+| **Tổng (MVP)** | **46** | **100%** |
 
 ### Khu vực cần ưu tiên
 
 **1. FE cho features đã có BE (🔧 → ✅):**
-- Bidding page cho Reviewer
-- Review form cho Reviewer
 - Reviewer Assignment dashboard cho Program Chair
 - Meta-review page cho Program Chair
-- Withdraw/Restore buttons cho Author
 - Conference complete/cancel cho Chair
 - Papers-in-track view cho Track Chair
+- Discussion thread cho Reviewers
 
 **2. Logic cần hoàn thiện (📦 → 🔧):**
 - Ticket/Payment CRUD + FE registration flow
-- Notification system (entity cần thêm fields: title, message, type, isRead)
 - Conference fee configuration
 
 **3. Features hoàn toàn mới (❌):**

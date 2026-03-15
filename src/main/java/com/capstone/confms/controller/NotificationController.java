@@ -1,0 +1,71 @@
+package com.capstone.confms.controller;
+
+import com.capstone.confms.dto.NotificationDTO;
+import com.capstone.confms.dto.response.NotificationResponseDTO;
+import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.service.NotificationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/notifications")
+@RequiredArgsConstructor
+@Tag(name = "Notifications", description = "APIs for managing user notifications")
+public class NotificationController {
+
+    private final NotificationService notificationService;
+
+    @PostMapping
+    @Operation(summary = "Create a notification")
+    public ResponseEntity<NotificationResponseDTO> createNotification(
+            @Valid @RequestBody NotificationDTO dto) {
+        return new ResponseEntity<>(notificationService.createNotification(dto), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "Get notifications for a user (paginated, newest first)")
+    public ResponseEntity<PagedResponse<NotificationResponseDTO>> getNotificationsByUser(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(notificationService.getNotificationsByUser(userId, page, size));
+    }
+
+    @GetMapping("/user/{userId}/unread-count")
+    @Operation(summary = "Get unread notification count for a user")
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@PathVariable Integer userId) {
+        long count = notificationService.getUnreadCount(userId);
+        return ResponseEntity.ok(Map.of("count", count));
+    }
+
+    @PutMapping("/{id}/read")
+    @Operation(summary = "Mark a notification as read")
+    public ResponseEntity<NotificationResponseDTO> markAsRead(@PathVariable Integer id) {
+        return ResponseEntity.ok(notificationService.markAsRead(id));
+    }
+
+    @PutMapping("/user/{userId}/read-all")
+    @Operation(summary = "Mark all notifications as read for a user")
+    public ResponseEntity<Void> markAllAsRead(@PathVariable Integer userId) {
+        notificationService.markAllAsRead(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a notification")
+    public ResponseEntity<Void> deleteNotification(@PathVariable Integer id) {
+        notificationService.deleteNotification(id);
+        return ResponseEntity.noContent().build();
+    }
+}

@@ -30,6 +30,8 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     private final ReviewMetaReviewRepository reviewMetaReviewRepository;
     private final PaperRepository paperRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,6 +51,9 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
         // BR-3.21: Khi tạo meta-review → update paper status dựa vào decision
         updatePaperStatusFromDecision(saved.getPaper(), saved.getFinalDecision());
 
+        // Notification: notify authors about the decision
+        notifyAuthorsAboutDecision(saved);
+
         return mapToReviewMetaReviewResponseDTO(saved);
     }
 
@@ -62,6 +67,9 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
 
         // BR-3.21: Update paper status on decision change
         updatePaperStatusFromDecision(saved.getPaper(), saved.getFinalDecision());
+
+        // Notification: notify authors about the updated decision
+        notifyAuthorsAboutDecision(saved);
 
         return mapToReviewMetaReviewResponseDTO(saved);
     }
@@ -127,5 +135,45 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
                 .finalDecision(entity.getFinalDecision())
                 .reason(entity.getReason())
                 .build();
+    }
+
+    private void notifyAuthorsAboutDecision(ReviewMetaReview metaReview) {
+        try {
+            Paper paper = metaReview.getPaper();
+            Conference conference = paper.getTrack().getConference();
+            Decision decision = metaReview.getFinalDecision();
+
+            if (decision == Decision.REVISION) return; // Skip revision notifications for now
+
+            String decisionText = decision == Decision.APPROVE ? "ACCEPTED" : "REJECTED";
+            String title = "Paper " + decisionText + ": " + paper.getTitle();
+            String message = "Your paper \"" + paper.getTitle() + "\" in \"" + conference.getName()
+                    + "\" has been " + decisionText.toLowerCase() + ".";
+            if (metaReview.getReason() != null && !metaReview.getReason().isBlank()) {
+                message += " Reason: " + metaReview.getReason();
+            }
+
+            // Get all authors of the paper
+            java.util.Set<Integer> notifiedIds = new java.util.HashSet<>();
+            var paperAuthors = paperAuthorRepository.findByPaperId(paper.getId());
+            for (var pa : paperAuthors) {
+                if (pa.getUser() != null && notifiedIds.add(pa.getUser().getId())) {
+                    User author = pa.getUser();
+                    if (author != null) {
+                        notificationRepository.save(Notification.builder()
+                                .user(author)
+                                .conference(conference)
+                                .title(title)
+                                .message(message)
+                                .type("PAPER_DECISION")
+                                .link("/conference/" + conference.getId() + "/author")
+                                .isRead(false)
+                                .build());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create meta-review decision notification: {}", e.getMessage());
+        }
     }
 }

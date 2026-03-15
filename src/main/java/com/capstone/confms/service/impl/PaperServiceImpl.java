@@ -44,6 +44,7 @@ public class PaperServiceImpl implements PaperService {
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final NotificationRepository notificationRepository;
     private final ObjectMapper objectMapper;
 
     // ==================== VALID STATUS TRANSITIONS (BR-2.16) ====================
@@ -83,6 +84,28 @@ public class PaperServiceImpl implements PaperService {
 
         // BR-2.2: Auto-assign AUTHOR role
         autoAssignAuthorRole(track.getConference().getId());
+
+        // Notification: paper submitted
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl userDetails) {
+                User currentUser = userRepository.findById(userDetails.getId()).orElse(null);
+                if (currentUser != null) {
+                    Notification notification = Notification.builder()
+                            .user(currentUser)
+                            .conference(track.getConference())
+                            .title("Paper submitted successfully")
+                            .message("Your paper \"" + saved.getTitle() + "\" has been submitted to \"" + track.getConference().getName() + "\".")
+                            .type("PAPER_SUBMITTED")
+                            .link("/conference/" + track.getConference().getId() + "/author")
+                            .isRead(false)
+                            .build();
+                    notificationRepository.save(notification);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create paper submission notification: {}", e.getMessage());
+        }
 
         return mapToResponseDTO(saved);
     }
@@ -186,7 +209,30 @@ public class PaperServiceImpl implements PaperService {
 
         paper.setStatus(PaperStatus.WITHDRAWN);
         paper.setUpdatedAt(LocalDateTime.now());
-        return mapToResponseDTO(paperRepository.save(paper));
+        Paper saved = paperRepository.save(paper);
+
+        // Notification: notify chairs about withdrawal
+        try {
+            Conference conference = saved.getTrack().getConference();
+            List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                    .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.CONFERENCE_CHAIR);
+            for (ConferenceUserTrack chair : chairs) {
+                Notification notification = Notification.builder()
+                        .user(chair.getUser())
+                        .conference(conference)
+                        .title("Paper withdrawn")
+                        .message("Paper \"" + saved.getTitle() + "\" has been withdrawn from \"" + conference.getName() + "\".")
+                        .type("PAPER_WITHDRAWN")
+                        .link("/conference/" + conference.getId() + "/update")
+                        .isRead(false)
+                        .build();
+                notificationRepository.save(notification);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create paper withdrawal notification: {}", e.getMessage());
+        }
+
+        return mapToResponseDTO(saved);
     }
 
     // ==================== RESTORE (BR-2.15) ====================
@@ -307,7 +353,6 @@ public class PaperServiceImpl implements PaperService {
         entity.setKeywordsJson(serializeKeywords(dto.getKeywords()));
         entity.setSubmissionForm(submissionForm);
         entity.setExtraAnswersJson(dto.getExtraAnswersJson());
-        entity.setIsPassedPlagiarism(dto.getIsPassedPlagiarism() != null ? dto.getIsPassedPlagiarism() : false);
         entity.setTrack(track);
         entity.setPrimarySubjectArea(primarySA);
         entity.setSecondarySubjectAreas(secondarySAs);
@@ -339,7 +384,6 @@ public class PaperServiceImpl implements PaperService {
                 .title(entity.getTitle())
                 .abstractField(entity.getAbstractField())
                 .keywords(deserializeKeywords(entity.getKeywordsJson()))
-                .isPassedPlagiarism(entity.getIsPassedPlagiarism())
                 .submissionTime(entity.getSubmissionTime())
                 .status(entity.getStatus())
                 .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)

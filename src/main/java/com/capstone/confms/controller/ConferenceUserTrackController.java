@@ -95,6 +95,25 @@ public class ConferenceUserTrackController {
         return ResponseEntity.ok(conferenceUserTrackService.getConferenceUsersWithRoles(conferenceId, page, size));
     }
 
+    @GetMapping("/users/{userId}/reviewer-conferences")
+    @Operation(summary = "Get all conferences where user is assigned as REVIEWER (accepted only)")
+    public ResponseEntity<PagedResponse<ConferenceResponseDTO>> getReviewerConferencesByUserId(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(conferenceUserTrackService.getReviewerConferencesByUserId(userId, page, size));
+    }
+
+    @GetMapping("/users/{userId}/my-roles")
+    @Operation(summary = "Get all role assignments for a user across all conferences")
+    public ResponseEntity<java.util.List<ConferenceUserTrackResponseDTO>> getUserRoleAssignments(
+            @PathVariable Integer userId) {
+        return ResponseEntity.ok(conferenceUserTrackService.getUserRoleAssignments(userId));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Remove a role assignment from a user")
     public ResponseEntity<Void> removeRoleFromUser(@PathVariable Integer id) {

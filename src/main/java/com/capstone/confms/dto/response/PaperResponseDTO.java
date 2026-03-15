@@ -18,7 +18,6 @@ public class PaperResponseDTO {
     private String abstractField;
     private List<String> keywords;
     private Instant submissionTime;
-    private Boolean isPassedPlagiarism;
     private PaperStatus status;
     private Integer submissionFormId;
     private String extraAnswersJson;

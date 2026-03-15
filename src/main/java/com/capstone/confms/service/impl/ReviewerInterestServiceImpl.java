@@ -69,6 +69,14 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
         reviewerInterestRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<ReviewerInterestResponseDTO> getInterestsByReviewerId(Integer reviewerId) {
+        return reviewerInterestRepository.findByReviewer_Id(reviewerId).stream()
+                .map(this::mapToReviewerInterestResponseDTO)
+                .toList();
+    }
+
     private void mapDtoToReviewerInterestEntity(ReviewerInterestDTO dto, ReviewerInterest entity) {
         User reviewer = userRepository.findById(dto.getReviewerId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getReviewerId()));

@@ -57,9 +57,6 @@ public class Paper extends BaseEntity {
     @Column(name = "submission_time", nullable = false)
     private Instant submissionTime;
 
-    @Column(name = "is_passed_plagiarism", nullable = false)
-    private Boolean isPassedPlagiarism = false;
-
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     private PaperStatus status;

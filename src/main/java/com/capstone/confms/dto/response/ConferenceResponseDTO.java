@@ -16,6 +16,7 @@ public class ConferenceResponseDTO {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private ConferenceStatus status;
+    private String websiteUrl;
     private LocalDateTime createdAt;
 
     private String area;

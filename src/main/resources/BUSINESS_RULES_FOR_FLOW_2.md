@@ -169,7 +169,8 @@ DRAFT → SUBMITTED → UNDER_REVIEW → ACCEPTED → PUBLISHED
 | BR-2.18: Extra answers JSON | `Paper.extraAnswersJson` |
 | FIX: Keywords đổi JSON | `Paper.keywordsJson` TEXT, DTO dùng `List<String>` |
 | FIX: PaperAuthor thêm orderIndex + isPrimaryContact | `PaperAuthor.java` |
-| FIX: Paper.isPassedPlagiarism giữ làm flag đơn giản | `Paper.java` |
+
+> **2026-03-15:** Đã xóa `Paper.isPassedPlagiarism` — feature chưa triển khai, loại khỏi MVP.
 
 ### ⚠️ CẦN LÀM THÊM (Enhancement)
 | Business Rule | Ghi chú |
@@ -177,4 +178,5 @@ DRAFT → SUBMITTED → UNDER_REVIEW → ACCEPTED → PUBLISHED
 | BR-2.10: Auto-detect conflicts (cùng organization) | Cần thêm logic so sánh user.organization khi tạo paper |
 | BR-2.7: Author ordering API (reorder authors) | Entity có orderIndex, cần API endpoint để reorder |
 | BR-2.8: Author list lock (Chair config) | Cần setting trong ConferenceSubmissionForm |
+
 

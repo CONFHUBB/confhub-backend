@@ -16,4 +16,6 @@ public interface ConferenceUserTrackRepository extends JpaRepository<ConferenceU
     List<ConferenceUserTrack> findAllByUser_IdAndConference_Id(Integer userId, Integer conferenceId);
 
     List<ConferenceUserTrack> findByConference_Id(Integer conferenceId);
+
+    List<ConferenceUserTrack> findByUser_Id(Integer userId);
 }

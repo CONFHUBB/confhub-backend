@@ -7,6 +7,8 @@ import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.UserResponseDTO;
 import com.capstone.confms.dto.response.UserWithRolesResponseDTO;
 
+import java.util.List;
+
 public interface ConferenceUserTrackService {
 
     ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request);
@@ -16,6 +18,10 @@ public interface ConferenceUserTrackService {
     PagedResponse<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId, int page, int size);
 
     PagedResponse<ConferenceResponseDTO> getOrganizedConferencesByUserId(Integer userId, int page, int size);
+
+    PagedResponse<ConferenceResponseDTO> getReviewerConferencesByUserId(Integer userId, int page, int size);
+
+    List<ConferenceUserTrackResponseDTO> getUserRoleAssignments(Integer userId);
 
     ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId);
 

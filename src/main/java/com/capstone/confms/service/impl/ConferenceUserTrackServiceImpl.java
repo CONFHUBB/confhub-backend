@@ -13,6 +13,8 @@ import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ReviewRepository;
+import com.capstone.confms.repository.NotificationRepository;
+import com.capstone.confms.entity.Notification;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
@@ -38,6 +40,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         private final ConferenceRepository conferenceRepository;
         private final ConferenceTrackRepository conferenceTrackRepository;
         private final ReviewRepository reviewRepository;
+        private final NotificationRepository notificationRepository;
 
         @Override
         @Transactional(readOnly = true)
@@ -111,6 +114,43 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         }
 
         @Override
+        @Transactional(readOnly = true)
+        public PagedResponse<ConferenceResponseDTO> getReviewerConferencesByUserId(Integer userId, int page, int size) {
+                userRepository.findById(userId)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
+
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
+                                .findByUser_IdAndAssignedRole(userId, ConferenceTrackRole.REVIEWER);
+
+                List<Conference> distinctConferences = cuts.stream()
+                                .filter(cut -> Boolean.TRUE.equals(cut.getIsAccepted()))
+                                .map(ConferenceUserTrack::getConference)
+                                .collect(Collectors.toMap(Conference::getId, Function.identity(), (a, b) -> a,
+                                                LinkedHashMap::new))
+                                .values().stream()
+                                .toList();
+
+                List<ConferenceResponseDTO> all = distinctConferences.stream()
+                                .map(this::mapConferenceToResponseDTO)
+                                .toList();
+
+                return paginateList(all, page, size);
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<ConferenceUserTrackResponseDTO> getUserRoleAssignments(Integer userId) {
+                userRepository.findById(userId)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
+
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository.findByUser_Id(userId);
+
+                return cuts.stream()
+                                .map(this::mapToResponseDTO)
+                                .toList();
+        }
+
+        @Override
         @Transactional
         public ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request) {
                 User user = userRepository.findById(request.getUserId())
@@ -131,31 +171,95 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 entity.setAssignedRole(request.getAssignedRole());
                 entity.setInvitedAt(LocalDateTime.now());
                 ConferenceUserTrack saved = conferenceUserTrackRepository.save(entity);
+
+                // Auto-create notification — only if not already sent for this user+conference
+                boolean alreadyNotified = notificationRepository
+                                .existsByUser_IdAndConference_IdAndType(user.getId(), conference.getId(), "INVITATION");
+                if (!alreadyNotified) {
+                        String roleName = formatRoleName(request.getAssignedRole());
+                        Notification notification = Notification.builder()
+                                        .user(user)
+                                        .conference(conference)
+                                        .title("You have been invited as " + roleName)
+                                        .message("You have been invited to join \"" + conference.getName() + "\" as " + roleName + ".")
+                                        .type("INVITATION")
+                                        .link("/conference/reviewer-select")
+                                        .isRead(false)
+                                        .build();
+                        notificationRepository.save(notification);
+                }
+
                 return mapToResponseDTO(saved);
         }
 
         @Override
         @Transactional
         public ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId) {
-                ConferenceUserTrack cut = conferenceUserTrackRepository
-                                .findByUser_IdAndConference_Id(userId, conferenceId)
-                                .orElseThrow(() -> new ResourceNotFoundException(
-                                                "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
-                                                                + conferenceId));
-                cut.setIsAccepted(true);
-                return mapToResponseDTO(conferenceUserTrackRepository.save(cut));
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
+                                .findAllByUser_IdAndConference_Id(userId, conferenceId);
+                if (cuts.isEmpty()) {
+                        throw new ResourceNotFoundException(
+                                        "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
+                                                        + conferenceId);
+                }
+                cuts.forEach(cut -> cut.setIsAccepted(true));
+                List<ConferenceUserTrack> saved = conferenceUserTrackRepository.saveAll(cuts);
+
+                // Notify conference chairs that user accepted
+                User user = cuts.get(0).getUser();
+                Conference conference = cuts.get(0).getConference();
+                String roleName = formatRoleName(cuts.get(0).getAssignedRole());
+                List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                                .findByConference_IdAndAssignedRole(conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
+                for (ConferenceUserTrack chair : chairs) {
+                        Notification notification = Notification.builder()
+                                        .user(chair.getUser())
+                                        .conference(conference)
+                                        .title(user.getFirstName() + " " + user.getLastName() + " accepted invitation")
+                                        .message(user.getEmail() + " has accepted the " + roleName + " role in \"" + conference.getName() + "\".")
+                                        .type("ROLE_ACCEPTED")
+                                        .link("/conference/" + conferenceId + "/update")
+                                        .isRead(false)
+                                        .build();
+                        notificationRepository.save(notification);
+                }
+
+                return mapToResponseDTO(saved.get(0));
         }
 
         @Override
         @Transactional
         public ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId) {
-                ConferenceUserTrack cut = conferenceUserTrackRepository
-                                .findByUser_IdAndConference_Id(userId, conferenceId)
-                                .orElseThrow(() -> new ResourceNotFoundException(
-                                                "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
-                                                                + conferenceId));
-                cut.setIsAccepted(false);
-                return mapToResponseDTO(conferenceUserTrackRepository.save(cut));
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
+                                .findAllByUser_IdAndConference_Id(userId, conferenceId);
+                if (cuts.isEmpty()) {
+                        throw new ResourceNotFoundException(
+                                        "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
+                                                        + conferenceId);
+                }
+                cuts.forEach(cut -> cut.setIsAccepted(false));
+                List<ConferenceUserTrack> saved = conferenceUserTrackRepository.saveAll(cuts);
+
+                // Notify conference chairs that user declined
+                User user = cuts.get(0).getUser();
+                Conference conference = cuts.get(0).getConference();
+                String roleName = formatRoleName(cuts.get(0).getAssignedRole());
+                List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                                .findByConference_IdAndAssignedRole(conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
+                for (ConferenceUserTrack chair : chairs) {
+                        Notification notification = Notification.builder()
+                                        .user(chair.getUser())
+                                        .conference(conference)
+                                        .title(user.getFirstName() + " " + user.getLastName() + " declined invitation")
+                                        .message(user.getEmail() + " has declined the " + roleName + " role in \"" + conference.getName() + "\".")
+                                        .type("ROLE_DECLINED")
+                                        .link("/conference/" + conferenceId + "/update")
+                                        .isRead(false)
+                                        .build();
+                        notificationRepository.save(notification);
+                }
+
+                return mapToResponseDTO(saved.get(0));
         }
 
         @Override
@@ -217,6 +321,25 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                                 "Cannot remove REVIEWER role: this reviewer still has " + assignmentCount
                                                                 + " paper assignment(s). Remove assignments first.");
                         }
+                }
+
+                // Notify the removed user
+                String roleName = formatRoleName(cut.getAssignedRole());
+                boolean hasOtherRolesInConference = conferenceUserTrackRepository
+                                .findAllByUser_IdAndConference_Id(cut.getUser().getId(), cut.getConference().getId())
+                                .stream().anyMatch(c -> !c.getId().equals(conferenceUserTrackId));
+                if (!hasOtherRolesInConference) {
+                        // Only notify when removing the last role entry (avoid spam for multi-track removals)
+                        Notification notification = Notification.builder()
+                                        .user(cut.getUser())
+                                        .conference(cut.getConference())
+                                        .title("Your " + roleName + " role has been removed")
+                                        .message("Your " + roleName + " role in \"" + cut.getConference().getName() + "\" has been removed by the conference chair.")
+                                        .type("ROLE_REMOVED")
+                                        .link("/conference/" + cut.getConference().getId())
+                                        .isRead(false)
+                                        .build();
+                        notificationRepository.save(notification);
                 }
 
                 conferenceUserTrackRepository.deleteById(conferenceUserTrackId);
@@ -284,5 +407,15 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                 .totalPages(totalPages)
                                 .last(last)
                                 .build();
+        }
+
+        private String formatRoleName(ConferenceTrackRole role) {
+                return switch (role) {
+                        case CONFERENCE_CHAIR -> "Conference Chair";
+                        case PROGRAM_CHAIR -> "Program Chair";
+                        case REVIEWER -> "Reviewer";
+                        case AUTHOR -> "Author";
+                        case ATTENDEE -> "Attendee";
+                };
         }
 }

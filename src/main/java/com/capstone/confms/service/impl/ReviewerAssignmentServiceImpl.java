@@ -4,7 +4,9 @@ import com.capstone.confms.dto.request.AutoAssignConfigDTO;
 import com.capstone.confms.dto.response.AssignmentPreviewDTO;
 import com.capstone.confms.dto.response.AssignmentPreviewItemDTO;
 import com.capstone.confms.entity.Bidding;
+import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceUserTrack;
+import com.capstone.confms.entity.Notification;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.Review;
 import com.capstone.confms.entity.SubjectArea;
@@ -14,6 +16,7 @@ import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.BiddingRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.NotificationRepository;
 import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
@@ -50,6 +53,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
     private final PaperConflictRepository paperConflictRepository;
     private final ReviewerInterestRepository reviewerInterestRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final NotificationRepository notificationRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -214,6 +218,19 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             reviewRepository.save(review);
             confirmed.add(item);
             log.info("Assigned paper {} to reviewer {}", item.getPaperId(), item.getReviewerId());
+
+            // Notification: review assigned
+            Conference conference = paper.getTrack().getConference();
+            Notification notification = Notification.builder()
+                    .user(reviewer)
+                    .conference(conference)
+                    .title("New paper assigned for review")
+                    .message("You have been assigned to review \"" + paper.getTitle() + "\" in \"" + conference.getName() + "\".")
+                    .type("REVIEW_ASSIGNED")
+                    .link("/conference/" + conference.getId() + "/reviewer")
+                    .isRead(false)
+                    .build();
+            notificationRepository.save(notification);
         }
 
         return confirmed;
@@ -246,6 +263,19 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         review.setUpdatedAt(LocalDateTime.now());
 
         reviewRepository.save(review);
+
+        // Notification: review assigned (manual)
+        Conference conference = paper.getTrack().getConference();
+        Notification notification = Notification.builder()
+                .user(reviewer)
+                .conference(conference)
+                .title("New paper assigned for review")
+                .message("You have been assigned to review \"" + paper.getTitle() + "\" in \"" + conference.getName() + "\".")
+                .type("REVIEW_ASSIGNED")
+                .link("/conference/" + conference.getId() + "/reviewer")
+                .isRead(false)
+                .build();
+        notificationRepository.save(notification);
 
         return AssignmentPreviewItemDTO.builder()
                 .paperId(paper.getId())

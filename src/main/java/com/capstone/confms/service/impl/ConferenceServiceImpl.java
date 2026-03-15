@@ -10,6 +10,7 @@ import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.NotificationRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.ConferenceService;
@@ -17,7 +18,9 @@ import com.capstone.confms.service.ConferenceActivityService;
 import com.capstone.confms.utils.PaginationUtils;
 import com.capstone.confms.utils.enums.ConferenceStatus;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
+import com.capstone.confms.entity.Notification;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +39,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     private final ConferenceRepository repository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final ConferenceActivityService conferenceActivityService;
 
@@ -60,6 +64,18 @@ public class ConferenceServiceImpl implements ConferenceService {
         
         // Auto-initialize standard timeline activities
         conferenceActivityService.initializeDefaultActivitiesForConference(savedConference.getId());
+
+        // Notification: conference created
+        Notification notification = Notification.builder()
+                .user(currentUser)
+                .conference(savedConference)
+                .title("Conference created successfully")
+                .message("Your conference \"" + savedConference.getName() + "\" has been created and is pending approval.")
+                .type("CONFERENCE_CREATED")
+                .link("/conference/" + savedConference.getId() + "/update")
+                .isRead(false)
+                .build();
+        notificationRepository.save(notification);
 
         return mapToResponseDTO(savedConference);
     }
@@ -121,6 +137,8 @@ public class ConferenceServiceImpl implements ConferenceService {
 
         conference.setStatus(ConferenceStatus.ONGOING);
         Conference saved = repository.save(conference);
+        notifyAllMembers(saved, "Conference is now live",
+                "\"" + saved.getName() + "\" is now open for submissions.", "CONFERENCE_STATUS");
         return mapToResponseDTO(saved);
     }
 
@@ -137,6 +155,8 @@ public class ConferenceServiceImpl implements ConferenceService {
         }
         conference.setStatus(ConferenceStatus.SCHEDULED);
         Conference saved = repository.save(conference);
+        notifyAllMembers(saved, "Conference has been scheduled",
+                "\"" + saved.getName() + "\" has been approved and scheduled.", "CONFERENCE_STATUS");
         return mapToResponseDTO(saved);
     }
 
@@ -153,7 +173,10 @@ public class ConferenceServiceImpl implements ConferenceService {
                     "Can only complete ONGOING conferences. Current status: " + conference.getStatus());
         }
         conference.setStatus(ConferenceStatus.COMPLETED);
-        return mapToResponseDTO(repository.save(conference));
+        Conference saved = repository.save(conference);
+        notifyAllMembers(saved, "Conference completed",
+                "\"" + saved.getName() + "\" has been marked as completed.", "CONFERENCE_STATUS");
+        return mapToResponseDTO(saved);
     }
 
     @Override
@@ -170,7 +193,10 @@ public class ConferenceServiceImpl implements ConferenceService {
                     "Cannot cancel a conference with status " + conference.getStatus());
         }
         conference.setStatus(ConferenceStatus.CANCELLED);
-        return mapToResponseDTO(repository.save(conference));
+        Conference saved = repository.save(conference);
+        notifyAllMembers(saved, "Conference cancelled",
+                "\"" + saved.getName() + "\" has been cancelled by the chair.", "CONFERENCE_STATUS");
+        return mapToResponseDTO(saved);
     }
 
     private User getCurrentAuthenticatedUser() {
@@ -213,6 +239,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .startDate(entity.getStartDate())
                 .endDate(entity.getEndDate())
                 .status(entity.getStatus())
+                .websiteUrl(entity.getWebsiteUrl())
                 .createdAt(entity.getCreatedAt())
                 .area(entity.getArea())
                 .societySponsor(entity.getSocietySponsor())
@@ -223,5 +250,28 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .contactInformation(entity.getContactInformation())
                 .chairEmails(entity.getChairEmails())
                 .build();
+    }
+
+    private void notifyAllMembers(Conference conference, String title, String message, String type) {
+        List<ConferenceUserTrack> allMembers = conferenceUserTrackRepository.findByConference_Id(conference.getId());
+        // Deduplicate by userId
+        allMembers.stream()
+                .map(cut -> cut.getUser().getId())
+                .distinct()
+                .forEach(uid -> {
+                    User user = userRepository.findById(uid).orElse(null);
+                    if (user != null) {
+                        Notification n = Notification.builder()
+                                .user(user)
+                                .conference(conference)
+                                .title(title)
+                                .message(message)
+                                .type(type)
+                                .link("/conference/" + conference.getId())
+                                .isRead(false)
+                                .build();
+                        notificationRepository.save(n);
+                    }
+                });
     }
 }

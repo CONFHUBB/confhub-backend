@@ -13,5 +13,7 @@ public interface ReviewerInterestService {
 
     ReviewerInterestResponseDTO getReviewerInterestById(Integer id);
 
+    java.util.List<ReviewerInterestResponseDTO> getInterestsByReviewerId(Integer reviewerId);
+
     void deleteReviewerInterest(Integer id);
 }

@@ -9,6 +9,7 @@ import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewService;
 import com.capstone.confms.utils.PaginationUtils;
 import com.capstone.confms.utils.enums.ActivityType;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import com.capstone.confms.utils.enums.ReviewStatus;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,8 @@ public class ReviewServiceImpl implements ReviewService {
     private final ConferenceActivityRepository activityRepository;
     private final ReviewAnswerRepository reviewAnswerRepository;
     private final ReviewQuestionRepository reviewQuestionRepository;
+    private final NotificationRepository notificationRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     // BR-3.14: Valid review status transitions
     private static final Map<ReviewStatus, Set<ReviewStatus>> VALID_TRANSITIONS = Map.of(
@@ -90,7 +93,47 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         mapDtoToEntity(dto, review);
-        return mapToResponseDTO(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+
+        // Notification: review completed → notify chairs
+        if (dto.getStatus() == ReviewStatus.COMPLETED) {
+            try {
+                Conference conference = saved.getPaper().getTrack().getConference();
+                String reviewerName = saved.getReviewer().getFirstName() + " " + saved.getReviewer().getLastName();
+                // Notify CONFERENCE_CHAIR + PROGRAM_CHAIR
+                List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.CONFERENCE_CHAIR);
+                List<ConferenceUserTrack> pChairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.PROGRAM_CHAIR);
+                Set<Integer> notifiedIds = new java.util.HashSet<>();
+                for (ConferenceUserTrack chair : chairs) {
+                    if (notifiedIds.add(chair.getUser().getId())) {
+                        notificationRepository.save(Notification.builder()
+                                .user(chair.getUser()).conference(conference)
+                                .title("Review completed by " + reviewerName)
+                                .message(reviewerName + " has completed their review for \"" + saved.getPaper().getTitle() + "\".")
+                                .type("REVIEW_COMPLETED")
+                                .link("/conference/" + conference.getId() + "/update")
+                                .isRead(false).build());
+                    }
+                }
+                for (ConferenceUserTrack pc : pChairs) {
+                    if (notifiedIds.add(pc.getUser().getId())) {
+                        notificationRepository.save(Notification.builder()
+                                .user(pc.getUser()).conference(conference)
+                                .title("Review completed by " + reviewerName)
+                                .message(reviewerName + " has completed their review for \"" + saved.getPaper().getTitle() + "\".")
+                                .type("REVIEW_COMPLETED")
+                                .link("/conference/" + conference.getId() + "/update")
+                                .isRead(false).build());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to create review completed notification: {}", e.getMessage());
+            }
+        }
+
+        return mapToResponseDTO(saved);
     }
 
     @Override

@@ -24,6 +24,5 @@ public class PaperDTO {
     // JSON string chứa câu trả lời động theo ConferenceSubmissionForm.definitionJson
     private String extraAnswersJson;
     private Instant submissionTime;
-    private Boolean isPassedPlagiarism;
     private PaperStatus status;
 }

@@ -58,4 +58,11 @@ public class ReviewerInterestController {
         reviewerInterestService.deleteReviewerInterest(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/reviewer/{reviewerId}")
+    @Operation(summary = "Get all interests for a specific reviewer")
+    public ResponseEntity<java.util.List<ReviewerInterestResponseDTO>> getInterestsByReviewerId(
+            @PathVariable Integer reviewerId) {
+        return ResponseEntity.ok(reviewerInterestService.getInterestsByReviewerId(reviewerId));
+    }
 }

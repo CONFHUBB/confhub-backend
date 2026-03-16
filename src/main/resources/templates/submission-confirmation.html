@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Submission Confirmation</title>
+</head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0;">
+<div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background-color: #2980b9; padding: 24px 32px;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Submission Confirmation</h2>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 32px;">
+        <p style="color: #333; font-size: 16px; margin-top: 0;">
+            Dear <strong th:text="${authorName}">[Author Name]</strong>,
+        </p>
+
+        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            Your paper has been successfully submitted to
+            <strong th:text="${conferenceName}">[Conference Name]</strong>.
+        </p>
+
+        <div style="background-color: #f0f7ff; border-left: 4px solid #2980b9; padding: 16px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 8px 0; color: #555; font-size: 14px;">
+                <strong>Paper ID:</strong> <span th:text="${paperId}">#</span>
+            </p>
+            <p style="margin: 0; color: #555; font-size: 14px;">
+                <strong>Title:</strong> <span th:text="${paperTitle}">[Paper Title]</span>
+            </p>
+        </div>
+
+        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            You will receive further notifications regarding the review process. Please ensure your submission is complete before the deadline.
+        </p>
+
+        <p style="color: #999; font-size: 13px; margin-top: 28px; border-top: 1px solid #eee; padding-top: 16px;">
+            This is an automated message from the Conference Management System. Please do not reply to this email.
+        </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8f9fa; padding: 16px 32px; text-align: center;">
+        <p style="color: #999; font-size: 12px; margin: 0;">
+            © Conference Management System (CONFMS)
+        </p>
+    </div>
+</div>
+</body>
+</html>

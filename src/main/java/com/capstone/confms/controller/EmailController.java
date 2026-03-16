@@ -2,6 +2,8 @@ package com.capstone.confms.controller;
 
 
 import com.capstone.confms.dto.EmailDTO;
+import com.capstone.confms.dto.request.BulkEmailRequestDTO;
+import com.capstone.confms.service.ConferenceUserTrackService;
 import com.capstone.confms.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +17,8 @@ import org.springframework.mail.MailException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URI;
+
 
 @RestController
 @RequestMapping("/api/v1/email")
@@ -24,15 +28,13 @@ public class EmailController {
 
 
     private final EmailService emailService;
+    private final ConferenceUserTrackService conferenceUserTrackService;
 
-    @Value("${spring.mail.username}")
-    private String fromEmail;
+    @Value("${app.base-url}")
+    private String baseUrl;
 
-    @Value("${app.redirect.accept}")
-    private String acceptRedirectUrl;
-
-    @Value("${app.redirect.decline}")
-    private String declineRedirectUrl;
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
 
     @PostMapping
@@ -49,12 +51,17 @@ public class EmailController {
     }
 
     @PostMapping(value = "/invite", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Send a conference invitation email", description = "Send an HTML invitation email with Accept and Decline links, and an optional file attachment.")
+    @Operation(summary = "Send a conference invitation email",
+            description = "Send an HTML invitation email with Accept and Decline links using real token. Requires conferenceId and role.")
     public ResponseEntity<String> sendInvitationEmail(
             @RequestParam("to") String to,
             @RequestParam("recipientName") String recipientName,
             @RequestParam("subject") String subject,
             @RequestParam("conferenceName") String conferenceName,
+            @RequestParam("conferenceId") Integer conferenceId,
+            @RequestParam("role") String role,
+            @RequestParam(value = "trackName", required = false) String trackName,
+            @RequestParam("invitationToken") String invitationToken,
             @RequestPart(value = "file", required = false) MultipartFile file) {
 
         try {
@@ -66,8 +73,11 @@ public class EmailController {
                 fileName = file.getOriginalFilename();
             }
 
+            String acceptLink = baseUrl + "/api/v1/email/accept/" + invitationToken;
+            String declineLink = baseUrl + "/api/v1/email/decline/" + invitationToken;
+
             emailService.sendInvitationEmail(to, recipientName, subject, conferenceName,
-                    acceptRedirectUrl, declineRedirectUrl, fileData, fileName);
+                    role, trackName, acceptLink, declineLink, fileData, fileName);
             return ResponseEntity.ok("Invitation email sent successfully to: " + to);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Send email unsuccessfully. Internal mail server error: " + e.getMessage());
@@ -76,21 +86,46 @@ public class EmailController {
 
 
     @GetMapping("/accept/{token}")
-    @Operation(summary = "Execute when user clicks Accept in the email", description = "Handle the logic when a user clicks the Accept link in the email. The token is used to identify the specific request/transaction.")
-    public ResponseEntity<String> acceptEmail(@PathVariable String token) {
-        // TODO: Query database to find the request/transaction associated with the token
-
-        return ResponseEntity.ok("<h1>Cảm ơn bạn!</h1>\n" +
-                "<p>Bạn đã XÁC NHẬN yêu cầu thành công.</p>\n" +
-                "<br>\n" +
-                "<a href=\"https://youtu.be/YzKMMbBsa8s?si=0PYHeI46Td-8PV6b\" style=\"display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;\">Tiếp tục</a>");
+    @Operation(summary = "Accept invitation via email link",
+            description = "Handle the logic when a user clicks the Accept link in the invitation email. Validates token, updates DB, and redirects to frontend.")
+    public ResponseEntity<Void> acceptEmail(@PathVariable String token) {
+        try {
+            conferenceUserTrackService.acceptByToken(token);
+            return ResponseEntity.status(302)
+                    .location(URI.create(frontendUrl + "/invitation/accepted?token=" + token))
+                    .build();
+        } catch (Exception e) {
+            return ResponseEntity.status(302)
+                    .location(URI.create(frontendUrl + "/invitation/error?message=" + e.getMessage()))
+                    .build();
+        }
     }
 
     @GetMapping("/decline/{token}")
-    @Operation(summary = "Execute when user clicks Decline in the email", description = "Handle the logic when a user clicks the Decline link in the email. The token is used to identify the specific request/transaction.")
-    public ResponseEntity<String> declineEmail(@PathVariable String token) {
-        // TODO: Query database to find the request/transaction associated with the token
+    @Operation(summary = "Decline invitation via email link",
+            description = "Handle the logic when a user clicks the Decline link in the invitation email. Validates token, updates DB, and redirects to frontend.")
+    public ResponseEntity<Void> declineEmail(@PathVariable String token) {
+        try {
+            conferenceUserTrackService.declineByToken(token);
+            return ResponseEntity.status(302)
+                    .location(URI.create(frontendUrl + "/invitation/declined?token=" + token))
+                    .build();
+        } catch (Exception e) {
+            return ResponseEntity.status(302)
+                    .location(URI.create(frontendUrl + "/invitation/error?message=" + e.getMessage()))
+                    .build();
+        }
+    }
 
-        return ResponseEntity.ok("<h1>Đã hủy!</h1><p>Bạn đã TỪ CHỐI yêu cầu này.</p>");
+    @PostMapping("/bulk")
+    @Operation(summary = "Send bulk email to a group of conference participants",
+            description = "Send email to all reviewers, authors, or other groups in a conference")
+    public ResponseEntity<String> sendBulkEmail(@Valid @RequestBody BulkEmailRequestDTO request) {
+        try {
+            emailService.sendBulkEmail(request);
+            return ResponseEntity.ok("Bulk email sent successfully");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to send bulk email: " + e.getMessage());
+        }
     }
 }

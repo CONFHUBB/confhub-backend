@@ -51,4 +51,10 @@ public class ConferenceUserTrack extends BaseEntity{
     @Column(name = "is_registered")
     private Boolean isRegistered;
 
+    @Column(name = "invitation_token", unique = true)
+    private String invitationToken;
+
+    @Column(name = "token_expires_at")
+    private LocalDateTime tokenExpiresAt;
+
 }

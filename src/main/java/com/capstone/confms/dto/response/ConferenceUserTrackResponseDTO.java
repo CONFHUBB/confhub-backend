@@ -15,6 +15,8 @@ public class ConferenceUserTrackResponseDTO {
     private LocalDateTime invitedAt;
     private Boolean isAccepted;
     private Boolean isRegistered;
+    private String invitationToken;
+    private LocalDateTime tokenExpiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

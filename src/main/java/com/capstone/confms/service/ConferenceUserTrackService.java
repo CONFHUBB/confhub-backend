@@ -27,6 +27,12 @@ public interface ConferenceUserTrackService {
 
     ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId);
 
+    ConferenceUserTrackResponseDTO acceptByToken(String token);
+
+    ConferenceUserTrackResponseDTO declineByToken(String token);
+
+    ConferenceUserTrackResponseDTO resendInvitation(Integer conferenceUserTrackId);
+
     PagedResponse<UserWithRolesResponseDTO> getConferenceUsersWithRoles(Integer conferenceId, int page, int size);
 
     void removeRoleFromUser(Integer conferenceUserTrackId);

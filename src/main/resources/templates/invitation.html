@@ -4,25 +4,62 @@
     <meta charset="UTF-8">
     <title>Conference Invitation</title>
 </head>
-<body>
-<h2 style="color: #2c3e50;">Conference Management System</h2>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0;">
+<div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
-<p>Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,</p>
+    <!-- Header -->
+    <div style="background-color: #2c3e50; padding: 24px 32px;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Conference Management System</h2>
+    </div>
 
-<p>You have been invited to participate in the conference: <strong th:text="${conferenceName}">[Conference Name]</strong>.</p>
+    <!-- Body -->
+    <div style="padding: 32px;">
+        <p style="color: #333; font-size: 16px; margin-top: 0;">
+            Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,
+        </p>
 
-<p>Please review the invitation and confirm your participation by clicking one of the buttons below.</p>
+        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            You have been invited to participate in the conference
+            <strong th:text="${conferenceName}">[Conference Name]</strong>
+            as a <strong th:text="${role}">[Role]</strong>.
+        </p>
 
-<div style="margin-top: 20px;">
-    <a th:href="${acceptLink}"
-       style="padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
-        Accept Invitation
-    </a>
+        <!-- Track Info (only shown when trackName is provided) -->
+        <div th:if="${trackName != null and !trackName.isEmpty()}"
+             style="background-color: #f0f4ff; border-left: 4px solid #3b82f6; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Assigned Track:</strong> <span th:text="${trackName}">[Track Name]</span>
+            </p>
+        </div>
 
-    <a th:href="${declineLink}"
-       style="padding: 10px 20px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">
-        Decline Invitation
-    </a>
+        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            Please review the invitation and confirm your participation by clicking one of the buttons below.
+        </p>
+
+        <!-- Buttons -->
+        <div style="margin-top: 28px; text-align: center;">
+            <a th:href="${acceptLink}"
+               style="display: inline-block; padding: 12px 28px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600; margin-right: 12px;">
+                ✓ Accept Invitation
+            </a>
+
+            <a th:href="${declineLink}"
+               style="display: inline-block; padding: 12px 28px; background-color: #c0392b; color: white; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600;">
+                ✗ Decline Invitation
+            </a>
+        </div>
+
+        <p style="color: #999; font-size: 13px; margin-top: 28px; border-top: 1px solid #eee; padding-top: 16px;">
+            This invitation link will expire in 7 days. If you did not expect this invitation, you can safely ignore this email.
+        </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8f9fa; padding: 16px 32px; text-align: center;">
+        <p style="color: #999; font-size: 12px; margin: 0;">
+            © Conference Management System (CONFMS)
+        </p>
+    </div>
 </div>
 </body>
 </html>

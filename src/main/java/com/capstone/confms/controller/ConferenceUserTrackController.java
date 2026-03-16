@@ -121,4 +121,10 @@ public class ConferenceUserTrackController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{id}/resend-invitation")
+    @Operation(summary = "Resend invitation", description = "Regenerate token and reset invitation to pending. Old email link will be invalidated.")
+    public ResponseEntity<ConferenceUserTrackResponseDTO> resendInvitation(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceUserTrackService.resendInvitation(id));
+    }
+
 }

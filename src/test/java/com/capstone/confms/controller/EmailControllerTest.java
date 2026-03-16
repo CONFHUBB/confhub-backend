@@ -1,6 +1,7 @@
 package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.EmailDTO;
+import com.capstone.confms.service.ConferenceUserTrackService;
 import com.capstone.confms.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,11 +20,14 @@ class EmailControllerTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private ConferenceUserTrackService conferenceUserTrackService;
+
     private EmailController emailController;
 
     @BeforeEach
     void setUp() {
-        emailController = new EmailController(emailService);
+        emailController = new EmailController(emailService, conferenceUserTrackService);
     }
 
     @Test
@@ -46,22 +50,24 @@ class EmailControllerTest {
 
     @Test
     void sendInvitationEmailShouldReturnOk() {
-        var result = emailController.sendInvitationEmail("user@example.com", "User", "Subject", "Conference", null);
+        var result = emailController.sendInvitationEmail(
+                "user@example.com", "User", "Subject", "Conference",
+                1, "REVIEWER", "AI Track", "test-token-123", null);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
     }
 
     @Test
-    void acceptEmailShouldReturnOk() {
+    void acceptEmailShouldRedirect() {
         var result = emailController.acceptEmail("token123");
 
-        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(HttpStatus.FOUND, result.getStatusCode());
     }
 
     @Test
-    void declineEmailShouldReturnOk() {
+    void declineEmailShouldRedirect() {
         var result = emailController.declineEmail("token123");
 
-        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(HttpStatus.FOUND, result.getStatusCode());
     }
 }

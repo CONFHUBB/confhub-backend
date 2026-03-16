@@ -12,6 +12,7 @@ import java.util.List;
 public class PaperResponseDTO {
     private Integer id;
     private Integer trackId;
+    private String trackName;
     private Integer primarySubjectAreaId;
     private List<Integer> secondarySubjectAreaIds;
     private String title;

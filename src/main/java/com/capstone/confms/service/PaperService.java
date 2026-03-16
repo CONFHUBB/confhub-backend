@@ -26,4 +26,9 @@ public interface PaperService {
     // BR-2.15: Withdraw + Restore
     PaperResponseDTO withdrawPaper(Integer id);
     PaperResponseDTO restorePaper(Integer id);
+
+    /**
+     * Get all papers in a conference (for Chair/PC paper management).
+     */
+    java.util.List<PaperResponseDTO> getPapersByConference(Integer conferenceId);
 }

@@ -78,15 +78,18 @@ secondaryMatch = matchCount / totalSecondary (tỷ lệ SA secondary trùng)
 | maxPapersPerReviewer | 5 | Số paper tối đa/reviewer |
 | bidWeight | 0.6 | Trọng số bid score |
 | relevanceWeight | 0.4 | Trọng số relevance |
+| loadBalancing | false | Ưu tiên phân bổ đều papers cho reviewers |
 
 ### BR-3.10: Thuật toán (Greedy Weighted Scoring)
 1. Tính `combinedScore = bidScore * bidWeight + relevanceScore * relevanceWeight` cho mỗi cặp (paper, reviewer)
-2. Lọc: bỏ conflicts, bỏ pairs đã assigned
-3. Sắp xếp theo score giảm dần
-4. Greedy assign: chọn top candidate, kiểm tra constraints:
+2. Lọc: bỏ conflicts (bao gồm domain conflicts), bỏ pairs đã assigned
+3. **Domain Conflict Detection (2026-03-17):** So sánh email domain reviewer vs authors → block nếu cùng institutional domain (loại trừ public domains: gmail.com, yahoo.com, hotmail.com, outlook.com)
+4. Sắp xếp theo score giảm dần
+5. Greedy assign: chọn top candidate, kiểm tra constraints:
    - Paper chưa đến `minReviewersPerPaper`?
    - Reviewer chưa đạt `maxPapersPerReviewer`?
-5. Trả preview (KHÔNG lưu DB ngay)
+6. **Load Balancing (2026-03-17):** Nếu `loadBalancing = true`, ưu tiên reviewers có ít papers hơn (dùng penalty factor)
+7. Trả preview (KHÔNG lưu DB ngay)
 
 ### BR-3.11: Preview → Confirm flow
 1. **POST /auto-assign** → trả preview (danh sách assignments + stats)
@@ -185,8 +188,13 @@ ASSIGNED → IN_PROGRESS → COMPLETED
 | BR-3.6: Upsert bid logic | `BiddingServiceImpl.submitOrUpdateBid()` |
 | BR-3.7: Relevance score algorithm | `BiddingServiceImpl.calculateRelevanceScoreWithExpertise()` |
 | BR-3.9-3.12: Auto/manual assign + preview | `ReviewerAssignmentServiceImpl.java` |
+| BR-3.9: Load balancing trong auto-assign | `ReviewerAssignmentServiceImpl.runAutoAssign()` (2026-03-17) |
+| BR-3.10: Domain conflict detection | `DomainConflictUtil.java` + `ReviewerAssignmentServiceImpl.runAutoAssign()` (2026-03-17) |
+| BR-3.12: Manual assign populate reviewId | `ReviewerAssignmentServiceImpl.manualAssign()` (2026-03-17) |
 | BR-3.13: Check review chưa COMPLETED trước khi remove | `ReviewerAssignmentServiceImpl.removeAssignment()` |
 | BR-3.14: ASSIGNED→IN_PROGRESS→COMPLETED transitions | `ReviewServiceImpl.VALID_TRANSITIONS` map |
+| BR-3.14: ReviewResponseDTO flat DTOs (no circular ref) | `ReviewResponseDTO.PaperInfo` + `ReviewResponseDTO.ReviewerInfo` (2026-03-17) |
+| BR-3.14: Reviews scoped by conference | `ReviewController.getReviewsByReviewerAndConference()` (2026-03-17) |
 | BR-3.15: Check REVIEW_SUBMISSION activity enabled | `ReviewServiceImpl.validateReviewActivity()` |
 | BR-3.16: ReviewQuestion + choices | `ReviewQuestion.java`, `ReviewQuestionChoice.java` |
 | BR-3.17: Validate required questions before complete | `ReviewServiceImpl.validateRequiredQuestionsCompleted()` |
@@ -194,4 +202,6 @@ ASSIGNED → IN_PROGRESS → COMPLETED
 | BR-3.19: ReviewComment entity | `ReviewComment.java` |
 | BR-3.20: ReviewMetaReview entity | `ReviewMetaReview.java` |
 | BR-3.21: Meta-review → update paper status | `ReviewMetaReviewServiceImpl.updatePaperStatusFromDecision()` |
+
+> **2026-03-17:** Thêm domain conflict detection, load balancing, flat ReviewResponseDTO, scoped review API.
 

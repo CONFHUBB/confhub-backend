@@ -1,6 +1,6 @@
 # 📋 MVP Functional Requirements — Checklist
 
-> **Ngày cập nhật:** 2026-03-15  
+> **Ngày cập nhật:** 2026-03-17  
 > **Dự án:** ConfMS — Conference Management System  
 > **Legend:**  
 > ✅ = Đã implement (BE + FE)  
@@ -46,7 +46,7 @@
 | 2.2 | Design scoring criteria (choices with values) | ✅ | `ReviewQuestionChoice` entity với `value` field + FE editor |
 | 2.3 | Configure review type (single/double-blind) | ✅ | `TrackReviewSetting.isDoubleBlind` + FE `review-settings.tsx` |
 | 2.4 | Launch bidding | 🔧 | `ConferenceActivity` REVIEWER_BIDDING enable/disable. FE có activity timeline UI |
-| 2.5 | Auto-assignment of reviewers | 🔧 | `ReviewerAssignmentController.autoAssign()` API hoàn chỉnh, chưa có FE |
+| 2.5 | Auto-assignment of reviewers | ✅ | `ReviewerAssignmentController.autoAssign()` API + FE `reviewer-assignment.tsx` (auto/manual assign, preview, confirm) (2026-03-17) |
 | 2.6 | Monitor review progress | ❌ | Chưa có progress tracking API (coverage, overdue) |
 | 2.7 | Perform meta-reviews & final decisions | 🔧 | `ReviewMetaReviewController` CRUD + auto paper status update (BR-3.21), chưa có FE |
 | 2.8 | Build conference program (sessions, rooms, time slots) | ❌ | Chưa có entities/API |
@@ -123,17 +123,19 @@
 
 | Status | Số lượng | % |
 |---|---|---|
-| ✅ Đã implement (BE + FE) | 19 | 41% |
-| 🔧 Có BE, chưa có FE | 10 | 22% |
+| ✅ Đã implement (BE + FE) | 20 | 43% |
+| 🔧 Có BE, chưa có FE | 9 | 20% |
 | 📦 Có entity, chưa có logic | 5 | 11% |
 | ❌ Chưa implement | 11 | 24% |
 | 🚫 Không thuộc MVP | 1 | 2% |
 | **Tổng (MVP)** | **46** | **100%** |
 
+> **2026-03-17:** 2.5 Auto-assignment (🔧→✅), FE reviewer assignment UI hoàn chỉnh.
+
 ### Khu vực cần ưu tiên
 
 **1. FE cho features đã có BE (🔧 → ✅):**
-- Reviewer Assignment dashboard cho Program Chair
+- ~~Reviewer Assignment dashboard cho Program Chair~~ ✅ (2026-03-17)
 - Meta-review page cho Program Chair
 - Conference complete/cancel cho Chair
 - Papers-in-track view cho Track Chair

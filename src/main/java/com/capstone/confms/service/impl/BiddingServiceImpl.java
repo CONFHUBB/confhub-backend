@@ -7,10 +7,11 @@ import com.capstone.confms.dto.response.PaperForBiddingDTO;
 import com.capstone.confms.entity.Bidding;
 import com.capstone.confms.entity.ConferenceActivity;
 import com.capstone.confms.entity.Paper;
+import com.capstone.confms.entity.PaperAuthor;
 import com.capstone.confms.entity.ReviewerInterest;
 import com.capstone.confms.entity.SubjectArea;
-import com.capstone.confms.entity.TrackReviewSetting;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.utils.DomainConflictUtil;
 import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.utils.enums.BidValue;
 import com.capstone.confms.utils.enums.Expertise;
@@ -19,12 +20,15 @@ import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.BiddingRepository;
 import com.capstone.confms.repository.ConferenceActivityRepository;
+import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewerInterestRepository;
 import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.BiddingService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +54,10 @@ public class BiddingServiceImpl implements BiddingService {
     private final UserRepository userRepository;
     private final ConferenceActivityRepository activityRepository;
     private final PaperConflictRepository paperConflictRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
     private final ReviewerInterestRepository reviewerInterestRepository;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -149,31 +156,45 @@ public class BiddingServiceImpl implements BiddingService {
     @Override
     @Transactional(readOnly = true)
     public List<PaperForBiddingDTO> getPapersForBidding(Integer reviewerId, Integer conferenceId) {
-        // 1. Lấy tất cả papers trong conference
+        // 0. Lấy reviewer info
+        User reviewer = userRepository.findById(reviewerId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + reviewerId));
+
+        // 1. Kiểm tra bắt buộc chọn subject areas trước khi bid
+        List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
+        if (interests.isEmpty()) {
+            throw new BadRequestException(
+                    "You must select your Subject Areas / Areas of Expertise before viewing papers for bidding. " +
+                    "Please go to the Subject Areas page first.");
+        }
+
+        // 2. Lấy tất cả papers trong conference
         List<Paper> allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
 
-        // 2. Lấy paper IDs mà reviewer có conflict
+        // 3. Lấy paper IDs mà reviewer có conflict (manual)
         Set<Integer> conflictPaperIds = paperConflictRepository.findByUser_Id(reviewerId)
                 .stream()
                 .map(pc -> pc.getPaper().getId())
                 .collect(Collectors.toSet());
 
-        // 3. Lấy bids hiện tại của reviewer
+        // 4. Domain conflict detection — lấy email domain của reviewer
+        String reviewerDomain = DomainConflictUtil.extractDomain(reviewer.getEmail());
+
+        // 5. Lấy bids hiện tại của reviewer
         Map<Integer, BidValue> existingBids = biddingRepository
                 .findByReviewer_IdAndPaper_Track_Conference_Id(reviewerId, conferenceId)
                 .stream()
                 .collect(Collectors.toMap(b -> b.getPaper().getId(), Bidding::getBidValue));
 
-        // 4. Lấy reviewer interests (có expertise weight)
-        List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
+        // 6. Lấy reviewer interests (có expertise weight)
         Map<Integer, Expertise> expertiseMap = interests.stream()
                 .collect(Collectors.toMap(ri -> ri.getSubjectArea().getId(), ReviewerInterest::getExpertise));
         Set<Integer> reviewerSubjectAreaIds = expertiseMap.keySet();
 
-        // 5. Check double blind setting per track
+        // 7. Check double blind setting per track
         Map<Integer, Boolean> trackDoubleBlindMap = new java.util.HashMap<>();
 
-        // 6. Build danh sách papers
+        // 8. Build danh sách papers
         List<PaperForBiddingDTO> result = new ArrayList<>();
         for (Paper paper : allPapers) {
             // BR-3.4: Lọc WITHDRAWN + DRAFT papers
@@ -181,9 +202,20 @@ public class BiddingServiceImpl implements BiddingService {
                 continue;
             }
 
-            // Bỏ qua conflicting papers
+            // Bỏ qua conflicting papers (manual conflicts)
             if (conflictPaperIds.contains(paper.getId())) {
                 continue;
+            }
+
+            // Domain conflict: check if reviewer shares institutional domain with any author
+            if (reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
+                List<PaperAuthor> authors = paperAuthorRepository.findByPaperId(paper.getId());
+                boolean hasDomainConflict = authors.stream()
+                        .map(pa -> DomainConflictUtil.extractDomain(pa.getUser().getEmail()))
+                        .anyMatch(reviewerDomain::equalsIgnoreCase);
+                if (hasDomainConflict) {
+                    continue;
+                }
             }
 
             // BR-3.2: Tính relevance score với expertise weight
@@ -197,6 +229,12 @@ public class BiddingServiceImpl implements BiddingService {
                         .map(SubjectArea::getName)
                         .collect(Collectors.toList())
                     : List.of();
+
+            // Parse keywords from JSON
+            List<String> keywords = parseKeywords(paper.getKeywordsJson());
+
+            // Track name
+            String trackName = paper.getTrack().getName();
 
             // BR-3.4: Double Blind check — ẩn abstract nếu isDoubleBlind
             Integer trackId = paper.getTrack().getId();
@@ -212,6 +250,8 @@ public class BiddingServiceImpl implements BiddingService {
                     .abstractText(isDoubleBlind ? null : paper.getAbstractField())
                     .primarySubjectArea(primarySA)
                     .secondarySubjectAreas(secondarySAs)
+                    .keywords(keywords)
+                    .trackName(trackName)
                     .relevanceScore(relevance)
                     .currentBid(existingBids.getOrDefault(paper.getId(), null))
                     .isDoubleBlind(isDoubleBlind)
@@ -229,16 +269,28 @@ public class BiddingServiceImpl implements BiddingService {
     // ========== Private helpers ==========
 
     /**
-     * BR-3.1: Check requireSubjectAreas setting
+     * Parse keywords JSON string to List<String>.
+     */
+    private List<String> parseKeywords(String keywordsJson) {
+        if (keywordsJson == null || keywordsJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(keywordsJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to parse keywords JSON: {}", keywordsJson, e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * BR-3.1: Validate subject areas — always require at least 1 interest before bidding.
      */
     private void validateRequireSubjectAreas(Integer trackId, Integer reviewerId) {
-        Optional<TrackReviewSetting> setting = trackReviewSettingRepository.findByTrackId(trackId);
-        if (setting.isPresent() && Boolean.TRUE.equals(setting.get().getRequireSubjectAreas())) {
-            List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
-            if (interests.isEmpty()) {
-                throw new BadRequestException(
-                        "You must select your subject areas/expertise before bidding (requireSubjectAreas is ON)");
-            }
+        List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
+        if (interests.isEmpty()) {
+            throw new BadRequestException(
+                    "You must select your Subject Areas / Areas of Expertise before bidding.");
         }
     }
 

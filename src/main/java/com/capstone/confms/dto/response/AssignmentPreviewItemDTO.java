@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AssignmentPreviewItemDTO {
+    private Integer reviewId;      // Review entity ID (for remove)
     private Integer paperId;
     private String paperTitle;
     private Integer reviewerId;

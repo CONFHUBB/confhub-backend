@@ -251,6 +251,16 @@ public class PaperServiceImpl implements PaperService {
         return mapToResponseDTO(paperRepository.save(paper));
     }
 
+    // ==================== GET BY CONFERENCE (Chair/PC) ====================
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaperResponseDTO> getPapersByConference(Integer conferenceId) {
+        List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        return papers.stream()
+                .map(this::mapToResponseDTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     // ==================== VALIDATION HELPERS ====================
 
     /**
@@ -378,6 +388,7 @@ public class PaperServiceImpl implements PaperService {
         return PaperResponseDTO.builder()
                 .id(entity.getId())
                 .trackId(entity.getTrack().getId())
+                .trackName(entity.getTrack().getName())
                 .primarySubjectAreaId(
                         entity.getPrimarySubjectArea() != null ? entity.getPrimarySubjectArea().getId() : null)
                 .secondarySubjectAreaIds(secondaryIds)

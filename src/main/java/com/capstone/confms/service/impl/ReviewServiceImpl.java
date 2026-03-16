@@ -152,6 +152,15 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewResponseDTO> getReviewsByReviewerAndConference(Integer reviewerId, Integer conferenceId) {
+        return reviewRepository.findByReviewer_IdAndPaper_Track_Conference_Id(reviewerId, conferenceId)
+                .stream()
+                .map(this::mapToResponseDTO)
+                .toList();
+    }
+
     // ==================== Validation Helpers ====================
 
     /**
@@ -252,10 +261,29 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private ReviewResponseDTO mapToResponseDTO(Review entity) {
+        ReviewResponseDTO.PaperInfo paperInfo = null;
+        if (entity.getPaper() != null) {
+            paperInfo = ReviewResponseDTO.PaperInfo.builder()
+                    .id(entity.getPaper().getId())
+                    .title(entity.getPaper().getTitle())
+                    .abstractField(entity.getPaper().getAbstractField())
+                    .build();
+        }
+
+        ReviewResponseDTO.ReviewerInfo reviewerInfo = null;
+        if (entity.getReviewer() != null) {
+            reviewerInfo = ReviewResponseDTO.ReviewerInfo.builder()
+                    .id(entity.getReviewer().getId())
+                    .firstName(entity.getReviewer().getFirstName())
+                    .lastName(entity.getReviewer().getLastName())
+                    .email(entity.getReviewer().getEmail())
+                    .build();
+        }
+
         return ReviewResponseDTO.builder()
                 .id(entity.getId())
-                .paper(entity.getPaper())
-                .reviewer(entity.getReviewer())
+                .paper(paperInfo)
+                .reviewer(reviewerInfo)
                 .status(entity.getStatus())
                 .totalScore(entity.getTotalScore())
                 .build();

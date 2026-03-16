@@ -11,12 +11,14 @@ import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.Review;
 import com.capstone.confms.entity.SubjectArea;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.utils.DomainConflictUtil;
 import com.capstone.confms.utils.enums.BidValue;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.BiddingRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.NotificationRepository;
+import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
@@ -51,6 +53,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
     private final UserRepository userRepository;
     private final BiddingRepository biddingRepository;
     private final PaperConflictRepository paperConflictRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
     private final ReviewerInterestRepository reviewerInterestRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final NotificationRepository notificationRepository;
@@ -61,6 +64,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         Integer conferenceId = config.getConferenceId();
         double bidWeight = config.getBidWeight() != null ? config.getBidWeight() : 0.6;
         double relevanceWeight = config.getRelevanceWeight() != null ? config.getRelevanceWeight() : 0.4;
+        boolean loadBalancing = config.getLoadBalancing() != null && config.getLoadBalancing();
 
         // 1. Lấy tất cả papers trong conference
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
@@ -99,14 +103,34 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             reviewerSubjectAreas.put(reviewer.getId(), saIds);
         }
 
+        // 3b. Pre-compute domain conflict data: paper authors by paper
+        Map<Integer, Set<String>> paperAuthorDomains = new HashMap<>();
+        for (Paper paper : papers) {
+            Set<String> domains = paperAuthorRepository.findByPaperId(paper.getId()).stream()
+                    .map(pa -> pa.getUser().getEmail())
+                    .map(DomainConflictUtil::extractDomain)
+                    .filter(d -> d != null && !DomainConflictUtil.isPublicDomain(d))
+                    .collect(Collectors.toSet());
+            paperAuthorDomains.put(paper.getId(), domains);
+        }
+
         // 4. Build candidate list: score mỗi cặp (paper, reviewer)
         List<AssignmentPreviewItemDTO> candidates = new ArrayList<>();
 
         for (Paper paper : papers) {
             for (User reviewer : reviewers) {
-                // Bỏ qua nếu có conflict
+                // Bỏ qua nếu có conflict (PaperConflict table)
                 if (paperConflictRepository.existsByPaper_IdAndUser_Id(paper.getId(), reviewer.getId())) {
                     continue;
+                }
+
+                // Bỏ qua nếu có domain conflict
+                String reviewerDomain = DomainConflictUtil.extractDomain(reviewer.getEmail());
+                if (reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
+                    Set<String> authorDomains = paperAuthorDomains.getOrDefault(paper.getId(), Set.of());
+                    if (authorDomains.contains(reviewerDomain)) {
+                        continue;
+                    }
                 }
 
                 // Bỏ qua nếu đã assigned
@@ -161,6 +185,15 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             }
             if (currentReviewerCount >= config.getMaxPapersPerReviewer()) {
                 continue; // Reviewer đã đạt max
+            }
+
+            // Load balancing: ưu tiên reviewer ít paper hơn
+            if (loadBalancing && currentReviewerCount > 0) {
+                // Tìm xem có reviewer nào khác cho paper này có ít assignment hơn
+                int avgLoad = (int) Math.ceil((double) papers.size() * config.getMinReviewersPerPaper() / reviewers.size());
+                if (currentReviewerCount >= avgLoad + 1) {
+                    continue; // Bỏ qua reviewer đã vượt mức trung bình
+                }
             }
 
             selectedAssignments.add(candidate);
@@ -278,6 +311,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         notificationRepository.save(notification);
 
         return AssignmentPreviewItemDTO.builder()
+                .reviewId(review.getId())
                 .paperId(paper.getId())
                 .paperTitle(paper.getTitle())
                 .reviewerId(reviewer.getId())
@@ -310,17 +344,45 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         List<Review> reviews = reviewRepository.findByPaper_Track_Conference_Id(conferenceId);
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
 
+        // Pre-compute bids + reviewer subject areas for score calculation
+        Map<String, BidValue> bidMap = new HashMap<>();
+        for (Paper paper : papers) {
+            List<Bidding> paperBids = biddingRepository.findByPaper_Id(paper.getId());
+            for (Bidding bid : paperBids) {
+                bidMap.put(paper.getId() + "-" + bid.getReviewer().getId(), bid.getBidValue());
+            }
+        }
+
+        Map<Integer, Set<Integer>> reviewerSubjectAreas = new HashMap<>();
+        for (Review review : reviews) {
+            Integer reviewerId = review.getReviewer().getId();
+            if (!reviewerSubjectAreas.containsKey(reviewerId)) {
+                Set<Integer> saIds = reviewerInterestRepository.findByReviewer_Id(reviewerId)
+                        .stream()
+                        .map(ri -> ri.getSubjectArea().getId())
+                        .collect(Collectors.toSet());
+                reviewerSubjectAreas.put(reviewerId, saIds);
+            }
+        }
+
         List<AssignmentPreviewItemDTO> items = reviews.stream()
-                .map(review -> AssignmentPreviewItemDTO.builder()
-                        .paperId(review.getPaper().getId())
-                        .paperTitle(review.getPaper().getTitle())
-                        .reviewerId(review.getReviewer().getId())
-                        .reviewerName(review.getReviewer().getFirstName() + " " + review.getReviewer().getLastName())
-                        .reviewerEmail(review.getReviewer().getEmail())
-                        .score(0.0)
-                        .bidScore(0.0)
-                        .relevanceScore(0.0)
-                        .build())
+                .map(review -> {
+                    double bidScore = getBidScore(bidMap.get(review.getPaper().getId() + "-" + review.getReviewer().getId()));
+                    double relevanceScore = calculateRelevanceScore(review.getPaper(), reviewerSubjectAreas.get(review.getReviewer().getId()));
+                    double combinedScore = bidScore * 0.6 + relevanceScore * 0.4;
+
+                    return AssignmentPreviewItemDTO.builder()
+                            .reviewId(review.getId())
+                            .paperId(review.getPaper().getId())
+                            .paperTitle(review.getPaper().getTitle())
+                            .reviewerId(review.getReviewer().getId())
+                            .reviewerName(review.getReviewer().getFirstName() + " " + review.getReviewer().getLastName())
+                            .reviewerEmail(review.getReviewer().getEmail())
+                            .score(combinedScore)
+                            .bidScore(bidScore)
+                            .relevanceScore(relevanceScore)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         Map<Integer, Integer> reviewersPerPaper = new HashMap<>();

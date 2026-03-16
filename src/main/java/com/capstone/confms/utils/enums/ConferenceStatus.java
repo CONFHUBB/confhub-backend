@@ -4,6 +4,7 @@ public enum ConferenceStatus {
     PENDING,
     SCHEDULED,
     ONGOING,
+    BIDDING,
     COMPLETED,
     CANCELLED
 }

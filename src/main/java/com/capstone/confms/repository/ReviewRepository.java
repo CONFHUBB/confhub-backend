@@ -18,4 +18,6 @@ public interface ReviewRepository extends JpaRepository<Review, Integer> {
     long countByPaper_Id(Integer paperId);
 
     long countByReviewer_IdAndPaper_Track_Conference_Id(Integer reviewerId, Integer conferenceId);
+
+    List<Review> findByReviewer_IdAndPaper_Track_Conference_Id(Integer reviewerId, Integer conferenceId);
 }

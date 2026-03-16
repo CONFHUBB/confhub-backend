@@ -1,3 +1,100 @@
+# 📋 Changelog — Những Thay Đổi Ngày 2026-03-17
+
+> **Ngày:** 2026-03-17  
+> **Scope:** Backend + Frontend  
+
+---
+
+## 1. 🔗 Reviewer Assignment UI (Chair — Flow 3)
+
+**Mô tả:** Implement đầy đủ tab "Reviewer Assignment" trong trang update conference cho Chair.
+
+| Layer | File | Thay đổi |
+|---|---|---|
+| **FE** | `reviewer-assignment.tsx` | [NEW] Component quản lý reviewer assignment: overview, auto-assign config, preview, manual assign/remove |
+| **FE** | `assignment.api.ts` | [NEW] API functions cho auto-assign, manual assign, confirm, remove assignment |
+| **FE** | `conference-user-track.api.ts` | Fix URL endpoint → `/conferences/{id}/users-roles`, giảm page size thành 100 |
+| **BE** | `AutoAssignConfigDTO.java` | Thêm field `loadBalancing` |
+| **BE** | `AssignmentPreviewItemDTO.java` | Thêm field `reviewId` |
+| **BE** | `ReviewerAssignmentServiceImpl.java` | Thêm domain conflict detection, load balancing, populate `reviewId` |
+
+### Chức năng FE:
+- **Overview tab:** Hiển thị stats (total papers, reviewers, assignments, coverage)
+- **Auto-Assign tab:** Config (min reviewers/paper, max papers/reviewer, bid/relevance weight) → Preview → Confirm
+- **Manual tab:** Chọn paper + reviewer → assign trực tiếp
+- **Assignments table:** Hiển thị tất cả assignments, nút Remove
+
+---
+
+## 2. 🔍 Review API — Scoped by Conference
+
+**Vấn đề:** Reviewer Console fetch `getAllReviews()` → chỉ thấy tất cả reviews, không filter theo conference.
+
+| Layer | File | Thay đổi |
+|---|---|---|
+| **BE** | `ReviewRepository.java` | Thêm `findByReviewer_IdAndPaper_Track_Conference_Id()` |
+| **BE** | `ReviewController.java` | Thêm endpoint `GET /review/reviewer/{reviewerId}/conference/{conferenceId}` |
+| **BE** | `ReviewService.java` | Thêm method signature `getReviewsByReviewerAndConference()` |
+| **BE** | `ReviewServiceImpl.java` | Implement method mới |
+| **FE** | `review.api.ts` | Thêm `getReviewsByReviewerAndConference()` API function |
+| **FE** | `reviewer/page.tsx` | Dùng API mới thay vì `getAllReviews()`, thêm safety check cho response format |
+
+---
+
+## 3. 🛡️ Fix Circular JSON Serialization (Review API)
+
+**Vấn đề:** `ReviewResponseDTO` dùng raw JPA entities (`Paper`, `User`) → Jackson serialize cả entity graph → infinite recursion:
+```
+paper → track → conference → track → conference → ... (vô hạn)
+```
+
+| Layer | File | Thay đổi |
+|---|---|---|
+| **BE** | `ReviewResponseDTO.java` | Thay `Paper paper` + `User reviewer` bằng flat inner DTOs `PaperInfo` + `ReviewerInfo` |
+| **BE** | `ReviewServiceImpl.java` | Update `mapToResponseDTO()` để tạo flat DTOs thay vì pass raw entities |
+
+### Cấu trúc DTO mới:
+```java
+ReviewResponseDTO {
+    Integer id;
+    PaperInfo paper;        // { id, title, abstractField }
+    ReviewerInfo reviewer;  // { id, firstName, lastName, email }
+    ReviewStatus status;
+    BigDecimal totalScore;
+}
+```
+
+> ⚠️ **FE Impact:** FE types đã khớp sẵn (`types/review.ts` → `ReviewResponse.paper: { id, title, abstractField }`). Không cần sửa FE.
+
+---
+
+## 4. 🐛 Fix sendInvitationEmail Test
+
+**Vấn đề:** `EmailServiceImplTest.sendInvitationEmailShouldInvokeMailSender()` gọi với 9 params, method cần 10.
+
+| Layer | File | Thay đổi |
+|---|---|---|
+| **BE** | `EmailServiceImplTest.java` | Thêm `null` cho param `trackName` (vị trí thứ 6) |
+
+---
+
+## 5. 🎯 Activity Timeline — Error Display
+
+| Layer | File | Thay đổi |
+|---|---|---|
+| **FE** | `activity-timeline.tsx` | Cải thiện hiển thị lỗi: hỗ trợ RFC 7807 Problem Detail format (`error.detail`) |
+
+---
+
+## 6. 📊 Cập Nhật Status MVP
+
+| Item | Status cũ | Status mới |
+|---|---|---|
+| 2.5 Auto-assignment of reviewers | 🔧 | ✅ (có FE) |
+| 1.11 View all submissions | 🔧 | 🔧 (Chair có Paper Management tab) |
+
+---
+
 # 📋 Changelog — Những Thay Đổi Ngày 2026-03-15
 
 > **Ngày:** 2026-03-15  

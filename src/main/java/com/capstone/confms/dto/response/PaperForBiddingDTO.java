@@ -18,6 +18,8 @@ public class PaperForBiddingDTO {
     private String abstractText;
     private String primarySubjectArea;
     private List<String> secondarySubjectAreas;
+    private List<String> keywords;
+    private String trackName;
     private Double relevanceScore;
     private BidValue currentBid; // null nếu chưa bid ("Not Entered")
     private Boolean isDoubleBlind; // BR-3.4: flag cho frontend

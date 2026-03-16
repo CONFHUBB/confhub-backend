@@ -86,4 +86,11 @@ public class PaperController {
     public ResponseEntity<PaperResponseDTO> restorePaper(@PathVariable Integer id) {
         return ResponseEntity.ok(paperService.restorePaper(id));
     }
+
+    @GetMapping("/conference/{conferenceId}")
+    @Operation(summary = "Get all papers in a conference (for Chair/PC paper management)")
+    public ResponseEntity<java.util.List<PaperResponseDTO>> getPapersByConference(
+            @PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(paperService.getPapersByConference(conferenceId));
+    }
 }

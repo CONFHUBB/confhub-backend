@@ -1,7 +1,5 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.entity.Paper;
-import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.enums.ReviewStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -12,8 +10,25 @@ import java.math.BigDecimal;
 @Builder
 public class ReviewResponseDTO {
     private Integer id;
-    private Paper paper;
-    private User reviewer;
+    private PaperInfo paper;
+    private ReviewerInfo reviewer;
     private ReviewStatus status;
     private BigDecimal totalScore;
-}
+
+    @Data
+    @Builder
+    public static class PaperInfo {
+        private Integer id;
+        private String title;
+        private String abstractField;
+    }
+
+    @Data
+    @Builder
+    public static class ReviewerInfo {
+        private Integer id;
+        private String firstName;
+        private String lastName;
+        private String email;
+    }
+}

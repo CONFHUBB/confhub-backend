@@ -35,4 +35,9 @@ public class AutoAssignConfigDTO {
     @Min(value = 0)
     @Max(value = 1)
     private Double relevanceWeight = 0.4;
+
+    /**
+     * Bật cân bằng tải: phân bổ papers đều giữa các reviewers.
+     */
+    private Boolean loadBalancing = false;
 }

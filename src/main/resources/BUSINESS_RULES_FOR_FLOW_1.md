@@ -138,4 +138,7 @@ PENDING → SCHEDULED → ONGOING → COMPLETED
 | BR-1.9a: Không xóa CONFERENCE_CHAIR cuối cùng | `ConferenceUserTrackServiceImpl.removeRoleFromUser()` |
 | BR-1.9b: Check assignments trước khi gỡ REVIEWER | `ConferenceUserTrackServiceImpl.removeRoleFromUser()` |
 | BR-1.10: TrackReviewSetting | `TrackReviewSetting.java` |
+| BR-1.7: Check reviewer assignments trước REVIEW_SUBMISSION | `ConferenceActivityServiceImpl.validateActivityDependencies()` (error msg: "no reviewers have been assigned to papers") |
+| BR-1.9: Reviewer Assignment FE UI | `reviewer-assignment.tsx` (auto-assign, manual assign, remove) (2026-03-17) |
 
+> **2026-03-17:** Thêm FE tab Reviewer Assignment trong trang update conference.

@@ -43,7 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isVerified = vnPayIntegrationService.verifyPaymentSignature(fields, vnp_SecureHash);
 
         String paymentIdStr = request.getParameter("vnp_OrderInfo");
-        String returnUrl = "https://bgss.onrender.com/payment-details/" + paymentIdStr;
+        String returnUrl = "url" + paymentIdStr;
 
         if (isVerified) {
             String transactionStatus = request.getParameter("vnp_TransactionStatus");

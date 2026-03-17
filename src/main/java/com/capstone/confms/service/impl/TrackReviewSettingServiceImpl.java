@@ -52,6 +52,16 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         if (dto.getReviewerInviteExpirationDays() != null) setting.setReviewerInviteExpirationDays(dto.getReviewerInviteExpirationDays());
         if (dto.getAllowOthersReviewAccessAfterSubmit() != null) setting.setAllowOthersReviewAccessAfterSubmit(dto.getAllowOthersReviewAccessAfterSubmit());
         if (dto.getAllowReviewUpdateDuringDiscussion() != null) setting.setAllowReviewUpdateDuringDiscussion(dto.getAllowReviewUpdateDuringDiscussion());
+        if (dto.getShowReviewerIdentityToOtherReviewer() != null) setting.setShowReviewerIdentityToOtherReviewer(dto.getShowReviewerIdentityToOtherReviewer());
+        if (dto.getShowAggregateColumns() != null) setting.setShowAggregateColumns(dto.getShowAggregateColumns());
+        if (dto.getAllowReviewerSeeStatusBeforeNotification() != null) setting.setAllowReviewerSeeStatusBeforeNotification(dto.getAllowReviewerSeeStatusBeforeNotification());
+        if (dto.getEnableAllPapersForDiscussion() != null) setting.setEnableAllPapersForDiscussion(dto.getEnableAllPapersForDiscussion());
+        if (dto.getAllowDiscussNonAssignedPapers() != null) setting.setAllowDiscussNonAssignedPapers(dto.getAllowDiscussNonAssignedPapers());
+        if (dto.getAllowAuthorDiscuss() != null) setting.setAllowAuthorDiscuss(dto.getAllowAuthorDiscuss());
+        if (dto.getNotifyReviewerOnReviewUpdateDuringDiscussion() != null) setting.setNotifyReviewerOnReviewUpdateDuringDiscussion(dto.getNotifyReviewerOnReviewUpdateDuringDiscussion());
+        if (dto.getNotifyOnManualAssignment() != null) setting.setNotifyOnManualAssignment(dto.getNotifyOnManualAssignment());
+        if (dto.getDoNotShowWithdrawnPapers() != null) setting.setDoNotShowWithdrawnPapers(dto.getDoNotShowWithdrawnPapers());
+        if (dto.getAddReviewerOnInviteAccept() != null) setting.setAddReviewerOnInviteAccept(dto.getAddReviewerOnInviteAccept());
 
         TrackReviewSetting savedSetting = settingRepository.save(setting);
         track.setTrackReviewSetting(savedSetting);
@@ -94,6 +104,16 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setReviewerInviteExpirationDays(null);
             targetSetting.setAllowOthersReviewAccessAfterSubmit(false);
             targetSetting.setAllowReviewUpdateDuringDiscussion(false);
+            targetSetting.setShowReviewerIdentityToOtherReviewer(false);
+            targetSetting.setShowAggregateColumns(false);
+            targetSetting.setAllowReviewerSeeStatusBeforeNotification(false);
+            targetSetting.setEnableAllPapersForDiscussion(false);
+            targetSetting.setAllowDiscussNonAssignedPapers(false);
+            targetSetting.setAllowAuthorDiscuss(false);
+            targetSetting.setNotifyReviewerOnReviewUpdateDuringDiscussion(false);
+            targetSetting.setNotifyOnManualAssignment(false);
+            targetSetting.setDoNotShowWithdrawnPapers(false);
+            targetSetting.setAddReviewerOnInviteAccept(true);
         } else {
             // Copy fields from source
             targetSetting.setIsDoubleBlind(sourceSetting.getIsDoubleBlind());
@@ -103,6 +123,16 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setReviewerInviteExpirationDays(sourceSetting.getReviewerInviteExpirationDays());
             targetSetting.setAllowOthersReviewAccessAfterSubmit(sourceSetting.getAllowOthersReviewAccessAfterSubmit());
             targetSetting.setAllowReviewUpdateDuringDiscussion(sourceSetting.getAllowReviewUpdateDuringDiscussion());
+            targetSetting.setShowReviewerIdentityToOtherReviewer(sourceSetting.getShowReviewerIdentityToOtherReviewer());
+            targetSetting.setShowAggregateColumns(sourceSetting.getShowAggregateColumns());
+            targetSetting.setAllowReviewerSeeStatusBeforeNotification(sourceSetting.getAllowReviewerSeeStatusBeforeNotification());
+            targetSetting.setEnableAllPapersForDiscussion(sourceSetting.getEnableAllPapersForDiscussion());
+            targetSetting.setAllowDiscussNonAssignedPapers(sourceSetting.getAllowDiscussNonAssignedPapers());
+            targetSetting.setAllowAuthorDiscuss(sourceSetting.getAllowAuthorDiscuss());
+            targetSetting.setNotifyReviewerOnReviewUpdateDuringDiscussion(sourceSetting.getNotifyReviewerOnReviewUpdateDuringDiscussion());
+            targetSetting.setNotifyOnManualAssignment(sourceSetting.getNotifyOnManualAssignment());
+            targetSetting.setDoNotShowWithdrawnPapers(sourceSetting.getDoNotShowWithdrawnPapers());
+            targetSetting.setAddReviewerOnInviteAccept(sourceSetting.getAddReviewerOnInviteAccept());
         }
 
         settingRepository.save(targetSetting);
@@ -119,6 +149,16 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         dto.setReviewerInviteExpirationDays(entity.getReviewerInviteExpirationDays());
         dto.setAllowOthersReviewAccessAfterSubmit(entity.getAllowOthersReviewAccessAfterSubmit());
         dto.setAllowReviewUpdateDuringDiscussion(entity.getAllowReviewUpdateDuringDiscussion());
+        dto.setShowReviewerIdentityToOtherReviewer(entity.getShowReviewerIdentityToOtherReviewer());
+        dto.setShowAggregateColumns(entity.getShowAggregateColumns());
+        dto.setAllowReviewerSeeStatusBeforeNotification(entity.getAllowReviewerSeeStatusBeforeNotification());
+        dto.setEnableAllPapersForDiscussion(entity.getEnableAllPapersForDiscussion());
+        dto.setAllowDiscussNonAssignedPapers(entity.getAllowDiscussNonAssignedPapers());
+        dto.setAllowAuthorDiscuss(entity.getAllowAuthorDiscuss());
+        dto.setNotifyReviewerOnReviewUpdateDuringDiscussion(entity.getNotifyReviewerOnReviewUpdateDuringDiscussion());
+        dto.setNotifyOnManualAssignment(entity.getNotifyOnManualAssignment());
+        dto.setDoNotShowWithdrawnPapers(entity.getDoNotShowWithdrawnPapers());
+        dto.setAddReviewerOnInviteAccept(entity.getAddReviewerOnInviteAccept());
         return dto;
     }
 }

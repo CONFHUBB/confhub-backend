@@ -11,5 +11,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class PaperUpdateStatusDTO {
+    private Integer id;
     private PaperStatus status;
 }

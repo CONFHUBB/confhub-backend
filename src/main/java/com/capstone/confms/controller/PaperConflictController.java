@@ -56,4 +56,16 @@ public class PaperConflictController {
         paperConflictService.deletePaperConflict(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/paper/{paperId}")
+    @Operation(summary = "Get all conflicts for a specific paper")
+    public ResponseEntity<java.util.List<PaperConflictResponseDTO>> getConflictsByPaper(@PathVariable Integer paperId) {
+        return ResponseEntity.ok(paperConflictService.getConflictsByPaperId(paperId));
+    }
+
+    @GetMapping("/conference/{conferenceId}")
+    @Operation(summary = "Get all conflicts in a conference")
+    public ResponseEntity<java.util.List<PaperConflictResponseDTO>> getConflictsByConference(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(paperConflictService.getConflictsByConferenceId(conferenceId));
+    }
 }

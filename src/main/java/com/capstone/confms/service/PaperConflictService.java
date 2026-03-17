@@ -13,4 +13,8 @@ public interface PaperConflictService {
     PaperConflictResponseDTO getPaperConflictById(Integer id);
 
     void deletePaperConflict(Integer id);
+
+    java.util.List<PaperConflictResponseDTO> getConflictsByPaperId(Integer paperId);
+
+    java.util.List<PaperConflictResponseDTO> getConflictsByConferenceId(Integer conferenceId);
 }

@@ -68,4 +68,10 @@ public class Paper extends BaseEntity {
     @Column(name = "extra_answers", columnDefinition = "TEXT")
     private String extraAnswersJson;
 
+    @Column(name = "is_review_read_only", nullable = false)
+    private Boolean isReviewReadOnly = false;
+
+    @Column(name = "is_discussion_enabled", nullable = false)
+    private Boolean isDiscussionEnabled = false;
+
 }

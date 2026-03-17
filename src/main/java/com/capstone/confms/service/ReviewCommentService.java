@@ -3,6 +3,8 @@ package com.capstone.confms.service;
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
 
+import java.util.List;
+
 public interface ReviewCommentService {
 
     ReviewCommentResponseDTO createReviewComment(ReviewCommentDTO dto);
@@ -15,4 +17,10 @@ public interface ReviewCommentService {
 
     void deleteReviewComment(Integer id);
 
+    // Discussion APIs
+    List<ReviewCommentResponseDTO> getDiscussionByPaper(Integer paperId);
+
+    List<ReviewCommentResponseDTO> getCommentsByReview(Integer reviewId);
+
+    List<ReviewCommentResponseDTO> getReplies(Integer parentCommentId);
 }

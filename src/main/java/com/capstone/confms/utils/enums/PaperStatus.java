@@ -6,6 +6,7 @@ public enum PaperStatus {
     UNDER_REVIEW,
     ACCEPTED,
     REJECTED,
+    REVISION,
     WITHDRAWN,
     PUBLISHED
 }

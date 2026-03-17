@@ -31,4 +31,10 @@ public class PaperFile extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = false;
 
+    @Column(name = "is_revision", nullable = false)
+    private Boolean isRevision = false;
+
+    @Column(name = "is_camera_ready", nullable = false)
+    private Boolean isCameraReady = false;
+
 }

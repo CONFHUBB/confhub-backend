@@ -21,13 +21,30 @@ public class ReviewComment extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "review_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "review_id")
     private Review review;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "paper_id")
+    private Paper paper;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(name = "content", nullable = false)
     private String content;
 
     @Column(name = "is_visible_to_author", nullable = false)
     private Boolean isVisibleToAuthor = true;
+
+    @Column(name = "parent_comment_id")
+    private Integer parentCommentId;
+
+    @Column(name = "is_discussion_post", nullable = false)
+    private Boolean isDiscussionPost = false;
+
+    @Column(name = "title")
+    private String title;
 }

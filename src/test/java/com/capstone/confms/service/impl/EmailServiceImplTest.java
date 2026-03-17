@@ -65,7 +65,7 @@ class EmailServiceImplTest {
                 "subject",
                 "Conf",
                 "Reviewer",
-                null, // trackName
+                null,
                 "http://localhost:8080/api/v1/email/accept/test-token",
                 "http://localhost:8080/api/v1/email/decline/test-token",
                 null,

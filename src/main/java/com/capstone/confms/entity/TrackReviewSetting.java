@@ -46,4 +46,34 @@ public class TrackReviewSetting extends BaseEntity {
 
     @Column(name = "allow_review_update_during_discussion", nullable = false)
     private Boolean allowReviewUpdateDuringDiscussion = false;
+
+    @Column(name = "show_reviewer_identity_to_other_reviewer", nullable = false)
+    private Boolean showReviewerIdentityToOtherReviewer = false;
+
+    @Column(name = "show_aggregate_columns", nullable = false)
+    private Boolean showAggregateColumns = false;
+
+    @Column(name = "allow_reviewer_see_status_before_notification", nullable = false)
+    private Boolean allowReviewerSeeStatusBeforeNotification = false;
+
+    @Column(name = "enable_all_papers_for_discussion", nullable = false)
+    private Boolean enableAllPapersForDiscussion = false;
+
+    @Column(name = "allow_discuss_non_assigned_papers", nullable = false)
+    private Boolean allowDiscussNonAssignedPapers = false;
+
+    @Column(name = "allow_author_discuss", nullable = false)
+    private Boolean allowAuthorDiscuss = false;
+
+    @Column(name = "notify_reviewer_on_review_update_during_discussion", nullable = false)
+    private Boolean notifyReviewerOnReviewUpdateDuringDiscussion = false;
+
+    @Column(name = "notify_on_manual_assignment", nullable = false)
+    private Boolean notifyOnManualAssignment = false;
+
+    @Column(name = "do_not_show_withdrawn_papers", nullable = false)
+    private Boolean doNotShowWithdrawnPapers = false;
+
+    @Column(name = "add_reviewer_on_invite_accept", nullable = false)
+    private Boolean addReviewerOnInviteAccept = true;
 }

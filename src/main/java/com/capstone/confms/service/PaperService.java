@@ -31,4 +31,16 @@ public interface PaperService {
      * Get all papers in a conference (for Chair/PC paper management).
      */
     java.util.List<PaperResponseDTO> getPapersByConference(Integer conferenceId);
+
+    // BR-3.28: Review Read-Only
+    PaperResponseDTO toggleReviewReadOnly(Integer id, boolean readOnly);
+
+    // BR-3.30: Discussion per paper
+    PaperResponseDTO toggleDiscussion(Integer id, boolean enabled);
+
+    // BR-3.43: Bulk status update
+    java.util.List<PaperResponseDTO> bulkUpdatePaperStatus(java.util.List<PaperUpdateStatusDTO> dtos);
+
+    // BR-3.30: Bulk discussion toggle
+    java.util.List<PaperResponseDTO> bulkToggleDiscussion(java.util.List<Integer> paperIds, boolean enabled);
 }

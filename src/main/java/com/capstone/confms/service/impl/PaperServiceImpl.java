@@ -51,9 +51,10 @@ public class PaperServiceImpl implements PaperService {
     private static final Map<PaperStatus, Set<PaperStatus>> VALID_TRANSITIONS = Map.of(
             PaperStatus.DRAFT, Set.of(PaperStatus.SUBMITTED, PaperStatus.WITHDRAWN),
             PaperStatus.SUBMITTED, Set.of(PaperStatus.UNDER_REVIEW, PaperStatus.WITHDRAWN),
-            PaperStatus.UNDER_REVIEW, Set.of(PaperStatus.ACCEPTED, PaperStatus.REJECTED, PaperStatus.WITHDRAWN),
+            PaperStatus.UNDER_REVIEW, Set.of(PaperStatus.ACCEPTED, PaperStatus.REJECTED, PaperStatus.REVISION, PaperStatus.WITHDRAWN),
             PaperStatus.ACCEPTED, Set.of(PaperStatus.PUBLISHED),
             PaperStatus.REJECTED, Set.of(),
+            PaperStatus.REVISION, Set.of(PaperStatus.UNDER_REVIEW, PaperStatus.WITHDRAWN),
             PaperStatus.WITHDRAWN, Set.of(PaperStatus.SUBMITTED),
             PaperStatus.PUBLISHED, Set.of()
     );
@@ -250,7 +251,6 @@ public class PaperServiceImpl implements PaperService {
         paper.setUpdatedAt(LocalDateTime.now());
         return mapToResponseDTO(paperRepository.save(paper));
     }
-
     // ==================== GET BY CONFERENCE (Chair/PC) ====================
     @Override
     @Transactional(readOnly = true)
@@ -259,6 +259,59 @@ public class PaperServiceImpl implements PaperService {
         return papers.stream()
                 .map(this::mapToResponseDTO)
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    // ==================== TOGGLE REVIEW READ-ONLY (BR-3.28) ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO toggleReviewReadOnly(Integer id, boolean readOnly) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+        paper.setIsReviewReadOnly(readOnly);
+        paper.setUpdatedAt(LocalDateTime.now());
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== TOGGLE DISCUSSION (BR-3.30) ====================
+    @Override
+    @Transactional
+    public PaperResponseDTO toggleDiscussion(Integer id, boolean enabled) {
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
+        paper.setIsDiscussionEnabled(enabled);
+        paper.setUpdatedAt(LocalDateTime.now());
+        return mapToResponseDTO(paperRepository.save(paper));
+    }
+
+    // ==================== BULK UPDATE PAPER STATUS (BR-3.43) ====================
+    @Override
+    @Transactional
+    public List<PaperResponseDTO> bulkUpdatePaperStatus(List<PaperUpdateStatusDTO> dtos) {
+        List<PaperResponseDTO> results = new ArrayList<>();
+        for (PaperUpdateStatusDTO dto : dtos) {
+            Paper paper = paperRepository.findById(dto.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + dto.getId()));
+            validateStatusTransition(paper.getStatus(), dto.getStatus());
+            paper.setStatus(dto.getStatus());
+            paper.setUpdatedAt(LocalDateTime.now());
+            results.add(mapToResponseDTO(paperRepository.save(paper)));
+        }
+        return results;
+    }
+
+    // ==================== BULK TOGGLE DISCUSSION (BR-3.30) ====================
+    @Override
+    @Transactional
+    public List<PaperResponseDTO> bulkToggleDiscussion(List<Integer> paperIds, boolean enabled) {
+        List<PaperResponseDTO> results = new ArrayList<>();
+        for (Integer paperId : paperIds) {
+            Paper paper = paperRepository.findById(paperId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + paperId));
+            paper.setIsDiscussionEnabled(enabled);
+            paper.setUpdatedAt(LocalDateTime.now());
+            results.add(mapToResponseDTO(paperRepository.save(paper)));
+        }
+        return results;
     }
 
     // ==================== VALIDATION HELPERS ====================

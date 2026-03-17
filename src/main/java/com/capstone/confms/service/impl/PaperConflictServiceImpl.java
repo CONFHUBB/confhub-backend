@@ -74,6 +74,26 @@ public class PaperConflictServiceImpl implements PaperConflictService {
         paperConflictRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<PaperConflictResponseDTO> getConflictsByPaperId(Integer paperId) {
+        return paperConflictRepository.findByPaper_Id(paperId).stream()
+                .map(this::mapToPaperConflictResponseDTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<PaperConflictResponseDTO> getConflictsByConferenceId(Integer conferenceId) {
+        java.util.List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        java.util.List<Integer> paperIds = papers.stream().map(Paper::getId).toList();
+        if (paperIds.isEmpty()) return java.util.List.of();
+        return paperConflictRepository.findAll().stream()
+                .filter(pc -> paperIds.contains(pc.getPaper().getId()))
+                .map(this::mapToPaperConflictResponseDTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     private void mapDtoToPaperConflictEntity(PaperConflictDTO dto, PaperConflict entity) {
         Paper paper = paperRepository.findById(dto.getPaperId())
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));

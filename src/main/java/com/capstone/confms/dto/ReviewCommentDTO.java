@@ -1,6 +1,5 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.Review;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +11,11 @@ import lombok.RequiredArgsConstructor;
 @AllArgsConstructor
 public class ReviewCommentDTO {
     private Integer reviewId;
+    private Integer paperId;
+    private Integer userId;
+    private String title;
     private String content;
     private Boolean isVisibleToAuthor;
+    private Integer parentCommentId;
+    private Boolean isDiscussionPost;
 }

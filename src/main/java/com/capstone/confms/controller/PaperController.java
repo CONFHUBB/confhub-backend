@@ -93,4 +93,35 @@ public class PaperController {
             @PathVariable Integer conferenceId) {
         return ResponseEntity.ok(paperService.getPapersByConference(conferenceId));
     }
+
+    @PutMapping("/{id}/review-read-only")
+    @Operation(summary = "Toggle review read-only for a paper (BR-3.28)")
+    public ResponseEntity<PaperResponseDTO> toggleReviewReadOnly(
+            @PathVariable Integer id,
+            @RequestParam boolean readOnly) {
+        return ResponseEntity.ok(paperService.toggleReviewReadOnly(id, readOnly));
+    }
+
+    @PutMapping("/{id}/discussion")
+    @Operation(summary = "Enable/disable discussion for a paper (BR-3.30)")
+    public ResponseEntity<PaperResponseDTO> toggleDiscussion(
+            @PathVariable Integer id,
+            @RequestParam boolean enabled) {
+        return ResponseEntity.ok(paperService.toggleDiscussion(id, enabled));
+    }
+
+    @PutMapping("/bulk-status")
+    @Operation(summary = "Bulk update paper status (BR-3.43)")
+    public ResponseEntity<java.util.List<PaperResponseDTO>> bulkUpdatePaperStatus(
+            @RequestBody java.util.List<PaperUpdateStatusDTO> dtos) {
+        return ResponseEntity.ok(paperService.bulkUpdatePaperStatus(dtos));
+    }
+
+    @PutMapping("/bulk-discussion")
+    @Operation(summary = "Bulk enable/disable discussion for papers (BR-3.30)")
+    public ResponseEntity<java.util.List<PaperResponseDTO>> bulkToggleDiscussion(
+            @RequestBody java.util.List<Integer> paperIds,
+            @RequestParam boolean enabled) {
+        return ResponseEntity.ok(paperService.bulkToggleDiscussion(paperIds, enabled));
+    }
 }

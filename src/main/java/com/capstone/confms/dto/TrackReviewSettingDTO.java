@@ -11,4 +11,14 @@ public class TrackReviewSettingDTO {
     private Integer reviewerInviteExpirationDays = 7;
     private Boolean allowOthersReviewAccessAfterSubmit = false;
     private Boolean allowReviewUpdateDuringDiscussion = false;
+    private Boolean showReviewerIdentityToOtherReviewer = false;
+    private Boolean showAggregateColumns = false;
+    private Boolean allowReviewerSeeStatusBeforeNotification = false;
+    private Boolean enableAllPapersForDiscussion = false;
+    private Boolean allowDiscussNonAssignedPapers = false;
+    private Boolean allowAuthorDiscuss = false;
+    private Boolean notifyReviewerOnReviewUpdateDuringDiscussion = false;
+    private Boolean notifyOnManualAssignment = false;
+    private Boolean doNotShowWithdrawnPapers = false;
+    private Boolean addReviewerOnInviteAccept = true;
 }

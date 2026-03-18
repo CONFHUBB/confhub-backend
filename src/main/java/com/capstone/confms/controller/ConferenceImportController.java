@@ -106,4 +106,34 @@ public class ConferenceImportController {
                 ? ResponseEntity.status(HttpStatus.CREATED).body(result)
                 : ResponseEntity.badRequest().body(result);
     }
+
+    // ── Members ──
+
+    @GetMapping("/conferences/{conferenceId}/members/import/template")
+    @Operation(summary = "Download member Excel template")
+    public ResponseEntity<byte[]> memberTemplate(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member_template.xlsx")
+                .contentType(XLSX_TYPE)
+                .body(importService.generateMemberTemplate());
+    }
+
+    @PostMapping("/conferences/{conferenceId}/members/import/preview")
+    @Operation(summary = "Preview members from Excel (no DB write)")
+    public ResponseEntity<ImportResultDTO> previewMembers(
+            @PathVariable Integer conferenceId,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(importService.previewMembersFromExcel(file));
+    }
+
+    @PostMapping("/conferences/{conferenceId}/members/import")
+    @Operation(summary = "Import members for a conference from Excel file")
+    public ResponseEntity<ImportResultDTO> importMembers(
+            @PathVariable Integer conferenceId,
+            @RequestParam("file") MultipartFile file) {
+        ImportResultDTO result = importService.importMembersFromExcel(conferenceId, file);
+        return result.isSuccess()
+                ? ResponseEntity.status(HttpStatus.CREATED).body(result)
+                : ResponseEntity.badRequest().body(result);
+    }
 }

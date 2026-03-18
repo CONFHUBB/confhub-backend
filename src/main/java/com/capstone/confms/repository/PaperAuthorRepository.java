@@ -16,4 +16,6 @@ public interface PaperAuthorRepository extends JpaRepository<PaperAuthor, Intege
     List<PaperAuthor> findByPaperId(Integer paperId);
 
     Page<PaperAuthor> findByPaperId(Integer paperId, Pageable pageable);
+
+    boolean existsByPaperIdAndUserId(Integer paperId, Integer userId);
 }

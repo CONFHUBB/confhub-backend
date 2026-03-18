@@ -19,6 +19,7 @@ public class ImportResultDTO {
     private String conferenceName;
     private int tracksCreated;
     private int subjectAreasCreated;
+    private int membersCreated;
 
     @Builder.Default
     private List<ImportError> errors = new ArrayList<>();
@@ -31,6 +32,9 @@ public class ImportResultDTO {
 
     @Builder.Default
     private List<Map<String, String>> subjectAreaPreviews = new ArrayList<>();
+
+    @Builder.Default
+    private List<Map<String, String>> memberPreviews = new ArrayList<>();
 
     @Data
     @Builder

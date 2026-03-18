@@ -1,6 +1,9 @@
 package com.capstone.confms.repository;
 
+import com.capstone.confms.entity.Conference;
+import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.entity.ConferenceUserTrack;
+import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +24,7 @@ public interface ConferenceUserTrackRepository extends JpaRepository<ConferenceU
     List<ConferenceUserTrack> findByUser_Id(Integer userId);
 
     Optional<ConferenceUserTrack> findByInvitationToken(String invitationToken);
+
+    boolean existsByUserAndConferenceAndAssignedRoleAndConferenceTrack(
+            User user, Conference conference, ConferenceTrackRole assignedRole, ConferenceTrack conferenceTrack);
 }

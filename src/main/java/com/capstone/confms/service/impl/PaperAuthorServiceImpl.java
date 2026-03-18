@@ -2,11 +2,15 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.PaperAuthorDTO;
 import com.capstone.confms.dto.response.PaperAuthorResponseDTO;
+import com.capstone.confms.dto.response.UserResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.entity.Notification;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.PaperAuthor;
 import com.capstone.confms.entity.User;
+import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
+import com.capstone.confms.repository.NotificationRepository;
 import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.UserRepository;
@@ -32,6 +36,7 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     private final PaperAuthorRepository paperAuthorRepository;
     private final PaperRepository paperRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,6 +57,10 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     @Override
     @Transactional
     public PaperAuthorResponseDTO createPaperAuthor(PaperAuthorDTO dto) {
+        // Duplicate check
+        if (paperAuthorRepository.existsByPaperIdAndUserId(dto.getPaperId(), dto.getUserId())) {
+            throw new BadRequestException("This author is already added to the paper.");
+        }
         PaperAuthor entity = new PaperAuthor();
         mapDtoToPaperAuthorEntity(dto, entity);
         return mapToPaperAuthorResponseDTO(paperAuthorRepository.save(entity));
@@ -76,10 +85,29 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     @Override
     @Transactional
     public void deletePaperAuthor(Integer id) {
-        if (!paperAuthorRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Cannot delete. PaperAuthor not found with id " + id);
-        }
+        PaperAuthor pa = paperAuthorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cannot delete. PaperAuthor not found with id " + id));
+
+        User removedUser = pa.getUser();
+        Paper paper = pa.getPaper();
+
         paperAuthorRepository.deleteById(id);
+
+        // Notify the removed co-author
+        try {
+            Notification notification = Notification.builder()
+                    .user(removedUser)
+                    .conference(paper.getTrack().getConference())
+                    .title("You have been removed as co-author")
+                    .message("You have been removed as a co-author from the paper \"" + paper.getTitle() + "\".")
+                    .type("AUTHOR_REMOVED")
+                    .link("/paper")
+                    .isRead(false)
+                    .build();
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            log.error("Failed to send notification to removed co-author {}: {}", removedUser.getEmail(), e.getMessage());
+        }
     }
 
     private void mapDtoToPaperAuthorEntity(PaperAuthorDTO dto, PaperAuthor entity) {
@@ -99,10 +127,19 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
     }
 
     private PaperAuthorResponseDTO mapToPaperAuthorResponseDTO(PaperAuthor entity) {
+        User user = entity.getUser();
         return PaperAuthorResponseDTO.builder()
                 .id(entity.getId())
-                .paper(entity.getPaper())
-                .user(entity.getUser())
+                .paperId(entity.getPaper().getId())
+                .user(UserResponseDTO.builder()
+                        .id(user.getId())
+                        .title(user.getTitle())
+                        .firstName(user.getFirstName())
+                        .lastName(user.getLastName())
+                        .email(user.getEmail())
+                        .country(user.getCountry())
+                        .isActive(user.getIsActive())
+                        .build())
                 .build();
     }
-}
+}

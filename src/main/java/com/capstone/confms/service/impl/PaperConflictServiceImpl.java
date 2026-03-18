@@ -111,10 +111,20 @@ public class PaperConflictServiceImpl implements PaperConflictService {
     }
 
     private PaperConflictResponseDTO mapToPaperConflictResponseDTO(PaperConflict entity) {
+        Paper paper = entity.getPaper();
+        User user = entity.getUser();
         return PaperConflictResponseDTO.builder()
                 .id(entity.getId())
-                .paper(entity.getPaper())
-                .user(entity.getUser())
+                .paper(PaperConflictResponseDTO.PaperInfo.builder()
+                        .id(paper.getId())
+                        .title(paper.getTitle())
+                        .build())
+                .user(PaperConflictResponseDTO.UserInfo.builder()
+                        .id(user.getId())
+                        .firstName(user.getFirstName())
+                        .lastName(user.getLastName())
+                        .email(user.getEmail())
+                        .build())
                 .conflictType(entity.getConflictType())
                 .build();
     }

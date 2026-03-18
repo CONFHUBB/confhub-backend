@@ -266,6 +266,175 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         }
     }
 
+    // ===================== MEMBERS =====================
+
+    private static final String[] MEMBER_HEADERS = {"email", "role", "trackName"};
+
+    @Override
+    public ImportResultDTO previewMembersFromExcel(MultipartFile file) {
+        validateFile(file);
+        List<ImportError> errors = new ArrayList<>();
+
+        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            if (sheet == null) return errorResult("No sheet found in file");
+
+            List<Map<String, String>> rows = parseAllRows(sheet, MEMBER_HEADERS, "Members", errors);
+            validateMemberData(rows, errors);
+
+            return ImportResultDTO.builder()
+                    .success(errors.isEmpty())
+                    .memberPreviews(rows)
+                    .errors(errors)
+                    .build();
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to read Excel file: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public ImportResultDTO importMembersFromExcel(Integer conferenceId, MultipartFile file) {
+        ImportResultDTO preview = previewMembersFromExcel(file);
+        if (!preview.isSuccess()) return preview;
+
+        Conference conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
+
+        List<ImportError> errors = new ArrayList<>();
+        int count = 0;
+
+        for (int i = 0; i < preview.getMemberPreviews().size(); i++) {
+            Map<String, String> data = preview.getMemberPreviews().get(i);
+            int rowNum = i + 2;
+            String email = data.get("email").trim();
+            String roleStr = data.get("role").trim().toUpperCase().replace(" ", "_");
+            String trackName = data.get("trackName");
+
+            // Find user by email
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
+                        .message("User not found: " + email).build());
+                continue;
+            }
+
+            // Parse role
+            ConferenceTrackRole role;
+            try {
+                role = ConferenceTrackRole.valueOf(roleStr);
+            } catch (IllegalArgumentException e) {
+                errors.add(ImportError.builder().sheet("Members").row(rowNum).column("role")
+                        .message("Invalid role: " + roleStr).build());
+                continue;
+            }
+
+            // Find track if needed
+            ConferenceTrack track = null;
+            if (role == ConferenceTrackRole.PROGRAM_CHAIR || role == ConferenceTrackRole.REVIEWER) {
+                if (!notBlank(trackName)) {
+                    errors.add(ImportError.builder().sheet("Members").row(rowNum).column("trackName")
+                            .message("Track is required for " + role).build());
+                    continue;
+                }
+                track = trackRepository.findByConferenceAndName(conference, trackName.trim()).orElse(null);
+                if (track == null) {
+                    errors.add(ImportError.builder().sheet("Members").row(rowNum).column("trackName")
+                            .message("Track not found: " + trackName).build());
+                    continue;
+                }
+            }
+
+            // Check duplicate
+            boolean exists = conferenceUserTrackRepository.existsByUserAndConferenceAndAssignedRoleAndConferenceTrack(
+                    user, conference, role, track);
+            if (exists) {
+                errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
+                        .message("Duplicate: " + email + " already has role " + role).build());
+                continue;
+            }
+
+            // Create assignment
+            ConferenceUserTrack cut = new ConferenceUserTrack();
+            cut.setUser(user);
+            cut.setConference(conference);
+            cut.setAssignedRole(role);
+            cut.setConferenceTrack(track);
+            cut.setInvitedAt(LocalDateTime.now());
+            cut.setIsAccepted(true);
+            cut.setIsRegistered(true);
+            conferenceUserTrackRepository.save(cut);
+            count++;
+        }
+
+        if (!errors.isEmpty()) {
+            return ImportResultDTO.builder()
+                    .success(false)
+                    .errors(errors)
+                    .membersCreated(count)
+                    .build();
+        }
+
+        log.info("Imported {} members for conference {}", count, conferenceId);
+        return ImportResultDTO.builder()
+                .success(true)
+                .conferenceId(conferenceId)
+                .membersCreated(count)
+                .build();
+    }
+
+    @Override
+    public byte[] generateMemberTemplate() {
+        try (Workbook wb = new XSSFWorkbook()) {
+            CellStyle headerStyle = createHeaderStyle(wb);
+            Sheet sheet = wb.createSheet("Members");
+            writeHeaders(sheet, MEMBER_HEADERS, headerStyle);
+            String[][] samples = {
+                    {"reviewer1@example.com", "REVIEWER", "Machine Learning"},
+                    {"chair1@example.com", "PROGRAM_CHAIR", "NLP"},
+                    {"organizer@example.com", "CONFERENCE_CHAIR", ""},
+            };
+            for (int r = 0; r < samples.length; r++) {
+                Row row = sheet.createRow(r + 1);
+                for (int c = 0; c < samples[r].length; c++) row.createCell(c).setCellValue(samples[r][c]);
+            }
+            return toBytes(wb);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate template", e);
+        }
+    }
+
+    private void validateMemberData(List<Map<String, String>> rows, List<ImportError> errors) {
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < rows.size(); i++) {
+            int rowNum = i + 2;
+            Map<String, String> d = rows.get(i);
+            requireField(d, "email", "Members", rowNum, errors);
+            requireField(d, "role", "Members", rowNum, errors);
+
+            String email = d.get("email");
+            String role = d.get("role");
+            if (notBlank(email) && notBlank(role)) {
+                String key = email.trim().toLowerCase() + "|" + role.trim().toUpperCase();
+                if (!seen.add(key)) {
+                    errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
+                            .message("Duplicate row: " + email + " with role " + role).build());
+                }
+            }
+
+            // Validate role value
+            if (notBlank(role)) {
+                String normalized = role.trim().toUpperCase().replace(" ", "_");
+                try {
+                    ConferenceTrackRole.valueOf(normalized);
+                } catch (IllegalArgumentException e) {
+                    errors.add(ImportError.builder().sheet("Members").row(rowNum).column("role")
+                            .message("Invalid role: " + role + ". Valid: CONFERENCE_CHAIR, PROGRAM_CHAIR, REVIEWER").build());
+                }
+            }
+        }
+    }
+
     // ===================== HELPERS =====================
 
     private void validateFile(MultipartFile file) {

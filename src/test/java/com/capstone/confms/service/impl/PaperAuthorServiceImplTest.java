@@ -50,6 +50,9 @@ public class PaperAuthorServiceImplTest {
 
         user = new User();
         user.setId(2);
+        user.setFirstName("John");
+        user.setLastName("Doe");
+        user.setEmail("john@example.com");
 
         paperAuthor = new PaperAuthor();
         paperAuthor.setId(10);

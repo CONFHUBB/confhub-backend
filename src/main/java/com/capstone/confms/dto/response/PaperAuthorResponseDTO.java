@@ -1,7 +1,5 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.entity.Paper;
-import com.capstone.confms.entity.User;
 import lombok.Builder;
 import lombok.Data;
 
@@ -9,6 +7,6 @@ import lombok.Data;
 @Builder
 public class PaperAuthorResponseDTO {
     private Integer id;
-    private Paper paper;
-    private User user;
-}
+    private Integer paperId;
+    private UserResponseDTO user;
+}

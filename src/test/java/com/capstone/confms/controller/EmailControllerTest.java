@@ -59,7 +59,7 @@ class EmailControllerTest {
 
     @Test
     void acceptEmailShouldRedirect() {
-        var result = emailController.acceptEmail("token123");
+        var result = emailController.acceptEmail("token123", null);
 
         assertEquals(HttpStatus.FOUND, result.getStatusCode());
     }

@@ -11,6 +11,7 @@ import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.NotificationRepository;
 import com.capstone.confms.repository.ReviewRepository;
+import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,8 @@ public class ConferenceUserTrackServiceImplTest {
     private ReviewRepository reviewRepository;
     @Mock
     private NotificationRepository notificationRepository;
+    @Mock
+    private TrackReviewSettingRepository trackReviewSettingRepository;
 
     @InjectMocks
     private ConferenceUserTrackServiceImpl conferenceUserTrackService;
@@ -212,7 +215,7 @@ public class ConferenceUserTrackServiceImplTest {
                 .thenReturn(List.of(chairAssignment));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = conferenceUserTrackService.acceptInvitation(1, 10);
+        var result = conferenceUserTrackService.acceptInvitation(1, 10, null);
 
         assertNotNull(result);
         assertEquals(true, result.getIsAccepted());

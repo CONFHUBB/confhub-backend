@@ -68,11 +68,12 @@ public class ConferenceUserTrackController {
     }
 
     @PutMapping("/accept")
-    @Operation(summary = "Accept conference invitation", description = "Update isAccepted = true for the ConferenceUserTrack record matching userId and conferenceId")
+    @Operation(summary = "Accept conference invitation", description = "Update isAccepted = true for the ConferenceUserTrack record matching userId and conferenceId. Optionally set reviewerQuota.")
     public ResponseEntity<ConferenceUserTrackResponseDTO> acceptInvitation(
             @RequestParam Integer userId,
-            @RequestParam Integer conferenceId) {
-        return ResponseEntity.ok(conferenceUserTrackService.acceptInvitation(userId, conferenceId));
+            @RequestParam Integer conferenceId,
+            @RequestParam(required = false) Integer reviewerQuota) {
+        return ResponseEntity.ok(conferenceUserTrackService.acceptInvitation(userId, conferenceId, reviewerQuota));
     }
 
     @PutMapping("/decline")
@@ -125,6 +126,23 @@ public class ConferenceUserTrackController {
     @Operation(summary = "Resend invitation", description = "Regenerate token and reset invitation to pending. Old email link will be invalidated.")
     public ResponseEntity<ConferenceUserTrackResponseDTO> resendInvitation(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceUserTrackService.resendInvitation(id));
+    }
+
+    @PutMapping("/reviewer-quota")
+    @Operation(summary = "Update reviewer quota", description = "Set/update the maximum number of papers a reviewer wants to review")
+    public ResponseEntity<ConferenceUserTrackResponseDTO> updateReviewerQuota(
+            @RequestParam Integer userId,
+            @RequestParam Integer conferenceId,
+            @RequestParam Integer reviewerQuota) {
+        return ResponseEntity.ok(conferenceUserTrackService.updateReviewerQuota(userId, conferenceId, reviewerQuota));
+    }
+
+    @GetMapping("/reviewer-quota")
+    @Operation(summary = "Get reviewer quota", description = "Get the current review quota for a reviewer in a conference")
+    public ResponseEntity<Integer> getReviewerQuota(
+            @RequestParam Integer userId,
+            @RequestParam Integer conferenceId) {
+        return ResponseEntity.ok(conferenceUserTrackService.getReviewerQuota(userId, conferenceId));
     }
 
 }

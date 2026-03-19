@@ -44,7 +44,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     // BR-3.14: Valid review status transitions
     private static final Map<ReviewStatus, Set<ReviewStatus>> VALID_TRANSITIONS = Map.of(
-            ReviewStatus.ASSIGNED, Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.DECLINED),
+            ReviewStatus.ASSIGNED, Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.COMPLETED, ReviewStatus.DECLINED),
             ReviewStatus.IN_PROGRESS, Set.of(ReviewStatus.COMPLETED),
             ReviewStatus.COMPLETED, Set.of(),
             ReviewStatus.DECLINED, Set.of()
@@ -267,6 +267,8 @@ public class ReviewServiceImpl implements ReviewService {
                     .id(entity.getPaper().getId())
                     .title(entity.getPaper().getTitle())
                     .abstractField(entity.getPaper().getAbstractField())
+                    .trackId(entity.getPaper().getTrack() != null ? entity.getPaper().getTrack().getId() : null)
+                    .keywordsJson(entity.getPaper().getKeywordsJson())
                     .build();
         }
 

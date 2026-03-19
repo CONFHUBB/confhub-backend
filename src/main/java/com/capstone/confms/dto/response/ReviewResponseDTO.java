@@ -21,6 +21,8 @@ public class ReviewResponseDTO {
         private Integer id;
         private String title;
         private String abstractField;
+        private Integer trackId;
+        private String keywordsJson;
     }
 
     @Data

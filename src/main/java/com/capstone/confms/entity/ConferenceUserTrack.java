@@ -57,4 +57,7 @@ public class ConferenceUserTrack extends BaseEntity{
     @Column(name = "token_expires_at")
     private LocalDateTime tokenExpiresAt;
 
+    @Column(name = "reviewer_quota")
+    private Integer reviewerQuota;
+
 }

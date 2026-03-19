@@ -88,9 +88,11 @@ public class EmailController {
     @GetMapping("/accept/{token}")
     @Operation(summary = "Accept invitation via email link",
             description = "Handle the logic when a user clicks the Accept link in the invitation email. Validates token, updates DB, and redirects to frontend.")
-    public ResponseEntity<Void> acceptEmail(@PathVariable String token) {
+    public ResponseEntity<Void> acceptEmail(
+            @PathVariable String token,
+            @RequestParam(required = false) Integer reviewerQuota) {
         try {
-            conferenceUserTrackService.acceptByToken(token);
+            conferenceUserTrackService.acceptByToken(token, reviewerQuota);
             return ResponseEntity.status(302)
                     .location(URI.create(frontendUrl + "/invitation/accepted?token=" + token))
                     .build();

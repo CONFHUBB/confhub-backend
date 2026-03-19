@@ -15,9 +15,11 @@ import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.NotificationRepository;
 import com.capstone.confms.entity.Notification;
+import com.capstone.confms.entity.TrackReviewSetting;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import com.capstone.confms.service.EmailService;
@@ -46,6 +48,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         private final ConferenceTrackRepository conferenceTrackRepository;
         private final ReviewRepository reviewRepository;
         private final NotificationRepository notificationRepository;
+        private final TrackReviewSettingRepository trackReviewSettingRepository;
         private final EmailService emailService;
 
         @Value("${app.base-url}")
@@ -238,7 +241,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
 
         @Override
         @Transactional
-        public ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId) {
+        public ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId, Integer reviewerQuota) {
                 List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
                                 .findAllByUser_IdAndConference_Id(userId, conferenceId);
                 if (cuts.isEmpty()) {
@@ -246,7 +249,13 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                         "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
                                                         + conferenceId);
                 }
-                cuts.forEach(cut -> cut.setIsAccepted(true));
+                cuts.forEach(cut -> {
+                        cut.setIsAccepted(true);
+                        if (reviewerQuota != null && cut.getAssignedRole() == ConferenceTrackRole.REVIEWER
+                                        && isReviewerQuotaAllowed(cut)) {
+                                cut.setReviewerQuota(reviewerQuota);
+                        }
+                });
                 List<ConferenceUserTrack> saved = conferenceUserTrackRepository.saveAll(cuts);
 
                 // Notify conference chairs that user accepted
@@ -310,7 +319,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
 
         @Override
         @Transactional
-        public ConferenceUserTrackResponseDTO acceptByToken(String token) {
+        public ConferenceUserTrackResponseDTO acceptByToken(String token, Integer reviewerQuota) {
                 ConferenceUserTrack cut = conferenceUserTrackRepository.findByInvitationToken(token)
                                 .orElseThrow(() -> new ResourceNotFoundException("Invalid invitation token"));
 
@@ -326,6 +335,10 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 }
 
                 cut.setIsAccepted(true);
+                if (reviewerQuota != null && cut.getAssignedRole() == ConferenceTrackRole.REVIEWER
+                                && isReviewerQuotaAllowed(cut)) {
+                        cut.setReviewerQuota(reviewerQuota);
+                }
                 ConferenceUserTrack saved = conferenceUserTrackRepository.save(cut);
 
                 // Notify conference chairs
@@ -514,6 +527,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 dto.setIsRegistered(entity.getIsRegistered());
                 dto.setInvitationToken(entity.getInvitationToken());
                 dto.setTokenExpiresAt(entity.getTokenExpiresAt());
+                dto.setReviewerQuota(entity.getReviewerQuota());
                 dto.setCreatedAt(entity.getCreatedAt());
                 dto.setUpdatedAt(entity.getUpdatedAt());
                 return dto;
@@ -575,5 +589,48 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         case AUTHOR -> "Author";
                         case ATTENDEE -> "Attendee";
                 };
+        }
+
+        /**
+         * Check if reviewer quota is allowed for the track associated with this ConferenceUserTrack.
+         */
+        private boolean isReviewerQuotaAllowed(ConferenceUserTrack cut) {
+                ConferenceTrack track = cut.getConferenceTrack();
+                if (track == null) return false;
+                return trackReviewSettingRepository.findByTrackId(track.getId())
+                                .map(TrackReviewSetting::getAllowReviewerQuota)
+                                .orElse(false);
+        }
+
+        @Override
+        @Transactional
+        public ConferenceUserTrackResponseDTO updateReviewerQuota(Integer userId, Integer conferenceId, Integer reviewerQuota) {
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
+                                .findAllByUser_IdAndConference_Id(userId, conferenceId);
+                if (cuts.isEmpty()) {
+                        throw new ResourceNotFoundException(
+                                        "ConferenceUserTrack not found for userId=" + userId + " conferenceId="
+                                                        + conferenceId);
+                }
+                // Update quota on all REVIEWER records where allowReviewerQuota is enabled
+                cuts.stream()
+                        .filter(cut -> cut.getAssignedRole() == ConferenceTrackRole.REVIEWER)
+                        .filter(this::isReviewerQuotaAllowed)
+                        .forEach(cut -> cut.setReviewerQuota(reviewerQuota));
+                List<ConferenceUserTrack> saved = conferenceUserTrackRepository.saveAll(cuts);
+                return mapToResponseDTO(saved.get(0));
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public Integer getReviewerQuota(Integer userId, Integer conferenceId) {
+                List<ConferenceUserTrack> cuts = conferenceUserTrackRepository
+                                .findAllByUser_IdAndConference_Id(userId, conferenceId);
+                return cuts.stream()
+                        .filter(cut -> cut.getAssignedRole() == ConferenceTrackRole.REVIEWER)
+                        .map(ConferenceUserTrack::getReviewerQuota)
+                        .filter(q -> q != null)
+                        .findFirst()
+                        .orElse(null);
         }
 }

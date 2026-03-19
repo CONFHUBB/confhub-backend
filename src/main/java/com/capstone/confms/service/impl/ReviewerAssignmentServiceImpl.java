@@ -84,6 +84,14 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             throw new BadRequestException("No reviewers found in this conference");
         }
 
+        // 2b. Pre-compute reviewer personal quotas
+        Map<Integer, Integer> reviewerQuotaMap = new HashMap<>();
+        for (ConferenceUserTrack rTrack : reviewerTracks) {
+            if (rTrack.getReviewerQuota() != null) {
+                reviewerQuotaMap.put(rTrack.getUser().getId(), rTrack.getReviewerQuota());
+            }
+        }
+
         // 3. Pre-compute: bids, conflicts, subject areas
         Map<String, BidValue> bidMap = new HashMap<>(); // key = "paperId-reviewerId"
         for (Paper paper : papers) {
@@ -183,8 +191,11 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             if (currentPaperCount >= config.getMinReviewersPerPaper()) {
                 continue; // Paper đã đủ reviewer
             }
-            if (currentReviewerCount >= config.getMaxPapersPerReviewer()) {
-                continue; // Reviewer đã đạt max
+            // Ưu tiên reviewer's personal quota, fallback to config default
+            Integer personalQuota = reviewerQuotaMap.getOrDefault(candidate.getReviewerId(), null);
+            int effectiveMax = personalQuota != null ? personalQuota : config.getMaxPapersPerReviewer();
+            if (currentReviewerCount >= effectiveMax) {
+                continue; // Reviewer đã đạt max (personal quota or default)
             }
 
             // Load balancing: ưu tiên reviewer ít paper hơn

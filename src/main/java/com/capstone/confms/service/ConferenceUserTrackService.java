@@ -23,11 +23,11 @@ public interface ConferenceUserTrackService {
 
     List<ConferenceUserTrackResponseDTO> getUserRoleAssignments(Integer userId);
 
-    ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId);
+    ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId, Integer reviewerQuota);
 
     ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId);
 
-    ConferenceUserTrackResponseDTO acceptByToken(String token);
+    ConferenceUserTrackResponseDTO acceptByToken(String token, Integer reviewerQuota);
 
     ConferenceUserTrackResponseDTO declineByToken(String token);
 
@@ -36,4 +36,8 @@ public interface ConferenceUserTrackService {
     PagedResponse<UserWithRolesResponseDTO> getConferenceUsersWithRoles(Integer conferenceId, int page, int size);
 
     void removeRoleFromUser(Integer conferenceUserTrackId);
+
+    ConferenceUserTrackResponseDTO updateReviewerQuota(Integer userId, Integer conferenceId, Integer reviewerQuota);
+
+    Integer getReviewerQuota(Integer userId, Integer conferenceId);
 }

@@ -345,9 +345,21 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 }
             }
 
-            // Check duplicate
-            boolean exists = conferenceUserTrackRepository.existsByUserAndConferenceAndAssignedRoleAndConferenceTrack(
-                    user, conference, role, track);
+            // Check duplicate – handle null track (CONFERENCE_CHAIR) explicitly
+            boolean exists;
+            if (track == null) {
+                exists = conferenceUserTrackRepository
+                        .findAllByUser_IdAndConference_Id(user.getId(), conference.getId())
+                        .stream()
+                        .anyMatch(cut -> cut.getAssignedRole() == role && cut.getConferenceTrack() == null);
+            } else {
+                exists = conferenceUserTrackRepository
+                        .findAllByUser_IdAndConference_Id(user.getId(), conference.getId())
+                        .stream()
+                        .anyMatch(cut -> cut.getAssignedRole() == role
+                                && cut.getConferenceTrack() != null
+                                && cut.getConferenceTrack().getId().equals(track.getId()));
+            }
             if (exists) {
                 errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
                         .message("Duplicate: " + email + " already has role " + role).build());
@@ -414,8 +426,11 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
             String email = d.get("email");
             String role = d.get("role");
+            String trackName = d.get("trackName");
             if (notBlank(email) && notBlank(role)) {
-                String key = email.trim().toLowerCase() + "|" + role.trim().toUpperCase();
+                // Include trackName in the key so same user with same role on different tracks is valid
+                String trackPart = notBlank(trackName) ? trackName.trim().toLowerCase() : "";
+                String key = email.trim().toLowerCase() + "|" + role.trim().toUpperCase() + "|" + trackPart;
                 if (!seen.add(key)) {
                     errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
                             .message("Duplicate row: " + email + " with role " + role).build());

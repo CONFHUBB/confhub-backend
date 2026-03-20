@@ -65,6 +65,12 @@ public class PaperFileController {
         return ResponseEntity.ok(paperFileService.getPaperFileById(id));
     }
 
+    @GetMapping("/paper/{paperId}")
+    @Operation(summary = "Get all Paper Files for a specific paper")
+    public ResponseEntity<java.util.List<PaperFileResponseDTO>> getFilesByPaperId(@PathVariable Integer paperId) {
+        return ResponseEntity.ok(paperFileService.getFilesByPaperId(paperId));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update Paper File details")
     public ResponseEntity<PaperFileResponseDTO> updatePaperFile(@Valid @PathVariable Integer id,

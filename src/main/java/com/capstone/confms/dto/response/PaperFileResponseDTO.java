@@ -1,6 +1,5 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.entity.Paper;
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,7 +7,7 @@ import lombok.Data;
 @Builder
 public class PaperFileResponseDTO {
     private Integer id;
-    private Paper paper;
+    private Integer paperId;
     private String url;
     private Boolean isActive;
 }

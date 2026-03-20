@@ -5,13 +5,19 @@ import com.capstone.confms.dto.response.ConferenceResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ConferenceService;
+import com.capstone.confms.service.FirebaseStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/conferences")
@@ -20,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 public class ConferenceController {
 
     private final ConferenceService conferenceService;
+    private final FirebaseStorageService firebaseStorageService;
 
     @PostMapping
     @Operation(summary = "Create a new conference")
@@ -81,5 +88,14 @@ public class ConferenceController {
     @Operation(summary = "Cancel a conference")
     public ResponseEntity<ConferenceResponseDTO> cancelConference(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceService.cancelConference(id));
+    }
+
+    @PostMapping(value = "/{id}/upload-banner", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a banner image for the conference")
+    public ResponseEntity<Map<String, String>> uploadBannerImage(
+            @PathVariable Integer id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        String downloadUrl = firebaseStorageService.uploadImage(file, id);
+        return ResponseEntity.ok(Map.of("url", downloadUrl));
     }
 }

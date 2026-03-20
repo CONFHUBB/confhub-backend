@@ -11,6 +11,7 @@ import java.util.List;
 @Builder
 public class PaperResponseDTO {
     private Integer id;
+    private Integer conferenceId;
     private Integer trackId;
     private String trackName;
     private Integer primarySubjectAreaId;

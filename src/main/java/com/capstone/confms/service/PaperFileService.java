@@ -12,5 +12,7 @@ public interface PaperFileService {
 
     PaperFileResponseDTO getPaperFileById(Integer id);
 
+    java.util.List<PaperFileResponseDTO> getFilesByPaperId(Integer paperId);
+
     void deletePaperFile(Integer id);
 }

@@ -60,6 +60,14 @@ public class PaperFileServiceImpl implements PaperFileService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public java.util.List<PaperFileResponseDTO> getFilesByPaperId(Integer paperId) {
+        return paperFileRepository.findByPaper_Id(paperId).stream()
+                .map(this::mapToPaperFileResponseDTO)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public void deletePaperFile(Integer id) {
         if (!paperFileRepository.existsById(id)) {
@@ -84,7 +92,7 @@ public class PaperFileServiceImpl implements PaperFileService {
     private PaperFileResponseDTO mapToPaperFileResponseDTO(PaperFile entity) {
         return PaperFileResponseDTO.builder()
                 .id(entity.getId())
-                .paper(entity.getPaper())
+                .paperId(entity.getPaper().getId())
                 .url(entity.getUrl())
                 .isActive(entity.getIsActive())
                 .build();

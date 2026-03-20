@@ -162,14 +162,26 @@ public class BiddingServiceImpl implements BiddingService {
 
         // 1. Kiểm tra bắt buộc chọn subject areas trước khi bid
         List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
-        if (interests.isEmpty()) {
+
+        // Check if any track in this conference requires subject areas
+        List<Paper> allPapersRaw = paperRepository.findByTrack_Conference_Id(conferenceId);
+        Set<Integer> trackIds = allPapersRaw.stream()
+                .map(p -> p.getTrack().getId())
+                .collect(Collectors.toSet());
+        boolean anyTrackRequires = trackIds.stream().anyMatch(trackId ->
+                trackReviewSettingRepository.findByTrackId(trackId)
+                        .map(s -> Boolean.TRUE.equals(s.getRequireSubjectAreas()))
+                        .orElse(false)
+        );
+
+        if (interests.isEmpty() && anyTrackRequires) {
             throw new BadRequestException(
                     "You must select your Subject Areas / Areas of Expertise before viewing papers for bidding. " +
                     "Please go to the Subject Areas page first.");
         }
 
-        // 2. Lấy tất cả papers trong conference
-        List<Paper> allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        // 2. Lấy tất cả papers trong conference (reuse if already fetched)
+        List<Paper> allPapers = allPapersRaw;
 
         // 3. Lấy paper IDs mà reviewer có conflict (manual)
         Set<Integer> conflictPaperIds = paperConflictRepository.findByUser_Id(reviewerId)
@@ -287,6 +299,12 @@ public class BiddingServiceImpl implements BiddingService {
      * BR-3.1: Validate subject areas — always require at least 1 interest before bidding.
      */
     private void validateRequireSubjectAreas(Integer trackId, Integer reviewerId) {
+        // Only enforce if the track's review setting requires subject areas
+        boolean requiresSA = trackReviewSettingRepository.findByTrackId(trackId)
+                .map(s -> Boolean.TRUE.equals(s.getRequireSubjectAreas()))
+                .orElse(false);
+        if (!requiresSA) return;
+
         List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
         if (interests.isEmpty()) {
             throw new BadRequestException(

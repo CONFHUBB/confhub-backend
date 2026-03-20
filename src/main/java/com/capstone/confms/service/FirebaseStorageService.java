@@ -24,4 +24,10 @@ public interface FirebaseStorageService {
      * @return the public download URL, or null if not found
      */
     String getFileUrl(String fileName);
+
+    /**
+     * Uploads an image to Firebase Storage under conferences/{conferenceId}/banners/
+     * and returns the public download URL.
+     */
+    String uploadImage(MultipartFile file, Integer conferenceId) throws IOException;
 }

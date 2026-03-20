@@ -440,6 +440,7 @@ public class PaperServiceImpl implements PaperService {
 
         return PaperResponseDTO.builder()
                 .id(entity.getId())
+                .conferenceId(entity.getTrack().getConference().getId())
                 .trackId(entity.getTrack().getId())
                 .trackName(entity.getTrack().getName())
                 .primarySubjectAreaId(

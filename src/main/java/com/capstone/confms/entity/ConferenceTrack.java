@@ -41,8 +41,6 @@ public class ConferenceTrack extends BaseEntity {
     @OneToOne(mappedBy = "track", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private TrackReviewSetting trackReviewSetting;
 
-    @Column(name = "max_submissions", nullable = false)
-    private Integer maxSubmissions;
 
     @OneToMany(mappedBy = "track", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("orderIndex ASC")

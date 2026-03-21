@@ -105,17 +105,32 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         Map<ActivityType, ConferenceActivity> activityMap = existingActivities.stream()
                 .collect(Collectors.toMap(ConferenceActivity::getActivityType, a -> a));
 
+        // Determine which activity (if any) is being enabled
+        ActivityType enablingType = null;
+        for (ConferenceActivityDTO dto : activityDTOs) {
+            ConferenceActivity activity = activityMap.get(dto.getActivityType());
+            if (activity != null && Boolean.TRUE.equals(dto.getIsEnabled())
+                    && !Boolean.TRUE.equals(activity.getIsEnabled())) {
+                enablingType = dto.getActivityType();
+                break;
+            }
+        }
+
+        // If enabling an activity, validate dependencies first
+        if (enablingType != null) {
+            validateActivityDependencies(conferenceId, enablingType);
+
+            // Disable ALL other activities (only 1 can be active at a time)
+            for (ConferenceActivity a : existingActivities) {
+                if (a.getActivityType() != enablingType) {
+                    a.setIsEnabled(false);
+                }
+            }
+        }
+
         for (ConferenceActivityDTO dto : activityDTOs) {
             ConferenceActivity activity = activityMap.get(dto.getActivityType());
             if (activity != null) {
-                // BR-1.5 + BR-1.7: Validate dependencies khi bật activity
-                boolean isEnabling = Boolean.TRUE.equals(dto.getIsEnabled())
-                        && !Boolean.TRUE.equals(activity.getIsEnabled());
-
-                if (isEnabling) {
-                    validateActivityDependencies(conferenceId, dto.getActivityType());
-                }
-
                 if (dto.getIsEnabled() != null) {
                     activity.setIsEnabled(dto.getIsEnabled());
                 }

@@ -14,7 +14,6 @@ import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.DomainConflictUtil;
 import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.utils.enums.BidValue;
-import com.capstone.confms.utils.enums.Expertise;
 import com.capstone.confms.utils.enums.PaperStatus;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
@@ -163,25 +162,15 @@ public class BiddingServiceImpl implements BiddingService {
         // 1. Kiểm tra bắt buộc chọn subject areas trước khi bid
         List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
 
-        // Check if any track in this conference requires subject areas
-        List<Paper> allPapersRaw = paperRepository.findByTrack_Conference_Id(conferenceId);
-        Set<Integer> trackIds = allPapersRaw.stream()
-                .map(p -> p.getTrack().getId())
-                .collect(Collectors.toSet());
-        boolean anyTrackRequires = trackIds.stream().anyMatch(trackId ->
-                trackReviewSettingRepository.findByTrackId(trackId)
-                        .map(s -> Boolean.TRUE.equals(s.getRequireSubjectAreas()))
-                        .orElse(false)
-        );
-
-        if (interests.isEmpty() && anyTrackRequires) {
+        // Check if any track in this conference has papers — subject areas are always required
+        if (interests.isEmpty()) {
             throw new BadRequestException(
-                    "You must select your Subject Areas / Areas of Expertise before viewing papers for bidding. " +
+                    "You must select your Subject Areas before viewing papers for bidding. " +
                     "Please go to the Subject Areas page first.");
         }
 
-        // 2. Lấy tất cả papers trong conference (reuse if already fetched)
-        List<Paper> allPapers = allPapersRaw;
+        // 2. Lấy tất cả papers trong conference
+        List<Paper> allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
 
         // 3. Lấy paper IDs mà reviewer có conflict (manual)
         Set<Integer> conflictPaperIds = paperConflictRepository.findByUser_Id(reviewerId)
@@ -198,15 +187,15 @@ public class BiddingServiceImpl implements BiddingService {
                 .stream()
                 .collect(Collectors.toMap(b -> b.getPaper().getId(), Bidding::getBidValue));
 
-        // 6. Lấy reviewer interests (có expertise weight)
-        Map<Integer, Expertise> expertiseMap = interests.stream()
-                .collect(Collectors.toMap(ri -> ri.getSubjectArea().getId(), ReviewerInterest::getExpertise));
-        Set<Integer> reviewerSubjectAreaIds = expertiseMap.keySet();
+        // 6. Lấy reviewer interests (full objects for CMT3 scoring)
+        List<ReviewerInterest> reviewerInterests = interests;
 
         // 7. Check double blind setting per track
         Map<Integer, Boolean> trackDoubleBlindMap = new java.util.HashMap<>();
+        // 8. Pre-fetch track settings for domain conflict config
+        Map<Integer, Boolean> trackDomainConflictEnabled = new java.util.HashMap<>();
 
-        // 8. Build danh sách papers
+        // 9. Build danh sách papers
         List<PaperForBiddingDTO> result = new ArrayList<>();
         for (Paper paper : allPapers) {
             // BR-3.4: Lọc WITHDRAWN + DRAFT papers
@@ -219,9 +208,21 @@ public class BiddingServiceImpl implements BiddingService {
                 continue;
             }
 
-            // Domain conflict: check if reviewer shares institutional domain with any author
-            if (reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
-                List<PaperAuthor> authors = paperAuthorRepository.findByPaperId(paper.getId());
+            // Author self-review block: reviewer cannot bid on their own paper
+            List<PaperAuthor> authors = paperAuthorRepository.findByPaperId(paper.getId());
+            boolean isAuthor = authors.stream().anyMatch(pa -> pa.getUser().getId().equals(reviewerId));
+            if (isAuthor) {
+                continue;
+            }
+
+            // Domain conflict: only if enableDomainConflict is true for this track
+            Integer trackId = paper.getTrack().getId();
+            boolean domainEnabled = trackDomainConflictEnabled.computeIfAbsent(trackId, tid -> {
+                var setting = trackReviewSettingRepository.findByTrackId(tid).orElse(null);
+                return setting == null || Boolean.TRUE.equals(setting.getEnableDomainConflict());
+            });
+
+            if (domainEnabled && reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
                 boolean hasDomainConflict = authors.stream()
                         .map(pa -> DomainConflictUtil.extractDomain(pa.getUser().getEmail()))
                         .anyMatch(reviewerDomain::equalsIgnoreCase);
@@ -230,8 +231,8 @@ public class BiddingServiceImpl implements BiddingService {
                 }
             }
 
-            // BR-3.2: Tính relevance score với expertise weight
-            double relevance = calculateRelevanceScoreWithExpertise(paper, reviewerSubjectAreaIds, expertiseMap);
+            // BR-3.2: Tính relevance score theo CMT3 formula
+            double relevance = calculateRelevanceScoreCMT3(paper, reviewerInterests);
 
             // Lấy subject area names
             String primarySA = paper.getPrimarySubjectArea() != null
@@ -249,7 +250,6 @@ public class BiddingServiceImpl implements BiddingService {
             String trackName = paper.getTrack().getName();
 
             // BR-3.4: Double Blind check — ẩn abstract nếu isDoubleBlind
-            Integer trackId = paper.getTrack().getId();
             boolean isDoubleBlind = trackDoubleBlindMap.computeIfAbsent(trackId, tid -> {
                 return trackReviewSettingRepository.findByTrackId(tid)
                         .map(setting -> Boolean.TRUE.equals(setting.getIsDoubleBlind()))
@@ -299,67 +299,105 @@ public class BiddingServiceImpl implements BiddingService {
      * BR-3.1: Validate subject areas — always require at least 1 interest before bidding.
      */
     private void validateRequireSubjectAreas(Integer trackId, Integer reviewerId) {
-        // Only enforce if the track's review setting requires subject areas
-        boolean requiresSA = trackReviewSettingRepository.findByTrackId(trackId)
-                .map(s -> Boolean.TRUE.equals(s.getRequireSubjectAreas()))
-                .orElse(false);
-        if (!requiresSA) return;
-
+        // Subject areas are always required (hardcoded business rule)
         List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
         if (interests.isEmpty()) {
             throw new BadRequestException(
-                    "You must select your Subject Areas / Areas of Expertise before bidding.");
+                    "You must select your Subject Areas before bidding.");
         }
     }
 
     /**
-     * BR-3.2: Relevance score with expertise weight.
-     * EXPERT=1.0, KNOWLEDGEABLE=0.7, INTERESTED=0.4
+     * BR-3.2: CMT3-style relevance score.
+     * Relevance = 0.80pp1 + 0.32pp1h + 0.16ps1 + 0.05ps1h + 0.16sp1 + 0.05sp1h + 0.04ss1 + 0.01ss1h
+     * Normalized to [0,1] by dividing by max raw score (1.59).
      */
-    private double calculateRelevanceScoreWithExpertise(Paper paper, Set<Integer> reviewerSAIds,
-                                                         Map<Integer, Expertise> expertiseMap) {
-        if (reviewerSAIds.isEmpty()) {
+    private double calculateRelevanceScoreCMT3(Paper paper, List<ReviewerInterest> reviewerInterests) {
+        if (reviewerInterests == null || reviewerInterests.isEmpty()) {
             return 0.0;
         }
 
+        Set<Integer> reviewerPrimaryIds = reviewerInterests.stream()
+                .filter(ri -> Boolean.TRUE.equals(ri.getIsPrimary()))
+                .map(ri -> ri.getSubjectArea().getId())
+                .collect(Collectors.toSet());
+        Set<Integer> reviewerSecondaryIds = reviewerInterests.stream()
+                .filter(ri -> !Boolean.TRUE.equals(ri.getIsPrimary()))
+                .map(ri -> ri.getSubjectArea().getId())
+                .collect(Collectors.toSet());
+
+        Integer paperPrimaryId = paper.getPrimarySubjectArea() != null
+                ? paper.getPrimarySubjectArea().getId() : null;
+        Integer paperPrimaryParentId = paper.getPrimarySubjectArea() != null
+                && paper.getPrimarySubjectArea().getParent() != null
+                ? paper.getPrimarySubjectArea().getParent().getId() : null;
+
+        Set<Integer> paperSecondaryIds = paper.getSecondarySubjectAreas() != null
+                ? paper.getSecondarySubjectAreas().stream().map(SubjectArea::getId).collect(Collectors.toSet())
+                : Set.of();
+        Set<Integer> paperSecondaryParentIds = paper.getSecondarySubjectAreas() != null
+                ? paper.getSecondarySubjectAreas().stream()
+                    .filter(sa -> sa.getParent() != null)
+                    .map(sa -> sa.getParent().getId())
+                    .collect(Collectors.toSet())
+                : Set.of();
+
+        Map<Integer, Integer> reviewerSAParents = new java.util.HashMap<>();
+        for (ReviewerInterest ri : reviewerInterests) {
+            if (ri.getSubjectArea().getParent() != null) {
+                reviewerSAParents.put(ri.getSubjectArea().getId(), ri.getSubjectArea().getParent().getId());
+            }
+        }
+
         double score = 0.0;
+        final double MAX_RAW = 1.59;
 
-        // Primary subject area match (weight 0.6)
-        if (paper.getPrimarySubjectArea() != null) {
-            Integer primaryId = paper.getPrimarySubjectArea().getId();
-            if (reviewerSAIds.contains(primaryId)) {
-                double expertiseWeight = getExpertiseWeight(expertiseMap.get(primaryId));
-                score += 0.6 * expertiseWeight;
+        // pp1: Paper primary == Reviewer primary (0.80)
+        if (paperPrimaryId != null && reviewerPrimaryIds.contains(paperPrimaryId)) {
+            score += 0.80;
+        }
+        // pp1h: Parent(Paper primary) == Reviewer primary (0.32)
+        if (paperPrimaryParentId != null && reviewerPrimaryIds.contains(paperPrimaryParentId)) {
+            score += 0.32;
+        }
+        // ps1: Reviewer primary matches secondary SA of paper (0.16)
+        if (!reviewerPrimaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            if (reviewerPrimaryIds.stream().anyMatch(paperSecondaryIds::contains)) {
+                score += 0.16;
+            }
+        }
+        // ps1h: Reviewer primary matches parent of secondary SA of paper (0.05)
+        if (!reviewerPrimaryIds.isEmpty() && !paperSecondaryParentIds.isEmpty()) {
+            if (reviewerPrimaryIds.stream().anyMatch(paperSecondaryParentIds::contains)) {
+                score += 0.05;
+            }
+        }
+        // sp1: Paper primary matches secondary SA of reviewer (0.16)
+        if (paperPrimaryId != null && reviewerSecondaryIds.contains(paperPrimaryId)) {
+            score += 0.16;
+        }
+        // sp1h: Parent(Paper primary) matches secondary SA of reviewer (0.05)
+        if (paperPrimaryParentId != null && reviewerSecondaryIds.contains(paperPrimaryParentId)) {
+            score += 0.05;
+        }
+        // ss1: Secondary reviewer overlaps with secondary paper (0.04)
+        if (!reviewerSecondaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            if (reviewerSecondaryIds.stream().anyMatch(paperSecondaryIds::contains)) {
+                score += 0.04;
+            }
+        }
+        // ss1h: Parent of secondary reviewer overlaps with secondary paper (0.01)
+        if (!reviewerSecondaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            boolean hasParentOverlap = reviewerSecondaryIds.stream()
+                    .map(reviewerSAParents::get)
+                    .filter(java.util.Objects::nonNull)
+                    .anyMatch(paperSecondaryIds::contains);
+            if (hasParentOverlap) {
+                score += 0.01;
             }
         }
 
-        // Secondary subject areas match (weight 0.4)
-        List<SubjectArea> secondaryAreas = paper.getSecondarySubjectAreas();
-        if (secondaryAreas != null && !secondaryAreas.isEmpty()) {
-            double secondaryScore = 0.0;
-            int matchCount = 0;
-            for (SubjectArea sa : secondaryAreas) {
-                if (reviewerSAIds.contains(sa.getId())) {
-                    double expertiseWeight = getExpertiseWeight(expertiseMap.get(sa.getId()));
-                    secondaryScore += expertiseWeight;
-                    matchCount++;
-                }
-            }
-            if (matchCount > 0) {
-                score += 0.4 * (secondaryScore / secondaryAreas.size());
-            }
-        }
-
-        return Math.min(score, 1.0);
-    }
-
-    private double getExpertiseWeight(Expertise expertise) {
-        if (expertise == null) return 0.5;
-        return switch (expertise) {
-            case EXPERT -> 1.0;
-            case KNOWLEDGEABLE -> 0.7;
-            case INTERESTED -> 0.4;
-        };
+        return Math.min(score / MAX_RAW, 1.0);
     }
 
     private void validateBiddingPhaseOpen(Integer conferenceId) {

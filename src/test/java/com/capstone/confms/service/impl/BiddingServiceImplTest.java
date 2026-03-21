@@ -19,7 +19,7 @@ import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.utils.enums.BidValue;
-import com.capstone.confms.utils.enums.Expertise;
+
 import com.capstone.confms.utils.enums.PaperStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -183,7 +183,7 @@ public class BiddingServiceImplTest {
         ReviewerInterest interest = new ReviewerInterest();
         interest.setReviewer(reviewer);
         interest.setSubjectArea(paper.getPrimarySubjectArea());
-        interest.setExpertise(Expertise.EXPERT);
+        interest.setIsPrimary(true);
 
         TrackReviewSetting setting = new TrackReviewSetting();
         setting.setIsDoubleBlind(false);

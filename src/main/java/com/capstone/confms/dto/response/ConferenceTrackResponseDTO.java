@@ -11,6 +11,5 @@ public class ConferenceTrackResponseDTO {
     private String description;
     private Conference conference;
 
-    private Integer maxSubmissions;
     private TrackReviewSettingDTO trackReviewSetting;
 }

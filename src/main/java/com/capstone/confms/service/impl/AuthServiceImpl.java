@@ -1,6 +1,7 @@
 package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.UserDTO;
+import com.capstone.confms.dto.request.ActivateAccountRequest;
 import com.capstone.confms.dto.request.ChangePasswordRequest;
 import com.capstone.confms.dto.request.ForgotPasswordRequest;
 import com.capstone.confms.dto.request.LoginRequest;
@@ -11,6 +12,7 @@ import com.capstone.confms.entity.Role;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.entity.UserProfile;
 import com.capstone.confms.entity.UserRole;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.RoleRepository;
 import com.capstone.confms.repository.UserProfileRepository;
 import com.capstone.confms.repository.UserRepository;
@@ -45,6 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserProfileRepository userProfileRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final PasswordEncoder encoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
@@ -218,5 +221,51 @@ public class AuthServiceImpl implements AuthService {
         if (user.getOtpExpiration() == null || user.getOtpExpiration().isBefore(LocalDateTime.now())) {
             throw new BadRequestException("OTP has expired");
         }
+    }
+
+    @Override
+    @Transactional
+    public JwtResponse activateAccount(ActivateAccountRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
+
+        if (Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BadRequestException("Account is already activated");
+        }
+
+        // Verify invitation token
+        var cut = conferenceUserTrackRepository.findByInvitationToken(request.getInvitationToken())
+                .orElseThrow(() -> new BadRequestException("Invalid invitation token"));
+
+        if (!cut.getUser().getId().equals(user.getId())) {
+            throw new BadRequestException("Token does not match this email");
+        }
+
+        // Update user info
+        user.setPassword(encoder.encode(request.getNewPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setIsActive(true);
+        user.setOtpCode(null);
+        user.setOtpExpiration(null);
+        userRepository.save(user);
+
+        // Auto-login: authenticate and return JWT
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getNewPassword()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtTokenProvider.generateJwtToken(authentication);
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        return new JwtResponse(jwt,
+                userDetails.getId(),
+                userDetails.getEmail(),
+                userDetails.getFirstName(),
+                userDetails.getLastName(),
+                roles);
     }
 }

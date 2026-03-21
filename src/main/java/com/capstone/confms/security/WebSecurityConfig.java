@@ -62,6 +62,7 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/request-otp",
+                                "/api/v1/auth/activate",
                                 "/api/v1/email/accept/**",
                                 "/api/v1/email/decline/**")
                         .permitAll()

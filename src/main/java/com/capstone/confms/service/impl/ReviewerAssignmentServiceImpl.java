@@ -9,6 +9,7 @@ import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.Notification;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.Review;
+import com.capstone.confms.entity.ReviewerInterest;
 import com.capstone.confms.entity.SubjectArea;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.DomainConflictUtil;
@@ -23,6 +24,7 @@ import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.ReviewerInterestRepository;
+import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.ReviewerAssignmentService;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
@@ -57,6 +59,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
     private final ReviewerInterestRepository reviewerInterestRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final NotificationRepository notificationRepository;
+    private final TrackReviewSettingRepository trackReviewSettingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -101,20 +104,26 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             }
         }
 
-        // Map reviewer subject area IDs
-        Map<Integer, Set<Integer>> reviewerSubjectAreas = new HashMap<>();
+        // Map reviewer interests (full objects for CMT3 scoring)
+        Map<Integer, List<ReviewerInterest>> reviewerInterestsMap = new HashMap<>();
         for (User reviewer : reviewers) {
-            Set<Integer> saIds = reviewerInterestRepository.findByReviewer_Id(reviewer.getId())
-                    .stream()
-                    .map(ri -> ri.getSubjectArea().getId())
-                    .collect(Collectors.toSet());
-            reviewerSubjectAreas.put(reviewer.getId(), saIds);
+            List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewer.getId());
+            reviewerInterestsMap.put(reviewer.getId(), interests);
         }
 
-        // 3b. Pre-compute domain conflict data: paper authors by paper
+        // 3b. Pre-compute domain conflict data (only if any track has it enabled)
+        // Also pre-compute author IDs per paper for self-review block
         Map<Integer, Set<String>> paperAuthorDomains = new HashMap<>();
+        Map<Integer, Set<Integer>> paperAuthorIds = new HashMap<>();
+        Map<Integer, Boolean> trackDomainConflictEnabled = new HashMap<>();
+
         for (Paper paper : papers) {
-            Set<String> domains = paperAuthorRepository.findByPaperId(paper.getId()).stream()
+            var paperAuthors = paperAuthorRepository.findByPaperId(paper.getId());
+            paperAuthorIds.put(paper.getId(), paperAuthors.stream()
+                    .map(pa -> pa.getUser().getId())
+                    .collect(Collectors.toSet()));
+
+            Set<String> domains = paperAuthors.stream()
                     .map(pa -> pa.getUser().getEmail())
                     .map(DomainConflictUtil::extractDomain)
                     .filter(d -> d != null && !DomainConflictUtil.isPublicDomain(d))
@@ -127,17 +136,31 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
 
         for (Paper paper : papers) {
             for (User reviewer : reviewers) {
+                // Author self-review block: reviewer cannot be assigned to own paper
+                Set<Integer> authorIds = paperAuthorIds.getOrDefault(paper.getId(), Set.of());
+                if (authorIds.contains(reviewer.getId())) {
+                    continue;
+                }
+
                 // Bỏ qua nếu có conflict (PaperConflict table)
                 if (paperConflictRepository.existsByPaper_IdAndUser_Id(paper.getId(), reviewer.getId())) {
                     continue;
                 }
 
-                // Bỏ qua nếu có domain conflict
-                String reviewerDomain = DomainConflictUtil.extractDomain(reviewer.getEmail());
-                if (reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
-                    Set<String> authorDomains = paperAuthorDomains.getOrDefault(paper.getId(), Set.of());
-                    if (authorDomains.contains(reviewerDomain)) {
-                        continue;
+                // Domain conflict: only if enableDomainConflict is true for this track
+                Integer trackId = paper.getTrack().getId();
+                boolean domainEnabled = trackDomainConflictEnabled.computeIfAbsent(trackId, tid -> {
+                    var setting = trackReviewSettingRepository.findByTrackId(tid).orElse(null);
+                    return setting == null || Boolean.TRUE.equals(setting.getEnableDomainConflict());
+                });
+
+                if (domainEnabled) {
+                    String reviewerDomain = DomainConflictUtil.extractDomain(reviewer.getEmail());
+                    if (reviewerDomain != null && !DomainConflictUtil.isPublicDomain(reviewerDomain)) {
+                        Set<String> authorDomains = paperAuthorDomains.getOrDefault(paper.getId(), Set.of());
+                        if (authorDomains.contains(reviewerDomain)) {
+                            continue;
+                        }
                     }
                 }
 
@@ -150,7 +173,7 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
                 double bidScore = getBidScore(bidMap.get(paper.getId() + "-" + reviewer.getId()));
 
                 // Tính relevance score
-                double relevanceScore = calculateRelevanceScore(paper, reviewerSubjectAreas.get(reviewer.getId()));
+                double relevanceScore = calculateRelevanceScore(paper, reviewerInterestsMap.get(reviewer.getId()));
 
                 // Combined score
                 double combinedScore = bidScore * bidWeight + relevanceScore * relevanceWeight;
@@ -364,22 +387,19 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             }
         }
 
-        Map<Integer, Set<Integer>> reviewerSubjectAreas = new HashMap<>();
+        Map<Integer, List<ReviewerInterest>> reviewerInterestsMap = new HashMap<>();
         for (Review review : reviews) {
             Integer reviewerId = review.getReviewer().getId();
-            if (!reviewerSubjectAreas.containsKey(reviewerId)) {
-                Set<Integer> saIds = reviewerInterestRepository.findByReviewer_Id(reviewerId)
-                        .stream()
-                        .map(ri -> ri.getSubjectArea().getId())
-                        .collect(Collectors.toSet());
-                reviewerSubjectAreas.put(reviewerId, saIds);
+            if (!reviewerInterestsMap.containsKey(reviewerId)) {
+                List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
+                reviewerInterestsMap.put(reviewerId, interests);
             }
         }
 
         List<AssignmentPreviewItemDTO> items = reviews.stream()
                 .map(review -> {
                     double bidScore = getBidScore(bidMap.get(review.getPaper().getId() + "-" + review.getReviewer().getId()));
-                    double relevanceScore = calculateRelevanceScore(review.getPaper(), reviewerSubjectAreas.get(review.getReviewer().getId()));
+                    double relevanceScore = calculateRelevanceScore(review.getPaper(), reviewerInterestsMap.get(review.getReviewer().getId()));
                     double combinedScore = bidScore * 0.6 + relevanceScore * 0.4;
 
                     return AssignmentPreviewItemDTO.builder()
@@ -431,28 +451,110 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         };
     }
 
-    private double calculateRelevanceScore(Paper paper, Set<Integer> reviewerSubjectAreaIds) {
-        if (reviewerSubjectAreaIds == null || reviewerSubjectAreaIds.isEmpty()) {
+    private double calculateRelevanceScore(Paper paper, List<ReviewerInterest> reviewerInterests) {
+        if (reviewerInterests == null || reviewerInterests.isEmpty()) {
             return 0.0;
         }
 
-        double score = 0.0;
+        // Split reviewer interests into primary and secondary SA IDs
+        Set<Integer> reviewerPrimaryIds = reviewerInterests.stream()
+                .filter(ri -> Boolean.TRUE.equals(ri.getIsPrimary()))
+                .map(ri -> ri.getSubjectArea().getId())
+                .collect(Collectors.toSet());
+        Set<Integer> reviewerSecondaryIds = reviewerInterests.stream()
+                .filter(ri -> !Boolean.TRUE.equals(ri.getIsPrimary()))
+                .map(ri -> ri.getSubjectArea().getId())
+                .collect(Collectors.toSet());
 
-        if (paper.getPrimarySubjectArea() != null
-                && reviewerSubjectAreaIds.contains(paper.getPrimarySubjectArea().getId())) {
-            score += 0.6;
-        }
+        // Paper subject areas
+        Integer paperPrimaryId = paper.getPrimarySubjectArea() != null
+                ? paper.getPrimarySubjectArea().getId() : null;
+        Integer paperPrimaryParentId = paper.getPrimarySubjectArea() != null
+                && paper.getPrimarySubjectArea().getParent() != null
+                ? paper.getPrimarySubjectArea().getParent().getId() : null;
 
-        List<SubjectArea> secondaryAreas = paper.getSecondarySubjectAreas();
-        if (secondaryAreas != null && !secondaryAreas.isEmpty()) {
-            long matchCount = secondaryAreas.stream()
-                    .filter(sa -> reviewerSubjectAreaIds.contains(sa.getId()))
-                    .count();
-            if (matchCount > 0) {
-                score += 0.4 * ((double) matchCount / secondaryAreas.size());
+        Set<Integer> paperSecondaryIds = paper.getSecondarySubjectAreas() != null
+                ? paper.getSecondarySubjectAreas().stream().map(SubjectArea::getId).collect(Collectors.toSet())
+                : Set.of();
+        // Parents of secondary paper SAs
+        Set<Integer> paperSecondaryParentIds = paper.getSecondarySubjectAreas() != null
+                ? paper.getSecondarySubjectAreas().stream()
+                    .filter(sa -> sa.getParent() != null)
+                    .map(sa -> sa.getParent().getId())
+                    .collect(Collectors.toSet())
+                : Set.of();
+
+        // Reviewer SA parents
+        Map<Integer, Integer> reviewerSAParents = new HashMap<>();
+        for (ReviewerInterest ri : reviewerInterests) {
+            if (ri.getSubjectArea().getParent() != null) {
+                reviewerSAParents.put(ri.getSubjectArea().getId(), ri.getSubjectArea().getParent().getId());
             }
         }
 
-        return Math.min(score, 1.0);
+        double score = 0.0;
+        final double MAX_RAW = 1.59;
+
+        // pp1: Paper primary == Reviewer primary (0.80)
+        if (paperPrimaryId != null && reviewerPrimaryIds.contains(paperPrimaryId)) {
+            score += 0.80;
+        }
+
+        // pp1h: Parent(Paper primary) == Reviewer primary (0.32)
+        if (paperPrimaryParentId != null && reviewerPrimaryIds.contains(paperPrimaryParentId)) {
+            score += 0.32;
+        }
+
+        // ps1: Reviewer primary matches secondary SA of paper (0.16)
+        if (!reviewerPrimaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            for (Integer rpId : reviewerPrimaryIds) {
+                if (paperSecondaryIds.contains(rpId)) {
+                    score += 0.16;
+                    break;
+                }
+            }
+        }
+
+        // ps1h: Reviewer primary matches parent of secondary SA of paper (0.05)
+        if (!reviewerPrimaryIds.isEmpty() && !paperSecondaryParentIds.isEmpty()) {
+            for (Integer rpId : reviewerPrimaryIds) {
+                if (paperSecondaryParentIds.contains(rpId)) {
+                    score += 0.05;
+                    break;
+                }
+            }
+        }
+
+        // sp1: Paper primary matches secondary SA of reviewer (0.16)
+        if (paperPrimaryId != null && reviewerSecondaryIds.contains(paperPrimaryId)) {
+            score += 0.16;
+        }
+
+        // sp1h: Parent(Paper primary) matches secondary SA of reviewer (0.05)
+        if (paperPrimaryParentId != null && reviewerSecondaryIds.contains(paperPrimaryParentId)) {
+            score += 0.05;
+        }
+
+        // ss1: Secondary reviewer overlaps with secondary paper (0.04)
+        if (!reviewerSecondaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            boolean hasOverlap = reviewerSecondaryIds.stream().anyMatch(paperSecondaryIds::contains);
+            if (hasOverlap) {
+                score += 0.04;
+            }
+        }
+
+        // ss1h: Parent of secondary reviewer overlaps with secondary paper (0.01)
+        if (!reviewerSecondaryIds.isEmpty() && !paperSecondaryIds.isEmpty()) {
+            boolean hasParentOverlap = reviewerSecondaryIds.stream()
+                    .map(reviewerSAParents::get)
+                    .filter(java.util.Objects::nonNull)
+                    .anyMatch(paperSecondaryIds::contains);
+            if (hasParentOverlap) {
+                score += 0.01;
+            }
+        }
+
+        // Normalize to [0, 1]
+        return Math.min(score / MAX_RAW, 1.0);
     }
 }

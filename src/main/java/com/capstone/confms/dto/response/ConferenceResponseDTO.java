@@ -21,7 +21,7 @@ public class ConferenceResponseDTO {
 
     private String area;
     private String societySponsor;
-    private String conferenceIdNumber;
+
     private String country;
     private String province;
     private String bannerImageUrl;

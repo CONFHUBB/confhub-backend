@@ -88,7 +88,7 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
 
         entity.setReviewer(reviewer);
         entity.setSubjectArea(subjectArea);
-        entity.setExpertise(dto.getExpertise());
+        entity.setIsPrimary(dto.getIsPrimary() != null ? dto.getIsPrimary() : false);
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
@@ -100,7 +100,7 @@ public class ReviewerInterestServiceImpl implements ReviewerInterestService {
                 .id(entity.getId())
                 .reviewerId(entity.getReviewer().getId())
                 .subjectAreaId(entity.getSubjectArea().getId())
-                .expertise(entity.getExpertise())
+                .isPrimary(entity.getIsPrimary())
                 .build();
     }
 }

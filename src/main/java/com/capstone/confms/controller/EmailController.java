@@ -3,6 +3,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.EmailDTO;
 import com.capstone.confms.dto.request.BulkEmailRequestDTO;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import com.capstone.confms.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +30,7 @@ public class EmailController {
 
     private final EmailService emailService;
     private final ConferenceUserTrackService conferenceUserTrackService;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -93,6 +95,16 @@ public class EmailController {
             @RequestParam(required = false) Integer reviewerQuota) {
         try {
             conferenceUserTrackService.acceptByToken(token, reviewerQuota);
+
+            // Check if the user account is inactive (external/new user) — redirect to activate page
+            var cut = conferenceUserTrackRepository.findByInvitationToken(token).orElse(null);
+            if (cut != null && cut.getUser() != null && Boolean.FALSE.equals(cut.getUser().getIsActive())) {
+                String email = cut.getUser().getEmail();
+                return ResponseEntity.status(302)
+                        .location(URI.create(frontendUrl + "/auth/activate?email=" + email + "&token=" + token))
+                        .build();
+            }
+
             return ResponseEntity.status(302)
                     .location(URI.create(frontendUrl + "/invitation/accepted?token=" + token))
                     .build();

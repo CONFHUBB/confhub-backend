@@ -32,8 +32,7 @@ public class TrackReviewSetting extends BaseEntity {
     @Column(name = "reviewer_instructions", columnDefinition = "TEXT")
     private String reviewerInstructions;
 
-    @Column(name = "require_subject_areas", nullable = false)
-    private Boolean requireSubjectAreas = false;
+
 
     @Column(name = "allow_reviewer_quota", nullable = false)
     private Boolean allowReviewerQuota = false;
@@ -65,15 +64,18 @@ public class TrackReviewSetting extends BaseEntity {
     @Column(name = "allow_author_discuss", nullable = false)
     private Boolean allowAuthorDiscuss = false;
 
-    @Column(name = "notify_reviewer_on_review_update_during_discussion", nullable = false)
-    private Boolean notifyReviewerOnReviewUpdateDuringDiscussion = false;
 
-    @Column(name = "notify_on_manual_assignment", nullable = false)
-    private Boolean notifyOnManualAssignment = false;
 
     @Column(name = "do_not_show_withdrawn_papers", nullable = false)
     private Boolean doNotShowWithdrawnPapers = false;
 
-    @Column(name = "add_reviewer_on_invite_accept", nullable = false)
-    private Boolean addReviewerOnInviteAccept = true;
+    @Column(name = "enable_domain_conflict", nullable = false)
+    private Boolean enableDomainConflict = true;
+
+    @Column(name = "enable_author_self_conflict", nullable = false)
+    private Boolean enableAuthorSelfConflict = true;
+
+    @Column(name = "allow_author_configure_conflict", nullable = false)
+    private Boolean allowAuthorConfigureConflict = false;
+
 }

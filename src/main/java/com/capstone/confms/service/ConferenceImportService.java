@@ -17,7 +17,7 @@ public interface ConferenceImportService {
 
     // Subject Areas
     ImportResultDTO previewSubjectAreasFromExcel(MultipartFile file);
-    ImportResultDTO importSubjectAreasFromExcel(Integer trackId, MultipartFile file);
+    ImportResultDTO importSubjectAreasFromExcel(Integer conferenceId, MultipartFile file);
     byte[] generateSubjectAreaTemplate();
 
     // Members

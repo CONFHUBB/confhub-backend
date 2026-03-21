@@ -1,6 +1,7 @@
 package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.EmailDTO;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.service.ConferenceUserTrackService;
 import com.capstone.confms.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,11 +24,14 @@ class EmailControllerTest {
     @Mock
     private ConferenceUserTrackService conferenceUserTrackService;
 
+    @Mock
+    private ConferenceUserTrackRepository conferenceUserTrackRepository;
+
     private EmailController emailController;
 
     @BeforeEach
     void setUp() {
-        emailController = new EmailController(emailService, conferenceUserTrackService);
+        emailController = new EmailController(emailService, conferenceUserTrackService, conferenceUserTrackRepository);
     }
 
     @Test

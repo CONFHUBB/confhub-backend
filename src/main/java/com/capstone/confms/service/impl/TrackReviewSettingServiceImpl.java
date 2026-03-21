@@ -47,7 +47,6 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         // Apply DTO fields
         if (dto.getIsDoubleBlind() != null) setting.setIsDoubleBlind(dto.getIsDoubleBlind());
         if (dto.getReviewerInstructions() != null) setting.setReviewerInstructions(dto.getReviewerInstructions());
-        if (dto.getRequireSubjectAreas() != null) setting.setRequireSubjectAreas(dto.getRequireSubjectAreas());
         if (dto.getAllowReviewerQuota() != null) setting.setAllowReviewerQuota(dto.getAllowReviewerQuota());
         if (dto.getReviewerInviteExpirationDays() != null) setting.setReviewerInviteExpirationDays(dto.getReviewerInviteExpirationDays());
         if (dto.getAllowOthersReviewAccessAfterSubmit() != null) setting.setAllowOthersReviewAccessAfterSubmit(dto.getAllowOthersReviewAccessAfterSubmit());
@@ -58,10 +57,10 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         if (dto.getEnableAllPapersForDiscussion() != null) setting.setEnableAllPapersForDiscussion(dto.getEnableAllPapersForDiscussion());
         if (dto.getAllowDiscussNonAssignedPapers() != null) setting.setAllowDiscussNonAssignedPapers(dto.getAllowDiscussNonAssignedPapers());
         if (dto.getAllowAuthorDiscuss() != null) setting.setAllowAuthorDiscuss(dto.getAllowAuthorDiscuss());
-        if (dto.getNotifyReviewerOnReviewUpdateDuringDiscussion() != null) setting.setNotifyReviewerOnReviewUpdateDuringDiscussion(dto.getNotifyReviewerOnReviewUpdateDuringDiscussion());
-        if (dto.getNotifyOnManualAssignment() != null) setting.setNotifyOnManualAssignment(dto.getNotifyOnManualAssignment());
         if (dto.getDoNotShowWithdrawnPapers() != null) setting.setDoNotShowWithdrawnPapers(dto.getDoNotShowWithdrawnPapers());
-        if (dto.getAddReviewerOnInviteAccept() != null) setting.setAddReviewerOnInviteAccept(dto.getAddReviewerOnInviteAccept());
+        if (dto.getEnableDomainConflict() != null) setting.setEnableDomainConflict(dto.getEnableDomainConflict());
+        if (dto.getEnableAuthorSelfConflict() != null) setting.setEnableAuthorSelfConflict(dto.getEnableAuthorSelfConflict());
+        if (dto.getAllowAuthorConfigureConflict() != null) setting.setAllowAuthorConfigureConflict(dto.getAllowAuthorConfigureConflict());
 
         TrackReviewSetting savedSetting = settingRepository.save(setting);
         track.setTrackReviewSetting(savedSetting);
@@ -99,7 +98,6 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             // Source has no settings — reset target to defaults
             targetSetting.setIsDoubleBlind(false);
             targetSetting.setReviewerInstructions(null);
-            targetSetting.setRequireSubjectAreas(false);
             targetSetting.setAllowReviewerQuota(false);
             targetSetting.setReviewerInviteExpirationDays(null);
             targetSetting.setAllowOthersReviewAccessAfterSubmit(false);
@@ -110,15 +108,14 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setEnableAllPapersForDiscussion(false);
             targetSetting.setAllowDiscussNonAssignedPapers(false);
             targetSetting.setAllowAuthorDiscuss(false);
-            targetSetting.setNotifyReviewerOnReviewUpdateDuringDiscussion(false);
-            targetSetting.setNotifyOnManualAssignment(false);
             targetSetting.setDoNotShowWithdrawnPapers(false);
-            targetSetting.setAddReviewerOnInviteAccept(true);
+            targetSetting.setEnableDomainConflict(true);
+            targetSetting.setEnableAuthorSelfConflict(true);
+            targetSetting.setAllowAuthorConfigureConflict(false);
         } else {
             // Copy fields from source
             targetSetting.setIsDoubleBlind(sourceSetting.getIsDoubleBlind());
             targetSetting.setReviewerInstructions(sourceSetting.getReviewerInstructions());
-            targetSetting.setRequireSubjectAreas(sourceSetting.getRequireSubjectAreas());
             targetSetting.setAllowReviewerQuota(sourceSetting.getAllowReviewerQuota());
             targetSetting.setReviewerInviteExpirationDays(sourceSetting.getReviewerInviteExpirationDays());
             targetSetting.setAllowOthersReviewAccessAfterSubmit(sourceSetting.getAllowOthersReviewAccessAfterSubmit());
@@ -129,10 +126,10 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setEnableAllPapersForDiscussion(sourceSetting.getEnableAllPapersForDiscussion());
             targetSetting.setAllowDiscussNonAssignedPapers(sourceSetting.getAllowDiscussNonAssignedPapers());
             targetSetting.setAllowAuthorDiscuss(sourceSetting.getAllowAuthorDiscuss());
-            targetSetting.setNotifyReviewerOnReviewUpdateDuringDiscussion(sourceSetting.getNotifyReviewerOnReviewUpdateDuringDiscussion());
-            targetSetting.setNotifyOnManualAssignment(sourceSetting.getNotifyOnManualAssignment());
             targetSetting.setDoNotShowWithdrawnPapers(sourceSetting.getDoNotShowWithdrawnPapers());
-            targetSetting.setAddReviewerOnInviteAccept(sourceSetting.getAddReviewerOnInviteAccept());
+            targetSetting.setEnableDomainConflict(sourceSetting.getEnableDomainConflict());
+            targetSetting.setEnableAuthorSelfConflict(sourceSetting.getEnableAuthorSelfConflict());
+            targetSetting.setAllowAuthorConfigureConflict(sourceSetting.getAllowAuthorConfigureConflict());
         }
 
         settingRepository.save(targetSetting);
@@ -144,7 +141,6 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         TrackReviewSettingDTO dto = new TrackReviewSettingDTO();
         dto.setIsDoubleBlind(entity.getIsDoubleBlind());
         dto.setReviewerInstructions(entity.getReviewerInstructions());
-        dto.setRequireSubjectAreas(entity.getRequireSubjectAreas());
         dto.setAllowReviewerQuota(entity.getAllowReviewerQuota());
         dto.setReviewerInviteExpirationDays(entity.getReviewerInviteExpirationDays());
         dto.setAllowOthersReviewAccessAfterSubmit(entity.getAllowOthersReviewAccessAfterSubmit());
@@ -155,10 +151,10 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         dto.setEnableAllPapersForDiscussion(entity.getEnableAllPapersForDiscussion());
         dto.setAllowDiscussNonAssignedPapers(entity.getAllowDiscussNonAssignedPapers());
         dto.setAllowAuthorDiscuss(entity.getAllowAuthorDiscuss());
-        dto.setNotifyReviewerOnReviewUpdateDuringDiscussion(entity.getNotifyReviewerOnReviewUpdateDuringDiscussion());
-        dto.setNotifyOnManualAssignment(entity.getNotifyOnManualAssignment());
         dto.setDoNotShowWithdrawnPapers(entity.getDoNotShowWithdrawnPapers());
-        dto.setAddReviewerOnInviteAccept(entity.getAddReviewerOnInviteAccept());
+        dto.setEnableDomainConflict(entity.getEnableDomainConflict());
+        dto.setEnableAuthorSelfConflict(entity.getEnableAuthorSelfConflict());
+        dto.setAllowAuthorConfigureConflict(entity.getAllowAuthorConfigureConflict());
         return dto;
     }
 }

@@ -41,7 +41,6 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         TrackReviewSetting defaultSetting = new TrackReviewSetting();
         defaultSetting.setTrack(track);
         defaultSetting.setIsDoubleBlind(false);
-        defaultSetting.setRequireSubjectAreas(false);
         defaultSetting.setAllowReviewerQuota(false);
         defaultSetting.setAllowOthersReviewAccessAfterSubmit(false);
         defaultSetting.setAllowReviewUpdateDuringDiscussion(false);
@@ -114,7 +113,6 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         response.setId(entity.getId());
         response.setName(entity.getName());
         response.setDescription(entity.getDescription());
-        response.setMaxSubmissions(entity.getMaxSubmissions());
 
         // Map the full Conference object
         response.setConference(entity.getConference());
@@ -124,7 +122,6 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
             TrackReviewSetting entitySetting = entity.getTrackReviewSetting();
             settingDTO.setIsDoubleBlind(entitySetting.getIsDoubleBlind());
             settingDTO.setReviewerInstructions(entitySetting.getReviewerInstructions());
-            settingDTO.setRequireSubjectAreas(entitySetting.getRequireSubjectAreas());
             settingDTO.setAllowReviewerQuota(entitySetting.getAllowReviewerQuota());
             settingDTO.setReviewerInviteExpirationDays(entitySetting.getReviewerInviteExpirationDays());
             settingDTO.setAllowOthersReviewAccessAfterSubmit(entitySetting.getAllowOthersReviewAccessAfterSubmit());
@@ -141,7 +138,6 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
     private void mapRequestDtoToEntity(ConferenceTrackDTO dto, ConferenceTrack entity) {
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
-        entity.setMaxSubmissions(dto.getMaxSubmissions());
 
         if (dto.getTrackReviewSetting() != null) {
             TrackReviewSetting setting = entity.getTrackReviewSetting();
@@ -152,7 +148,6 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
             TrackReviewSettingDTO dtoSetting = dto.getTrackReviewSetting();
             if (dtoSetting.getIsDoubleBlind() != null) setting.setIsDoubleBlind(dtoSetting.getIsDoubleBlind());
             if (dtoSetting.getReviewerInstructions() != null) setting.setReviewerInstructions(dtoSetting.getReviewerInstructions());
-            if (dtoSetting.getRequireSubjectAreas() != null) setting.setRequireSubjectAreas(dtoSetting.getRequireSubjectAreas());
             if (dtoSetting.getAllowReviewerQuota() != null) setting.setAllowReviewerQuota(dtoSetting.getAllowReviewerQuota());
             if (dtoSetting.getReviewerInviteExpirationDays() != null) setting.setReviewerInviteExpirationDays(dtoSetting.getReviewerInviteExpirationDays());
             if (dtoSetting.getAllowOthersReviewAccessAfterSubmit() != null) setting.setAllowOthersReviewAccessAfterSubmit(dtoSetting.getAllowOthersReviewAccessAfterSubmit());

@@ -8,20 +8,24 @@ import com.capstone.confms.repository.*;
 import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.ConferenceActivityService;
 import com.capstone.confms.service.ConferenceImportService;
+import com.capstone.confms.service.EmailService;
 import com.capstone.confms.utils.enums.ConferenceStatus;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,14 +44,28 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final UserRepository userRepository;
     private final ConferenceActivityService conferenceActivityService;
+    private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final UserProfileRepository userProfileRepository;
+    private final NotificationRepository notificationRepository;
+    private final EmailService emailService;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
+    private static final int OTP_LENGTH = 6;
 
     private static final String[] CONFERENCE_HEADERS = {
             "name", "acronym", "description", "location", "startDate", "endDate",
             "websiteUrl", "country", "province", "area", "contactInformation", "chairEmails",
-            "bannerImageUrl", "conferenceIdNumber", "societySponsor"
+            "bannerImageUrl", "societySponsor"
     };
-    private static final String[] TRACK_HEADERS = {"name", "description", "maxSubmissions"};
-    private static final String[] SA_HEADERS = {"name", "description", "parentName"};
+    private static final String[] TRACK_HEADERS = {"name", "description"};
+    private static final String[] SA_HEADERS = {"trackName", "name", "description", "parentName"};
 
     // ===================== CONFERENCE =====================
 
@@ -104,7 +122,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                     "Ho Chi Minh City", "2026-06-01", "2026-06-03", "https://icai2026.org",
                     "Vietnam", "Ho Chi Minh", "Computer Science", "contact@icai2026.org",
                     "chair1@mail.com,chair2@mail.com", "https://icai2026.org/banner.png",
-                    "IEEE-12345", "IEEE, ACM"};
+                    "IEEE, ACM"};
             for (int i = 0; i < vals.length; i++) sample.createCell(i).setCellValue(vals[i]);
             return toBytes(wb);
         } catch (IOException e) {
@@ -206,40 +224,68 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
     @Override
     @Transactional
-    public ImportResultDTO importSubjectAreasFromExcel(Integer trackId, MultipartFile file) {
+    public ImportResultDTO importSubjectAreasFromExcel(Integer conferenceId, MultipartFile file) {
         ImportResultDTO preview = previewSubjectAreasFromExcel(file);
         if (!preview.isSuccess()) return preview;
 
-        ConferenceTrack track = trackRepository.findById(trackId)
-                .orElseThrow(() -> new BadRequestException("Track not found: " + trackId));
+        Conference conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
 
-        // First pass: create all without parents
-        Map<String, SubjectArea> created = new LinkedHashMap<>();
+        // Group rows by trackName
+        Map<String, List<Map<String, String>>> byTrack = new LinkedHashMap<>();
         for (Map<String, String> data : preview.getSubjectAreaPreviews()) {
-            SubjectArea sa = new SubjectArea();
-            sa.setName(data.get("name"));
-            sa.setDescription(data.getOrDefault("description", ""));
-            sa.setTrack(track);
-            created.put(sa.getName(), subjectAreaRepository.save(sa));
+            String trackName = data.get("trackName");
+            byTrack.computeIfAbsent(trackName, k -> new ArrayList<>()).add(data);
         }
 
-        // Second pass: link parents
-        for (Map<String, String> data : preview.getSubjectAreaPreviews()) {
-            String parentName = data.get("parentName");
-            if (parentName != null && !parentName.isBlank()) {
-                SubjectArea parent = created.get(parentName);
-                if (parent != null) {
-                    SubjectArea sa = created.get(data.get("name"));
-                    sa.setParent(parent);
-                    subjectAreaRepository.save(sa);
+        int totalCreated = 0;
+        List<ImportError> errors = new ArrayList<>();
+
+        for (Map.Entry<String, List<Map<String, String>>> entry : byTrack.entrySet()) {
+            String trackName = entry.getKey();
+            List<Map<String, String>> rows = entry.getValue();
+
+            ConferenceTrack track = trackRepository.findByConferenceAndName(conference, trackName)
+                    .orElse(null);
+            if (track == null) {
+                errors.add(ImportError.builder().sheet("SubjectAreas").row(0)
+                        .column("trackName").message("Track '" + trackName + "' not found in this conference").build());
+                continue;
+            }
+
+            // First pass: create all without parents
+            Map<String, SubjectArea> created = new LinkedHashMap<>();
+            for (Map<String, String> data : rows) {
+                SubjectArea sa = new SubjectArea();
+                sa.setName(data.get("name"));
+                sa.setDescription(data.getOrDefault("description", ""));
+                sa.setTrack(track);
+                created.put(sa.getName(), subjectAreaRepository.save(sa));
+            }
+
+            // Second pass: link parents
+            for (Map<String, String> data : rows) {
+                String parentName = data.get("parentName");
+                if (parentName != null && !parentName.isBlank()) {
+                    SubjectArea parent = created.get(parentName);
+                    if (parent != null) {
+                        SubjectArea sa = created.get(data.get("name"));
+                        sa.setParent(parent);
+                        subjectAreaRepository.save(sa);
+                    }
                 }
             }
+            totalCreated += created.size();
         }
 
-        log.info("Imported {} subject areas for track {}", created.size(), trackId);
+        if (!errors.isEmpty()) {
+            return ImportResultDTO.builder().success(false).errors(errors).build();
+        }
+
+        log.info("Imported {} subject areas for conference {}", totalCreated, conferenceId);
         return ImportResultDTO.builder()
                 .success(true)
-                .subjectAreasCreated(created.size())
+                .subjectAreasCreated(totalCreated)
                 .build();
     }
 
@@ -250,11 +296,11 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             Sheet sheet = wb.createSheet("SubjectAreas");
             writeHeaders(sheet, SA_HEADERS, headerStyle);
             String[][] samples = {
-                    {"Deep Learning", "Neural network architectures", ""},
-                    {"Reinforcement Learning", "RL algorithms", ""},
-                    {"Transfer Learning", "Domain adaptation", "Deep Learning"},
-                    {"Text Classification", "Document categorization", ""},
-                    {"Object Detection", "Detecting objects in images", ""}
+                    {"AI Track", "Deep Learning", "Neural network architectures", ""},
+                    {"AI Track", "Reinforcement Learning", "RL algorithms", ""},
+                    {"AI Track", "Transfer Learning", "Domain adaptation", "Deep Learning"},
+                    {"NLP Track", "Text Classification", "Document categorization", ""},
+                    {"NLP Track", "Sentiment Analysis", "Opinion mining", "Text Classification"}
             };
             for (int r = 0; r < samples.length; r++) {
                 Row row = sheet.createRow(r + 1);
@@ -281,6 +327,15 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
             List<Map<String, String>> rows = parseAllRows(sheet, MEMBER_HEADERS, "Members", errors);
             validateMemberData(rows, errors);
+
+            // Add status column: EXISTING or NEW
+            for (Map<String, String> row : rows) {
+                String email = row.get("email");
+                if (notBlank(email)) {
+                    boolean exists = userRepository.findByEmail(email.trim()).isPresent();
+                    row.put("status", exists ? "EXISTING" : "NEW");
+                }
+            }
 
             return ImportResultDTO.builder()
                     .success(errors.isEmpty())
@@ -311,12 +366,14 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             String roleStr = data.get("role").trim().toUpperCase().replace(" ", "_");
             String trackName = data.get("trackName");
 
-            // Find user by email
+            // Find or create user by email
             User user = userRepository.findByEmail(email).orElse(null);
+            boolean isNewUser = false;
             if (user == null) {
-                errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
-                        .message("User not found: " + email).build());
-                continue;
+                // Auto-create placeholder account
+                user = createPlaceholderUser(email);
+                isNewUser = true;
+                log.info("Created placeholder account for external user: {}", email);
             }
 
             // Parse role
@@ -346,8 +403,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             }
 
             // Check duplicate – handle null track (CONFERENCE_CHAIR) explicitly
+            final ConferenceTrack finalTrack = track;
             boolean exists;
-            if (track == null) {
+            if (finalTrack == null) {
                 exists = conferenceUserTrackRepository
                         .findAllByUser_IdAndConference_Id(user.getId(), conference.getId())
                         .stream()
@@ -358,7 +416,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                         .stream()
                         .anyMatch(cut -> cut.getAssignedRole() == role
                                 && cut.getConferenceTrack() != null
-                                && cut.getConferenceTrack().getId().equals(track.getId()));
+                                && cut.getConferenceTrack().getId().equals(finalTrack.getId()));
             }
             if (exists) {
                 errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
@@ -366,17 +424,49 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 continue;
             }
 
-            // Create assignment
+            // Create assignment — ALL users start as pending (must accept/decline)
             ConferenceUserTrack cut = new ConferenceUserTrack();
             cut.setUser(user);
             cut.setConference(conference);
             cut.setAssignedRole(role);
             cut.setConferenceTrack(track);
             cut.setInvitedAt(LocalDateTime.now());
-            cut.setIsAccepted(true);
-            cut.setIsRegistered(true);
+            cut.setIsAccepted(null);  // null = pending
+            cut.setIsRegistered(false);
+            cut.setInvitationToken(UUID.randomUUID().toString());
+            cut.setTokenExpiresAt(LocalDateTime.now().plusDays(7));
             conferenceUserTrackRepository.save(cut);
             count++;
+
+            // Set OTP for new users (needed for activation after accept)
+            if (isNewUser) {
+                String otp = generateOtp();
+                user.setOtpCode(otp);
+                user.setOtpExpiration(LocalDateTime.now().plusDays(7));
+                userRepository.save(user);
+            }
+
+            // Send HTML invitation email to ALL users (existing + new)
+            sendImportInvitationEmail(user, conference, cut, role, track);
+
+            // Create notification for existing users
+            if (!isNewUser) {
+                String roleName = formatRoleName(role);
+                boolean alreadyNotified = notificationRepository
+                        .existsByUser_IdAndConference_IdAndType(user.getId(), conference.getId(), "INVITATION");
+                if (!alreadyNotified) {
+                    Notification notification = Notification.builder()
+                            .user(user)
+                            .conference(conference)
+                            .title("You have been invited as " + roleName)
+                            .message("You have been invited to join \"" + conference.getName() + "\" as " + roleName + ".")
+                            .type("INVITATION")
+                            .link("/conference/reviewer-select")
+                            .isRead(false)
+                            .build();
+                    notificationRepository.save(notification);
+                }
+            }
         }
 
         if (!errors.isEmpty()) {
@@ -449,6 +539,83 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             }
         }
     }
+    // ===================== MEMBER CREATION HELPERS =====================
+
+    /**
+     * Creates a placeholder (inactive) user account for an external email.
+     */
+    private User createPlaceholderUser(String email) {
+        User user = new User();
+        user.setEmail(email);
+        user.setFirstName(email.split("@")[0]);  // Use email prefix as temporary name
+        user.setLastName("(Invited)");
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));  // Random password
+        user.setIsActive(false);
+        userRepository.save(user);
+
+        // Assign AUTHOR role
+        Role authorRole = roleRepository.findByName("AUTHOR")
+                .orElseThrow(() -> new BadRequestException("Role AUTHOR is not found"));
+        UserRole userRole = new UserRole();
+        userRole.setUser(user);
+        userRole.setRole(authorRole);
+        userRoleRepository.save(userRole);
+        
+        // Create empty UserProfile
+        UserProfile profile = new UserProfile();
+        profile.setUser(user);
+        userProfileRepository.save(profile);
+
+        return user;
+    }
+
+    /**
+     * Sends an HTML invitation email with Accept/Decline buttons (same style as manual invite).
+     */
+    private void sendImportInvitationEmail(User user, Conference conference, ConferenceUserTrack cut,
+                                            ConferenceTrackRole role, ConferenceTrack track) {
+        try {
+            String roleName = formatRoleName(role);
+            String trackName = track != null ? track.getName() : null;
+            String trackLabel = trackName != null ? " — " + trackName : "";
+            String acceptLink = baseUrl + "/api/v1/email/accept/" + cut.getInvitationToken();
+            String declineLink = baseUrl + "/api/v1/email/decline/" + cut.getInvitationToken();
+            String fullName = (user.getFirstName() != null ? user.getFirstName() : "") + " "
+                    + (user.getLastName() != null ? user.getLastName() : "");
+
+            emailService.sendInvitationEmail(
+                    user.getEmail(),
+                    fullName.trim(),
+                    "Invitation to " + conference.getName() + " as " + roleName + trackLabel,
+                    conference.getName(),
+                    roleName,
+                    trackName,
+                    acceptLink,
+                    declineLink,
+                    null,
+                    null);
+        } catch (Exception e) {
+            log.error("Failed to send invitation email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    private String formatRoleName(ConferenceTrackRole role) {
+        return switch (role) {
+            case CONFERENCE_CHAIR -> "Conference Chair";
+            case PROGRAM_CHAIR -> "Program Chair";
+            case REVIEWER -> "Reviewer";
+            case AUTHOR -> "Author";
+            case ATTENDEE -> "Attendee";
+        };
+    }
+
+    private String generateOtp() {
+        SecureRandom secureRandom = new SecureRandom();
+        int bound = (int) Math.pow(10, OTP_LENGTH);
+        int min = (int) Math.pow(10, OTP_LENGTH - 1);
+        int otpValue = secureRandom.nextInt(bound - min) + min;
+        return String.valueOf(otpValue);
+    }
 
     // ===================== HELPERS =====================
 
@@ -518,17 +685,10 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             Map<String, String> d = rows.get(i);
             requireField(d, "name", "Tracks", rowNum, errors);
             requireField(d, "description", "Tracks", rowNum, errors);
-            requireField(d, "maxSubmissions", "Tracks", rowNum, errors);
 
             String name = d.get("name");
             if (notBlank(name) && !names.add(name)) {
                 errors.add(ImportError.builder().sheet("Tracks").row(rowNum).column("name").message("Duplicate: " + name).build());
-            }
-            String maxSub = d.get("maxSubmissions");
-            if (notBlank(maxSub)) {
-                try { Integer.parseInt(maxSub); } catch (NumberFormatException e) {
-                    errors.add(ImportError.builder().sheet("Tracks").row(rowNum).column("maxSubmissions").message("Must be a number").build());
-                }
             }
         }
     }
@@ -538,21 +698,26 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         for (int i = 0; i < rows.size(); i++) {
             int rowNum = i + 2;
             Map<String, String> d = rows.get(i);
+            requireField(d, "trackName", "SubjectAreas", rowNum, errors);
             requireField(d, "name", "SubjectAreas", rowNum, errors);
 
+            String trackName = d.getOrDefault("trackName", "");
             String name = d.get("name");
-            if (notBlank(name) && !names.add(name)) {
-                errors.add(ImportError.builder().sheet("SubjectAreas").row(rowNum).column("name").message("Duplicate: " + name).build());
+            String uniqueKey = trackName + "::" + name;
+            if (notBlank(name) && !names.add(uniqueKey)) {
+                errors.add(ImportError.builder().sheet("SubjectAreas").row(rowNum).column("name").message("Duplicate: " + name + " in track " + trackName).build());
             }
             String parentName = d.get("parentName");
-            if (notBlank(parentName) && !names.contains(parentName)) {
-                // Check if parent is defined in an earlier row
+            if (notBlank(parentName)) {
+                // Check if parent is defined in an earlier row within the same track
                 boolean found = false;
                 for (int j = 0; j < i; j++) {
-                    if (parentName.equals(rows.get(j).get("name"))) { found = true; break; }
+                    if (parentName.equals(rows.get(j).get("name")) && trackName.equals(rows.get(j).getOrDefault("trackName", ""))) {
+                        found = true; break;
+                    }
                 }
                 if (!found) {
-                    errors.add(ImportError.builder().sheet("SubjectAreas").row(rowNum).column("parentName").message("Parent '" + parentName + "' not found in earlier rows").build());
+                    errors.add(ImportError.builder().sheet("SubjectAreas").row(rowNum).column("parentName").message("Parent '" + parentName + "' not found in earlier rows for track '" + trackName + "'").build());
                 }
             }
         }
@@ -574,7 +739,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         conf.setContactInformation(data.get("contactInformation"));
         conf.setChairEmails(data.get("chairEmails"));
         conf.setBannerImageUrl(data.getOrDefault("bannerImageUrl", ""));
-        conf.setConferenceIdNumber(data.getOrDefault("conferenceIdNumber", ""));
+
         conf.setSocietySponsor(data.getOrDefault("societySponsor", ""));
         conf.setStatus(ConferenceStatus.PENDING);
         Conference saved = conferenceRepository.save(conf);
@@ -595,7 +760,6 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         track.setName(data.get("name"));
         track.setDescription(data.get("description"));
         track.setConference(conference);
-        track.setMaxSubmissions(Integer.parseInt(data.get("maxSubmissions")));
         ConferenceTrack saved = trackRepository.save(track);
 
         TrackReviewSetting setting = new TrackReviewSetting();

@@ -52,7 +52,6 @@ class ConferenceTrackServiceImplTest {
         track.setConference(conference);
         track.setName("Main Track");
         track.setDescription("Desc");
-        track.setMaxSubmissions(5);
         track.setTrackReviewSetting(setting);
         setting.setTrack(track);
     }
@@ -68,7 +67,6 @@ class ConferenceTrackServiceImplTest {
         dto.setConferenceId(1);
         dto.setName("Main Track");
         dto.setDescription("Desc");
-        dto.setMaxSubmissions(5);
         dto.setTrackReviewSetting(new TrackReviewSettingDTO());
 
         when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
@@ -87,7 +85,6 @@ class ConferenceTrackServiceImplTest {
         dto.setConferenceId(1);
         dto.setName("Updated Track");
         dto.setDescription("Updated Desc");
-        dto.setMaxSubmissions(10);
 
         when(conferenceTrackRepository.findById(10)).thenReturn(Optional.of(track));
         when(conferenceTrackRepository.save(any(ConferenceTrack.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -96,7 +93,6 @@ class ConferenceTrackServiceImplTest {
 
         assertNotNull(result);
         assertEquals("Updated Track", result.getName());
-        assertEquals(10, result.getMaxSubmissions());
     }
 
     @Test

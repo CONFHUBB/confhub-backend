@@ -81,27 +81,29 @@ public class ConferenceImportController {
 
     // ── Subject Areas ──
 
-    @GetMapping("/subject-areas/import/template")
+    @GetMapping("/conferences/{conferenceId}/subject-areas/import/template")
     @Operation(summary = "Download subject area Excel template")
-    public ResponseEntity<byte[]> subjectAreaTemplate() {
+    public ResponseEntity<byte[]> subjectAreaTemplate(@PathVariable Integer conferenceId) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=subject_area_template.xlsx")
                 .contentType(XLSX_TYPE)
                 .body(importService.generateSubjectAreaTemplate());
     }
 
-    @PostMapping("/subject-areas/import/preview")
+    @PostMapping("/conferences/{conferenceId}/subject-areas/import/preview")
     @Operation(summary = "Preview subject areas from Excel (no DB write)")
-    public ResponseEntity<ImportResultDTO> previewSubjectAreas(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ImportResultDTO> previewSubjectAreas(
+            @PathVariable Integer conferenceId,
+            @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(importService.previewSubjectAreasFromExcel(file));
     }
 
-    @PostMapping("/subject-areas/import")
-    @Operation(summary = "Import subject areas for a track from Excel file")
+    @PostMapping("/conferences/{conferenceId}/subject-areas/import")
+    @Operation(summary = "Import subject areas for a conference from Excel file")
     public ResponseEntity<ImportResultDTO> importSubjectAreas(
-            @RequestParam("trackId") Integer trackId,
+            @PathVariable Integer conferenceId,
             @RequestParam("file") MultipartFile file) {
-        ImportResultDTO result = importService.importSubjectAreasFromExcel(trackId, file);
+        ImportResultDTO result = importService.importSubjectAreasFromExcel(conferenceId, file);
         return result.isSuccess()
                 ? ResponseEntity.status(HttpStatus.CREATED).body(result)
                 : ResponseEntity.badRequest().body(result);

@@ -1,6 +1,6 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.utils.enums.Expertise;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,5 +10,5 @@ public class ReviewerInterestResponseDTO {
     private Integer id;
     private Integer reviewerId;
     private Integer subjectAreaId;
-    private Expertise expertise;
+    private Boolean isPrimary;
 }

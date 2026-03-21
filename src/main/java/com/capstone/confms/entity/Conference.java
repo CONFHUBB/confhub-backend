@@ -53,8 +53,7 @@ public class Conference extends BaseEntity {
     @Column(name = "society_sponsor")
     private String societySponsor;
 
-    @Column(name = "conference_id_number")
-    private String conferenceIdNumber;
+
 
     @Column(name = "country")
     private String country;

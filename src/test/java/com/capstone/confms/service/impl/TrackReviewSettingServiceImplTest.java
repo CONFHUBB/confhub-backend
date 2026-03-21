@@ -54,7 +54,6 @@ public class TrackReviewSettingServiceImplTest {
         setting.setTrack(sourceTrack);
         setting.setIsDoubleBlind(true);
         setting.setReviewerInstructions("Review carefully");
-        setting.setRequireSubjectAreas(true);
         setting.setAllowReviewerQuota(true);
         setting.setReviewerInviteExpirationDays(7);
         setting.setAllowOthersReviewAccessAfterSubmit(true);
@@ -83,7 +82,6 @@ public class TrackReviewSettingServiceImplTest {
         TrackReviewSettingDTO dto = new TrackReviewSettingDTO();
         dto.setIsDoubleBlind(false);
         dto.setReviewerInstructions("Updated instructions");
-        dto.setRequireSubjectAreas(false);
         dto.setAllowReviewerQuota(false);
         dto.setReviewerInviteExpirationDays(5);
         dto.setAllowOthersReviewAccessAfterSubmit(false);

@@ -221,7 +221,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setWebsiteUrl(dto.getWebsiteUrl());
         entity.setArea(dto.getArea());
         entity.setSocietySponsor(dto.getSocietySponsor());
-        entity.setConferenceIdNumber(dto.getConferenceIdNumber());
+
         entity.setCountry(dto.getCountry());
         entity.setProvince(dto.getProvince());
         entity.setBannerImageUrl(dto.getBannerImageUrl());
@@ -243,7 +243,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .createdAt(entity.getCreatedAt())
                 .area(entity.getArea())
                 .societySponsor(entity.getSocietySponsor())
-                .conferenceIdNumber(entity.getConferenceIdNumber())
+
                 .country(entity.getCountry())
                 .province(entity.getProvince())
                 .bannerImageUrl(entity.getBannerImageUrl())

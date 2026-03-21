@@ -9,6 +9,5 @@ public class ConferenceTrackDTO {
     private String description;
     private Integer conferenceId;
 
-    private Integer maxSubmissions;
     private TrackReviewSettingDTO trackReviewSetting;
 }

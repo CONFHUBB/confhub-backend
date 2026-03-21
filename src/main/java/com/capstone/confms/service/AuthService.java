@@ -1,6 +1,7 @@
 package com.capstone.confms.service;
 
 import com.capstone.confms.dto.UserDTO;
+import com.capstone.confms.dto.request.ActivateAccountRequest;
 import com.capstone.confms.dto.request.ChangePasswordRequest;
 import com.capstone.confms.dto.request.ForgotPasswordRequest;
 import com.capstone.confms.dto.request.LoginRequest;
@@ -20,4 +21,6 @@ public interface AuthService {
     MessageResponse forgotPassword(ForgotPasswordRequest request);
 
     MessageResponse resetPassword(ResetPasswordRequest request);
+
+    JwtResponse activateAccount(ActivateAccountRequest request);
 }

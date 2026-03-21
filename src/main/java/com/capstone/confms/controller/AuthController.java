@@ -1,6 +1,7 @@
 package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.UserDTO;
+import com.capstone.confms.dto.request.ActivateAccountRequest;
 import com.capstone.confms.dto.request.ChangePasswordRequest;
 import com.capstone.confms.dto.request.ForgotPasswordRequest;
 import com.capstone.confms.dto.request.LoginRequest;
@@ -49,5 +50,10 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(authService.resetPassword(request));
+    }
+
+    @PostMapping("/activate")
+    public ResponseEntity<JwtResponse> activateAccount(@Valid @RequestBody ActivateAccountRequest request) {
+        return ResponseEntity.ok(authService.activateAccount(request));
     }
 }

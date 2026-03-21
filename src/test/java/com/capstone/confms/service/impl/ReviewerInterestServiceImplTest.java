@@ -7,7 +7,7 @@ import com.capstone.confms.entity.User;
 import com.capstone.confms.repository.ReviewerInterestRepository;
 import com.capstone.confms.repository.SubjectAreaRepository;
 import com.capstone.confms.repository.UserRepository;
-import com.capstone.confms.utils.enums.Expertise;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +55,7 @@ public class ReviewerInterestServiceImplTest {
         interest.setId(10);
         interest.setReviewer(reviewer);
         interest.setSubjectArea(subjectArea);
-        interest.setExpertise(Expertise.EXPERT);
+        interest.setIsPrimary(true);
     }
 
     @Test
@@ -76,7 +76,7 @@ public class ReviewerInterestServiceImplTest {
 
     @Test
     void createReviewerInterestShouldReturnResponse() {
-        ReviewerInterestDTO dto = ReviewerInterestDTO.builder().reviewerId(1).subjectAreaId(2).expertise(Expertise.INTERESTED).build();
+        ReviewerInterestDTO dto = ReviewerInterestDTO.builder().reviewerId(1).subjectAreaId(2).isPrimary(true).build();
         when(userRepository.findById(1)).thenReturn(Optional.of(reviewer));
         when(subjectAreaRepository.findById(2)).thenReturn(Optional.of(subjectArea));
         when(reviewerInterestRepository.save(any(ReviewerInterest.class))).thenReturn(interest);
@@ -89,7 +89,7 @@ public class ReviewerInterestServiceImplTest {
 
     @Test
     void updateReviewerInterestShouldReturnResponse() {
-        ReviewerInterestDTO dto = ReviewerInterestDTO.builder().reviewerId(1).subjectAreaId(2).expertise(Expertise.INTERESTED).build();
+        ReviewerInterestDTO dto = ReviewerInterestDTO.builder().reviewerId(1).subjectAreaId(2).isPrimary(false).build();
         when(reviewerInterestRepository.findById(10)).thenReturn(Optional.of(interest));
         when(userRepository.findById(1)).thenReturn(Optional.of(reviewer));
         when(subjectAreaRepository.findById(2)).thenReturn(Optional.of(subjectArea));
@@ -98,7 +98,7 @@ public class ReviewerInterestServiceImplTest {
         var result = reviewerInterestService.updateReviewerInterest(10, dto);
 
         assertNotNull(result);
-        assertEquals(Expertise.INTERESTED, result.getExpertise());
+        assertEquals(false, result.getIsPrimary());
     }
 
     @Test

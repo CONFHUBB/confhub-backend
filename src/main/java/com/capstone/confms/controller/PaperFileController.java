@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/paper-file")
@@ -40,6 +41,36 @@ public class PaperFileController {
                 .isActive(true)
                 .build();
         return new ResponseEntity<>(paperFileService.createPaperFile(dto), HttpStatus.CREATED);
+    }
+
+    @PostMapping(value = "/upload-camera-ready", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a camera-ready file (only for ACCEPTED papers with CAMERA_READY_SUBMISSION enabled)")
+    public ResponseEntity<PaperFileResponseDTO> uploadCameraReadyFile(
+            @RequestParam("conferenceId") Integer conferenceId,
+            @RequestParam("paperId") Integer paperId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
+        PaperFileDTO dto = PaperFileDTO.builder()
+                .paperId(paperId)
+                .url(downloadUrl)
+                .isActive(true)
+                .isCameraReady(true)
+                .build();
+        return new ResponseEntity<>(paperFileService.createCameraReadyFile(dto), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/approve-camera-ready/{paperId}")
+    @Operation(summary = "Approve camera-ready submission — transitions paper status from ACCEPTED to PUBLISHED")
+    public ResponseEntity<Void> approveCameraReady(@PathVariable Integer paperId) {
+        paperFileService.approveCameraReady(paperId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/camera-ready/conference/{conferenceId}")
+    @Operation(summary = "Get all camera-ready files for a conference")
+    public ResponseEntity<List<PaperFileResponseDTO>> getCameraReadyFilesByConference(
+            @PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(paperFileService.getCameraReadyFilesByConference(conferenceId));
     }
 
     @PostMapping
@@ -67,7 +98,7 @@ public class PaperFileController {
 
     @GetMapping("/paper/{paperId}")
     @Operation(summary = "Get all Paper Files for a specific paper")
-    public ResponseEntity<java.util.List<PaperFileResponseDTO>> getFilesByPaperId(@PathVariable Integer paperId) {
+    public ResponseEntity<List<PaperFileResponseDTO>> getFilesByPaperId(@PathVariable Integer paperId) {
         return ResponseEntity.ok(paperFileService.getFilesByPaperId(paperId));
     }
 

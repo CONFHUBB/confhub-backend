@@ -57,6 +57,12 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.getReviewsByReviewerAndConference(reviewerId, conferenceId));
     }
 
+    @GetMapping("/paper/{paperId}")
+    @Operation(summary = "Get all Reviews for a specific paper")
+    public ResponseEntity<java.util.List<ReviewResponseDTO>> getReviewsByPaper(@PathVariable Integer paperId) {
+        return ResponseEntity.ok(reviewService.getReviewsByPaper(paperId));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a Review")
     public ResponseEntity<Void> deleteReview(@PathVariable Integer id) {

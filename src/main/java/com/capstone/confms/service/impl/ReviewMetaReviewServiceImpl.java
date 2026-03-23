@@ -8,6 +8,7 @@ import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.*;
 import com.capstone.confms.service.ReviewMetaReviewService;
 import com.capstone.confms.utils.PaginationUtils;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import com.capstone.confms.utils.enums.Decision;
 import com.capstone.confms.utils.enums.PaperStatus;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -32,6 +35,7 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final PaperAuthorRepository paperAuthorRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -44,11 +48,28 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     @Override
     @Transactional
     public ReviewMetaReviewResponseDTO createReviewMetaReview(ReviewMetaReviewDTO dto) {
+        // Validate paper exists
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        // Validate user exists
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
+
+        // BR: Role authorization — only PROGRAM_CHAIR or CONFERENCE_CHAIR can create meta-review
+        validateChairRole(user.getId(), paper);
+
+        // BR: Unique constraint — only 1 meta-review per paper
+        if (reviewMetaReviewRepository.existsByPaper_Id(dto.getPaperId())) {
+            throw new BadRequestException(
+                    "Meta-review already exists for paper ID " + dto.getPaperId() + ". Use update instead.");
+        }
+
         ReviewMetaReview entity = new ReviewMetaReview();
-        mapDtoToReviewMetaReviewEntity(dto, entity);
+        mapDtoToReviewMetaReviewEntity(dto, entity, paper, user);
         ReviewMetaReview saved = reviewMetaReviewRepository.save(entity);
 
-        // BR-3.21: Khi tạo meta-review → update paper status dựa vào decision
+        // BR-3.21: Update paper status based on decision
         updatePaperStatusFromDecision(saved.getPaper(), saved.getFinalDecision());
 
         // Notification: notify authors about the decision
@@ -62,7 +83,17 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     public ReviewMetaReviewResponseDTO updateReviewMetaReview(Integer id, ReviewMetaReviewDTO dto) {
         ReviewMetaReview entity = reviewMetaReviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ReviewMetaReview not found with id " + id));
-        mapDtoToReviewMetaReviewEntity(dto, entity);
+
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
+
+        // BR: Role authorization
+        validateChairRole(user.getId(), paper);
+
+        mapDtoToReviewMetaReviewEntity(dto, entity, paper, user);
         ReviewMetaReview saved = reviewMetaReviewRepository.save(entity);
 
         // BR-3.21: Update paper status on decision change
@@ -90,6 +121,42 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
         reviewMetaReviewRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewMetaReviewResponseDTO> getMetaReviewsByConference(Integer conferenceId) {
+        return reviewMetaReviewRepository.findByPaper_Track_Conference_Id(conferenceId)
+                .stream()
+                .map(this::mapToReviewMetaReviewResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReviewMetaReviewResponseDTO getMetaReviewByPaper(Integer paperId) {
+        return reviewMetaReviewRepository.findByPaper_Id(paperId)
+                .map(this::mapToReviewMetaReviewResponseDTO)
+                .orElse(null);
+    }
+
+    /**
+     * Validate that the user has PROGRAM_CHAIR or CONFERENCE_CHAIR role
+     * in the conference that the paper belongs to.
+     */
+    private void validateChairRole(Integer userId, Paper paper) {
+        Integer conferenceId = paper.getTrack().getConference().getId();
+        List<ConferenceUserTrack> userRoles = conferenceUserTrackRepository
+                .findAllByUser_IdAndConference_Id(userId, conferenceId);
+
+        boolean isChair = userRoles.stream()
+                .anyMatch(cut -> cut.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR
+                        || cut.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR);
+
+        if (!isChair) {
+            throw new BadRequestException(
+                    "Only Program Chair or Conference Chair can create/update meta-reviews.");
+        }
+    }
+
     /**
      * BR-3.21: Map meta-review decision → paper status
      */
@@ -97,7 +164,7 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
         PaperStatus newStatus = switch (decision) {
             case APPROVE -> PaperStatus.ACCEPTED;
             case REJECT -> PaperStatus.REJECTED;
-            case REVISION -> paper.getStatus(); // Giữ nguyên, cần revision flow riêng
+            case REVISION -> PaperStatus.REVISION;
         };
 
         if (newStatus != paper.getStatus()) {
@@ -109,16 +176,10 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
         }
     }
 
-    private void mapDtoToReviewMetaReviewEntity(ReviewMetaReviewDTO dto, ReviewMetaReview entity) {
-        Paper paper = paperRepository.findById(dto.getPaperId())
-                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
-
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + dto.getUserId()));
-
+    private void mapDtoToReviewMetaReviewEntity(ReviewMetaReviewDTO dto, ReviewMetaReview entity,
+            Paper paper, User user) {
         entity.setPaper(paper);
         entity.setUser(user);
-
         entity.setFinalDecision(dto.getFinalDecision());
         entity.setReason(dto.getReason());
         if (entity.getId() == null) {
@@ -128,10 +189,25 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
     }
 
     private ReviewMetaReviewResponseDTO mapToReviewMetaReviewResponseDTO(ReviewMetaReview entity) {
+        Paper paper = entity.getPaper();
+        User user = entity.getUser();
+        ConferenceTrack track = paper.getTrack();
+
         return ReviewMetaReviewResponseDTO.builder()
                 .id(entity.getId())
-                .paper(entity.getPaper())
-                .user(entity.getUser())
+                .paper(ReviewMetaReviewResponseDTO.PaperInfo.builder()
+                        .id(paper.getId())
+                        .title(paper.getTitle())
+                        .status(paper.getStatus().name())
+                        .trackId(track != null ? track.getId() : null)
+                        .trackName(track != null ? track.getName() : null)
+                        .build())
+                .user(ReviewMetaReviewResponseDTO.UserInfo.builder()
+                        .id(user.getId())
+                        .firstName(user.getFirstName())
+                        .lastName(user.getLastName())
+                        .email(user.getEmail())
+                        .build())
                 .finalDecision(entity.getFinalDecision())
                 .reason(entity.getReason())
                 .build();
@@ -143,9 +219,16 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
             Conference conference = paper.getTrack().getConference();
             Decision decision = metaReview.getFinalDecision();
 
-            if (decision == Decision.REVISION) return; // Skip revision notifications for now
+            String decisionText;
+            switch (decision) {
+                case APPROVE -> decisionText = "ACCEPTED";
+                case REJECT -> decisionText = "REJECTED";
+                case REVISION -> decisionText = "REVISION REQUIRED";
+            default -> {
+                return;
+            }
+            }
 
-            String decisionText = decision == Decision.APPROVE ? "ACCEPTED" : "REJECTED";
             String title = "Paper " + decisionText + ": " + paper.getTitle();
             String message = "Your paper \"" + paper.getTitle() + "\" in \"" + conference.getName()
                     + "\" has been " + decisionText.toLowerCase() + ".";

@@ -4,6 +4,7 @@ import com.capstone.confms.dto.ConferenceDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ConferenceService;
+import com.capstone.confms.service.FirebaseStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,11 +27,14 @@ class ConferenceControllerTest {
     @Mock
     private ConferenceService conferenceService;
 
+    @Mock
+    private FirebaseStorageService firebaseStorageService;
+
     private ConferenceController conferenceController;
 
     @BeforeEach
     void setUp() {
-        conferenceController = new ConferenceController(conferenceService);
+        conferenceController = new ConferenceController(conferenceService, firebaseStorageService);
     }
 
     @Test

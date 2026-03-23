@@ -15,4 +15,10 @@ public interface PaperFileService {
     java.util.List<PaperFileResponseDTO> getFilesByPaperId(Integer paperId);
 
     void deletePaperFile(Integer id);
+
+    PaperFileResponseDTO createCameraReadyFile(PaperFileDTO dto);
+
+    void approveCameraReady(Integer paperId);
+
+    java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);
 }

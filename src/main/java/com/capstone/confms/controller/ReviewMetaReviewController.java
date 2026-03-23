@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/review-meta-review")
 @RequiredArgsConstructor
@@ -43,6 +45,23 @@ public class ReviewMetaReviewController {
     @Operation(summary = "Get Review Meta Review by ID")
     public ResponseEntity<ReviewMetaReviewResponseDTO> getReviewMetaReviewById(@PathVariable Integer id) {
         return ResponseEntity.ok(reviewMetaReviewService.getReviewMetaReviewById(id));
+    }
+
+    @GetMapping("/by-conference/{conferenceId}")
+    @Operation(summary = "Get all Review Meta Reviews for a conference")
+    public ResponseEntity<List<ReviewMetaReviewResponseDTO>> getMetaReviewsByConference(
+            @PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(reviewMetaReviewService.getMetaReviewsByConference(conferenceId));
+    }
+
+    @GetMapping("/by-paper/{paperId}")
+    @Operation(summary = "Get Review Meta Review for a specific paper")
+    public ResponseEntity<ReviewMetaReviewResponseDTO> getMetaReviewByPaper(@PathVariable Integer paperId) {
+        ReviewMetaReviewResponseDTO result = reviewMetaReviewService.getMetaReviewByPaper(paperId);
+        if (result == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(result);
     }
 
     @PutMapping("/{id}")

@@ -16,4 +16,6 @@ public interface ReviewService {
     void deleteReview(Integer id);
 
     java.util.List<ReviewResponseDTO> getReviewsByReviewerAndConference(Integer reviewerId, Integer conferenceId);
+
+    java.util.List<ReviewResponseDTO> getReviewsByPaper(Integer paperId);
 }

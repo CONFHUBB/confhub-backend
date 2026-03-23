@@ -1,6 +1,5 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.Paper;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,4 +13,6 @@ public class PaperFileDTO {
     private Integer paperId;
     private String url;
     private Boolean isActive;
+    private Boolean isCameraReady;
+    private Boolean isRevision;
 }

@@ -578,8 +578,17 @@ DRAFT: Chỉ hiển thị cho author, KHÔNG hiển thị cho reviewer/chair tro
 | BR-3.19: ReviewComment entity | `ReviewComment.java` |
 | BR-3.20: ReviewMetaReview entity | `ReviewMetaReview.java` |
 | BR-3.21: Meta-review → update paper status | `ReviewMetaReviewServiceImpl.updatePaperStatusFromDecision()` |
+| BR-3.21: REVISION → PaperStatus.REVISION fix | `ReviewMetaReviewServiceImpl` (2026-03-23) |
+| BR-3.21: Meta-review role auth (PROGRAM_CHAIR/CONFERENCE_CHAIR) | `ReviewMetaReviewServiceImpl.validateChairRole()` (2026-03-23) |
+| BR-3.21: Unique meta-review per paper | `ReviewMetaReviewServiceImpl.createReviewMetaReview()` (2026-03-23) |
+| BR-3.21: Flat ResponseDTO (avoid circular ref) | `ReviewMetaReviewResponseDTO.PaperInfo` + `UserInfo` (2026-03-23) |
+| BR-3.21: Scoped meta-review APIs | `ReviewMetaReviewController.getByConference/getByPaper` (2026-03-23) |
+| BR-3.21: Meta-review FE Decision Console | `chair/decisions/page.tsx` + `paper-decision-detail.tsx` (2026-03-23) |
 | BR-3.22 (partial): 7/18 settings đã có | `TrackReviewSetting.java` |
 | BR-3.26 (partial): Domain conflict trong auto-assign | `DomainConflictUtil.java` |
+| BR-3.51: Camera-ready upload + validation | `PaperFileServiceImpl.createCameraReadyFile()` (2026-03-23) |
+| BR-3.51: Camera-ready approve → PUBLISHED | `PaperFileServiceImpl.approveCameraReady()` (2026-03-23) |
+| BR-3.51: Camera-ready FE author page | `author/camera-ready/page.tsx` (2026-03-23) |
 
 > **2026-03-17:** Thêm domain conflict detection, load balancing, flat ReviewResponseDTO, scoped review API.
 
@@ -594,13 +603,14 @@ DRAFT: Chỉ hiển thị cho author, KHÔNG hiển thị cho reviewer/chair tro
 | BR-3.34-36: Review Aggregates | Tính avg score per question per paper | Thấp |
 | BR-3.37-39: Emergency Reviewer | `Reviewer.isEmergency` + assign flow | Thấp |
 | BR-3.40-42: Email tự động trong review | Notification khi assign, deadline reminder | **Cao** |
-| BR-3.43: Paper status REVISION, PUBLISHED | Thêm vào PaperStatus enum | **Cao** |
+| BR-3.43: Paper status REVISION, PUBLISHED | ~~Thêm vào PaperStatus enum~~ ✅ Đã có + REVISION fix (2026-03-23) | **Xong** |
 | BR-3.44-45: Author Notification Wizard | Template per status + bulk send | **Cao** |
 | BR-3.46-47: Data Visibility controls | Visibility settings per data type | Trung bình |
 | BR-3.48-50: Revision Cycle | Revision upload, re-review flow | Trung bình |
-| BR-3.51-52: Camera-Ready Submission | Camera-ready upload, PUBLISHED status | Trung bình |
+| BR-3.51-52: Camera-Ready Submission | ~~Camera-ready upload, PUBLISHED status~~ ✅ (2026-03-23) | **Xong** |
 | BR-3.53: Review Question Visibility | Per-question visibility flags | Trung bình |
 
 > **2026-03-17:** Thêm domain conflict detection, load balancing, flat ReviewResponseDTO, scoped review API.
-> **2026-03-17:** Bổ sung BR-3.22 → BR-3.53 từ CMT3 Chair Reviewing docs (bỏ maxEagerBids, bỏ DRAFT/DESK_REJECTED, thêm REVISION cycle + Camera-Ready + Question Visibility).
+> **2026-03-17:** Bổ sung BR-3.22 → BR-3.53 từ CMT3 Chair Reviewing docs.
+> **2026-03-23:** Implement BR-3.21 (role auth, unique constraint, REVISION fix, flat DTO, scoped APIs, FE Decision Console), BR-3.51-52 (camera-ready upload/approve/FE).
 

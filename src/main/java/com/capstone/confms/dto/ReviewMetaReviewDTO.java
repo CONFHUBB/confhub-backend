@@ -1,7 +1,5 @@
 package com.capstone.confms.dto;
 
-import com.capstone.confms.entity.Paper;
-import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.enums.Decision;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

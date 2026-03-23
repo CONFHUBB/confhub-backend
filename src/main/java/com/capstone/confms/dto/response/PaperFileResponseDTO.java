@@ -10,4 +10,6 @@ public class PaperFileResponseDTO {
     private Integer paperId;
     private String url;
     private Boolean isActive;
+    private Boolean isCameraReady;
+    private Boolean isRevision;
 }

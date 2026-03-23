@@ -161,6 +161,15 @@ public class ReviewServiceImpl implements ReviewService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewResponseDTO> getReviewsByPaper(Integer paperId) {
+        return reviewRepository.findByPaper_Id(paperId)
+                .stream()
+                .map(this::mapToResponseDTO)
+                .toList();
+    }
+
     // ==================== Validation Helpers ====================
 
     /**

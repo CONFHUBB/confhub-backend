@@ -1,6 +1,6 @@
 # 📋 MVP Functional Requirements — Checklist
 
-> **Ngày cập nhật:** 2026-03-17  
+> **Ngày cập nhật:** 2026-03-23  
 > **Dự án:** ConfMS — Conference Management System  
 > **Legend:**  
 > ✅ = Đã implement (BE + FE)  
@@ -29,7 +29,7 @@
 | 1.12 | View all reviews | 🔧 | `ReviewController` có API, chưa có FE page |
 | 1.13 | View payments | 📦 | `Payment` entity + VNPay basic integration, chưa có dashboard FE |
 | 1.14 | View attendees | 📦 | `Ticket` entity có user+conference, chưa có list API/FE |
-| 1.15 | Final override on decisions | 🔧 | `ReviewMetaReviewController` có tạo meta-review, chưa có FE |
+| 1.15 | Final override on decisions | ✅ | `ReviewMetaReviewController` + role auth + FE Chair Decision Console `chair/decisions/page.tsx` (2026-03-23) |
 | 1.16 | Access analytics dashboard | ❌ | Chưa có statistics/analytics API hoặc FE |
 | 1.17 | Manage sponsors | ❌ | Chưa có entity/API/FE |
 | 1.18 | Send bulk emails/notifications | 🔧 | `EmailController` có API gửi email, `ConferenceTemplate` cho templates, chưa có FE bulk send |
@@ -48,9 +48,9 @@
 | 2.4 | Launch bidding | 🔧 | `ConferenceActivity` REVIEWER_BIDDING enable/disable. FE có activity timeline UI |
 | 2.5 | Auto-assignment of reviewers | ✅ | `ReviewerAssignmentController.autoAssign()` API + FE `reviewer-assignment.tsx` (auto/manual assign, preview, confirm) (2026-03-17) |
 | 2.6 | Monitor review progress | ❌ | Chưa có progress tracking API (coverage, overdue) |
-| 2.7 | Perform meta-reviews & final decisions | 🔧 | `ReviewMetaReviewController` CRUD + auto paper status update (BR-3.21), chưa có FE |
+| 2.7 | Perform meta-reviews & final decisions | ✅ | `ReviewMetaReviewController` + role auth + unique constraint + REVISION fix + FE Decision Console (2026-03-23) |
 | 2.8 | Build conference program (sessions, rooms, time slots) | ❌ | Chưa có entities/API |
-| 2.9 | Approve camera-ready versions | ❌ | `PaperStatus.CAMERA_READY` có enum, chưa có approval flow |
+| 2.9 | Approve camera-ready versions | ✅ | `PaperFileController.approveCameraReady()` + upload validation + FE management (2026-03-23) |
 | 2.10 | Send decision emails | 🔧 | `EmailController` + `ConferenceTemplate` sẵn, chưa có batch decision email logic |
 | 2.11 | View papers in own track(s) | 🔧 | API filter by track tồn tại, chưa có FE page riêng cho Track Chair |
 | 2.12 | Copy review questions giữa tracks | ✅ | FE có `review-questions-copy-dialog.tsx` |
@@ -64,7 +64,7 @@
 | 3.1 | Bid on papers (Yes/Maybe/No) | ✅ | `BiddingController` full CRUD + FE `/conference/[id]/reviewer/bidding` |
 | 3.2 | Download assigned papers | ❌ | `PaperFile` entity tồn tại, chưa có download API for reviewers |
 | 3.3 | Submit reviews (scores + comments) | ✅ | `ReviewController` + `ReviewAnswerController` + FE `/conference/[id]/reviewer/review/[reviewId]` |
-| 3.4 | Discussion phase with other reviewers | 🔧 | `ReviewComment` entity có, chưa có discussion thread FE |
+| 3.4 | Discussion phase with other reviewers | ✅ | `ReviewComment` entity + discussion thread hiển thị trong Chair Decision Console (2026-03-23) |
 | 3.5 | Edit own reviews before deadline | ✅ | `ReviewController.updateReview()` + FE review page |
 | 3.6 | See only assigned papers (double-blind) | ✅ | `PaperForBiddingDTO.isDoubleBlind` + FE reviewer console |
 | 3.7 | Receive automatic reminders | ❌ | Chưa có scheduled reminder system |
@@ -85,7 +85,7 @@
 | 4.7 | ~~Plagiarism & format-check~~ | 🚫 | Đã xóa `isPassedPlagiarism` — không thuộc MVP (2026-03-15) |
 | 4.8 | View real-time submission status | ✅ | FE `paper/page.tsx` redesigned: summary cards + card layout + status badges |
 | 4.9 | Upload rebuttal (if enabled) | ❌ | `PaperRebuttal` entity đã bị xóa. Cần tạo lại nếu enable |
-| 4.10 | Submit camera-ready version | ❌ | `PaperStatus.CAMERA_READY` có enum, chưa có upload flow riêng |
+| 4.10 | Submit camera-ready version | ✅ | `PaperFileController.uploadCameraReady()` + validation (ACCEPTED only, activity check, deadline) + FE `author/camera-ready/page.tsx` (2026-03-23) |
 | 4.11 | Register for conference & pay fee | 📦 | `Ticket` + `Payment` entities, VNPay basic. Chưa có FE registration flow |
 | 4.12 | Receive notifications (desktop + email + push) | ✅ | `Notification` entity hoàn chỉnh + FE `notification-bell.tsx` real-time polling |
 | 4.13 | Download acceptance letter, invoice, visa support letter | ❌ | Chưa có document generation |
@@ -123,23 +123,24 @@
 
 | Status | Số lượng | % |
 |---|---|---|
-| ✅ Đã implement (BE + FE) | 20 | 43% |
-| 🔧 Có BE, chưa có FE | 9 | 20% |
+| ✅ Đã implement (BE + FE) | 25 | 54% |
+| 🔧 Có BE, chưa có FE | 5 | 11% |
 | 📦 Có entity, chưa có logic | 5 | 11% |
-| ❌ Chưa implement | 11 | 24% |
+| ❌ Chưa implement | 10 | 22% |
 | 🚫 Không thuộc MVP | 1 | 2% |
 | **Tổng (MVP)** | **46** | **100%** |
 
-> **2026-03-17:** 2.5 Auto-assignment (🔧→✅), FE reviewer assignment UI hoàn chỉnh.
+> **2026-03-17:** 2.5 Auto-assignment (🔧→✅), FE reviewer assignment UI hoàn chỉnh.  
+> **2026-03-23:** Meta-review FE (1.15, 2.7 → ✅), Camera-ready BE+FE (2.9, 4.10 → ✅), Discussion FE (3.4 → ✅). Tổng ✅ tăng từ 20 → 25.
 
 ### Khu vực cần ưu tiên
 
 **1. FE cho features đã có BE (🔧 → ✅):**
 - ~~Reviewer Assignment dashboard cho Program Chair~~ ✅ (2026-03-17)
-- Meta-review page cho Program Chair
+- ~~Meta-review page cho Program Chair~~ ✅ (2026-03-23)
+- ~~Discussion thread cho Reviewers~~ ✅ (2026-03-23)
 - Conference complete/cancel cho Chair
 - Papers-in-track view cho Track Chair
-- Discussion thread cho Reviewers
 
 **2. Logic cần hoàn thiện (📦 → 🔧):**
 - Ticket/Payment CRUD + FE registration flow
@@ -147,7 +148,7 @@
 
 **3. Features hoàn toàn mới (❌):**
 - Conference program builder (sessions, rooms, time slots)
-- Camera-ready submission flow
+- ~~Camera-ready submission flow~~ ✅ (2026-03-23)
 - Analytics dashboard
 - Export data (PDF, Excel)
 - Reminder/scheduling system

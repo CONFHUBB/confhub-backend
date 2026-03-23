@@ -1,7 +1,5 @@
 package com.capstone.confms.dto.response;
 
-import com.capstone.confms.entity.Paper;
-import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.enums.Decision;
 import lombok.Builder;
 import lombok.Data;
@@ -10,8 +8,27 @@ import lombok.Data;
 @Builder
 public class ReviewMetaReviewResponseDTO {
     private Integer id;
-    private Paper paper;
-    private User user;
+    private PaperInfo paper;
+    private UserInfo user;
     private Decision finalDecision;
     private String reason;
+
+    @Data
+    @Builder
+    public static class PaperInfo {
+        private Integer id;
+        private String title;
+        private String status;
+        private Integer trackId;
+        private String trackName;
+    }
+
+    @Data
+    @Builder
+    public static class UserInfo {
+        private Integer id;
+        private String firstName;
+        private String lastName;
+        private String email;
+    }
 }

@@ -6,20 +6,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "conference_activities", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"conference_id", "activity_type"})
-})
+@Table(name = "activity_audit_logs")
 @Getter
 @Setter
 @NoArgsConstructor
-public class ConferenceActivity extends BaseEntity {
+public class ActivityAuditLog extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conference_id", nullable = false)
@@ -29,15 +25,18 @@ public class ConferenceActivity extends BaseEntity {
     @Column(name = "activity_type", nullable = false)
     private ActivityType activityType;
 
-    @Column(name = "name", nullable = false)
-    private String name;
+    /**
+     * Action performed: ENABLED, DISABLED, DEADLINE_CHANGED
+     */
+    @Column(name = "action", nullable = false, length = 50)
+    private String action;
 
-    @Column(name = "is_enabled", nullable = false)
-    private Boolean isEnabled = false;
+    @Column(name = "old_value", length = 500)
+    private String oldValue;
 
-    @Column(name = "deadline")
-    private LocalDateTime deadline;
+    @Column(name = "new_value", length = 500)
+    private String newValue;
 
-    @Column(name = "last_reminder_sent_at")
-    private LocalDateTime lastReminderSentAt;
+    @Column(name = "performed_by", nullable = false)
+    private String performedBy;
 }

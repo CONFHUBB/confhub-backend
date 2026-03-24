@@ -1,5 +1,6 @@
 package com.capstone.confms.controller;
 
+import com.capstone.confms.dto.ActivityAuditLogDTO;
 import com.capstone.confms.dto.ConferenceActivityDTO;
 import com.capstone.confms.service.ConferenceActivityService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,5 +31,11 @@ public class ConferenceActivityController {
             @PathVariable Integer conferenceId,
             @RequestBody List<ConferenceActivityDTO> dtos) {
         return ResponseEntity.ok(activityService.updateActivities(conferenceId, dtos));
+    }
+
+    @GetMapping("/audit-logs")
+    @Operation(summary = "Get audit logs for activity changes in a conference")
+    public ResponseEntity<List<ActivityAuditLogDTO>> getAuditLogs(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok(activityService.getAuditLogs(conferenceId));
     }
 }

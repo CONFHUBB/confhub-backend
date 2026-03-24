@@ -1,38 +1,56 @@
 package com.capstone.confms.service.impl;
 
+import com.capstone.confms.dto.ActivityAuditLogDTO;
 import com.capstone.confms.dto.ConferenceActivityDTO;
+import com.capstone.confms.dto.NotificationDTO;
+import com.capstone.confms.entity.ActivityAuditLog;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceActivity;
+import com.capstone.confms.entity.ConferenceUserTrack;
+import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.utils.enums.ActivityType;
+import com.capstone.confms.repository.ActivityAuditLogRepository;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceActivityRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.SubjectAreaRepository;
 import com.capstone.confms.service.ConferenceActivityService;
+import com.capstone.confms.service.EmailService;
+import com.capstone.confms.service.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ConferenceActivityServiceImpl implements ConferenceActivityService {
 
     private final ConferenceActivityRepository activityRepository;
     private final ConferenceRepository conferenceRepository;
     private final ConferenceTrackRepository conferenceTrackRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final SubjectAreaRepository subjectAreaRepository;
     private final PaperRepository paperRepository;
     private final ReviewRepository reviewRepository;
+    private final ActivityAuditLogRepository auditLogRepository;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
+
+    private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     @Override
     @Transactional
@@ -92,9 +110,8 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     @Override
     @Transactional
     public List<ConferenceActivityDTO> updateActivities(Integer conferenceId, List<ConferenceActivityDTO> activityDTOs) {
-        if (!conferenceRepository.existsById(conferenceId)) {
-            throw new EntityNotFoundException("Conference not found with ID: " + conferenceId);
-        }
+        Conference conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + conferenceId));
 
         List<ConferenceActivity> existingActivities = activityRepository.findByConferenceId(conferenceId);
         if (existingActivities.isEmpty()) {
@@ -104,6 +121,14 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
 
         Map<ActivityType, ConferenceActivity> activityMap = existingActivities.stream()
                 .collect(Collectors.toMap(ConferenceActivity::getActivityType, a -> a));
+
+        // ── Capture old state for audit logging ──
+        Map<ActivityType, Boolean> oldEnabledState = new HashMap<>();
+        Map<ActivityType, LocalDateTime> oldDeadlineState = new HashMap<>();
+        for (ConferenceActivity a : existingActivities) {
+            oldEnabledState.put(a.getActivityType(), a.getIsEnabled());
+            oldDeadlineState.put(a.getActivityType(), a.getDeadline());
+        }
 
         // Determine which activity (if any) is being enabled
         ActivityType enablingType = null;
@@ -144,9 +169,87 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         }
 
         List<ConferenceActivity> savedActivities = activityRepository.saveAll(existingActivities);
+
+        // ── Write audit logs for changes ──
+        String currentUser = getCurrentUser();
+        List<ActivityAuditLog> auditLogs = new ArrayList<>();
+
+        for (ConferenceActivity saved : savedActivities) {
+            ActivityType type = saved.getActivityType();
+            Boolean oldEnabled = oldEnabledState.get(type);
+            Boolean newEnabled = saved.getIsEnabled();
+            LocalDateTime oldDeadline = oldDeadlineState.get(type);
+            LocalDateTime newDeadline = saved.getDeadline();
+
+            // Log enable/disable changes
+            if (!Objects.equals(oldEnabled, newEnabled)) {
+                ActivityAuditLog log = new ActivityAuditLog();
+                log.setConference(conference);
+                log.setActivityType(type);
+                log.setAction(Boolean.TRUE.equals(newEnabled) ? "ENABLED" : "DISABLED");
+                log.setOldValue(String.valueOf(oldEnabled));
+                log.setNewValue(String.valueOf(newEnabled));
+                log.setPerformedBy(currentUser);
+                auditLogs.add(log);
+            }
+
+            // Log deadline changes
+            if (!Objects.equals(oldDeadline, newDeadline)) {
+                ActivityAuditLog log = new ActivityAuditLog();
+                log.setConference(conference);
+                log.setActivityType(type);
+                log.setAction("DEADLINE_CHANGED");
+                log.setOldValue(oldDeadline != null ? oldDeadline.toString() : "none");
+                log.setNewValue(newDeadline != null ? newDeadline.toString() : "none");
+                log.setPerformedBy(currentUser);
+                auditLogs.add(log);
+            }
+        }
+
+        if (!auditLogs.isEmpty()) {
+            auditLogRepository.saveAll(auditLogs);
+            // ── Send notifications for each change ──
+            sendActivityChangeNotifications(conference, auditLogs);
+        }
+
         return savedActivities.stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActivityAuditLogDTO> getAuditLogs(Integer conferenceId) {
+        if (!conferenceRepository.existsById(conferenceId)) {
+            throw new EntityNotFoundException("Conference not found with ID: " + conferenceId);
+        }
+        return auditLogRepository.findByConferenceIdOrderByCreatedAtDesc(conferenceId)
+                .stream()
+                .map(this::mapAuditLogToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private String getCurrentUser() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            return auth != null ? auth.getName() : "system";
+        } catch (Exception e) {
+            return "system";
+        }
+    }
+
+    private ActivityAuditLogDTO mapAuditLogToDTO(ActivityAuditLog entity) {
+        ActivityAuditLogDTO dto = new ActivityAuditLogDTO();
+        dto.setId(entity.getId());
+        dto.setConferenceId(entity.getConference().getId());
+        dto.setActivityType(entity.getActivityType());
+        dto.setActivityLabel(formatActivityName(entity.getActivityType()));
+        dto.setAction(entity.getAction());
+        dto.setOldValue(entity.getOldValue());
+        dto.setNewValue(entity.getNewValue());
+        dto.setPerformedBy(entity.getPerformedBy());
+        dto.setCreatedAt(entity.getCreatedAt());
+        return dto;
     }
 
     /**
@@ -221,5 +324,77 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         dto.setDeadline(entity.getDeadline());
         return dto;
     }
-}
 
+    /**
+     * Send in-app notification + email to all conference members when activities change.
+     */
+    private void sendActivityChangeNotifications(Conference conference, List<ActivityAuditLog> auditLogs) {
+        try {
+            // Get all unique users in this conference
+            List<ConferenceUserTrack> members = conferenceUserTrackRepository.findByConference_Id(conference.getId());
+            Set<User> uniqueUsers = members.stream()
+                    .map(ConferenceUserTrack::getUser)
+                    .collect(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(User::getId))));
+
+            if (uniqueUsers.isEmpty()) return;
+
+            for (ActivityAuditLog auditLog : auditLogs) {
+                String activityLabel = formatActivityName(auditLog.getActivityType());
+                String title;
+                String message;
+
+                switch (auditLog.getAction()) {
+                    case "ENABLED" -> {
+                        title = "📢 " + activityLabel + " is now open";
+                        message = "The " + activityLabel + " phase for \"" + conference.getName()
+                                + "\" is now active."
+                                + (auditLog.getNewValue() != null && !"none".equals(auditLog.getNewValue())
+                                ? " Please complete before the deadline." : "");
+                    }
+                    case "DISABLED" -> {
+                        title = "🔒 " + activityLabel + " has closed";
+                        message = "The " + activityLabel + " phase for \"" + conference.getName()
+                                + "\" has been closed.";
+                    }
+                    case "DEADLINE_CHANGED" -> {
+                        String oldDeadline = "none".equals(auditLog.getOldValue()) ? "not set" : auditLog.getOldValue();
+                        String newDeadline = "none".equals(auditLog.getNewValue()) ? "removed" : auditLog.getNewValue();
+                        title = "📅 Deadline updated: " + activityLabel;
+                        message = "The deadline for " + activityLabel + " in \"" + conference.getName()
+                                + "\" has changed from " + oldDeadline + " to " + newDeadline + ".";
+                    }
+                    default -> {
+                        continue;
+                    }
+                }
+
+                String link = "/conference/" + conference.getId() + "/update";
+
+                for (User user : uniqueUsers) {
+                    try {
+                        // In-app notification
+                        NotificationDTO notifDTO = new NotificationDTO();
+                        notifDTO.setUserId(user.getId());
+                        notifDTO.setConferenceId(conference.getId());
+                        notifDTO.setTitle(title);
+                        notifDTO.setMessage(message);
+                        notifDTO.setType("ACTIVITY_UPDATE");
+                        notifDTO.setLink(link);
+                        notificationService.createNotification(notifDTO);
+
+                        // Email notification
+                        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+                            String emailSubject = "[" + conference.getName() + "] " + title;
+                            emailService.sendSimpleMessage(user.getEmail(), emailSubject, message);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to send activity notification to user {}: {}", user.getId(), e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send activity change notifications for conference {}: {}",
+                    conference.getId(), e.getMessage());
+        }
+    }
+}

@@ -5,6 +5,7 @@ import com.capstone.confms.utils.enums.ActivityType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +16,6 @@ public interface ConferenceActivityRepository extends JpaRepository<ConferenceAc
     Optional<ConferenceActivity> findByConferenceIdAndActivityType(Integer conferenceId, ActivityType activityType);
     
     void deleteByConferenceId(Integer conferenceId);
+
+    List<ConferenceActivity> findByIsEnabledTrueAndDeadlineBetween(LocalDateTime from, LocalDateTime to);
 }

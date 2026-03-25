@@ -2,6 +2,7 @@ package com.capstone.confms.service;
 
 import com.capstone.confms.dto.ConferenceDTO;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
+import com.capstone.confms.dto.response.ConferenceStatsDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 
 public interface ConferenceService {
@@ -14,4 +15,8 @@ public interface ConferenceService {
     ConferenceResponseDTO approveConference(Integer id);
     ConferenceResponseDTO completeConference(Integer id);
     ConferenceResponseDTO cancelConference(Integer id);
+
+    String getProgramSchedule(Integer conferenceId);
+    void updateProgramSchedule(Integer conferenceId, String programScheduleJson);
+    ConferenceStatsDTO getConferenceStats(Integer conferenceId);
 }

@@ -70,4 +70,7 @@ public class Conference extends BaseEntity {
     @Column(name = "chair_emails", columnDefinition = "TEXT")
     private String chairEmails;
 
+    @Column(name = "program_schedule", columnDefinition = "TEXT")
+    private String programSchedule;
+
 }

@@ -2,15 +2,20 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ConferenceDTO;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
+import com.capstone.confms.dto.response.ConferenceStatsDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceUserTrack;
+import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.NotificationRepository;
+import com.capstone.confms.repository.PaperRepository;
+import com.capstone.confms.repository.ReviewRepository;
+import com.capstone.confms.repository.TicketRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.security.services.UserDetailsImpl;
 import com.capstone.confms.service.ConferenceService;
@@ -42,6 +47,9 @@ public class ConferenceServiceImpl implements ConferenceService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final ConferenceActivityService conferenceActivityService;
+    private final PaperRepository paperRepository;
+    private final ReviewRepository reviewRepository;
+    private final TicketRepository ticketRepository;
 
     @Override
     @Transactional
@@ -197,6 +205,57 @@ public class ConferenceServiceImpl implements ConferenceService {
         notifyAllMembers(saved, "Conference cancelled",
                 "\"" + saved.getName() + "\" has been cancelled by the chair.", "CONFERENCE_STATUS");
         return mapToResponseDTO(saved);
+    }
+
+    @Override
+    public String getProgramSchedule(Integer conferenceId) {
+        return repository.findById(conferenceId)
+                .map(Conference::getProgramSchedule)
+                .orElse(null);
+    }
+
+    @Override
+    public void updateProgramSchedule(Integer conferenceId, String programScheduleJson) {
+        Conference conf = repository.findById(conferenceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
+        conf.setProgramSchedule(programScheduleJson);
+        repository.save(conf);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConferenceStatsDTO getConferenceStats(Integer conferenceId) {
+        List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        int total = papers.size();
+        int submitted = (int) papers.stream().filter(p -> !"DRAFT".equals(p.getStatus() != null ? p.getStatus().name() : "")).count();
+        int underReview = (int) papers.stream().filter(p -> p.getStatus() != null && "UNDER_REVIEW".equals(p.getStatus().name())).count();
+        int accepted = (int) papers.stream().filter(p -> p.getStatus() != null && ("ACCEPTED".equals(p.getStatus().name()) || "PUBLISHED".equals(p.getStatus().name()))).count();
+        int rejected = (int) papers.stream().filter(p -> p.getStatus() != null && "REJECTED".equals(p.getStatus().name())).count();
+        int revision  = (int) papers.stream().filter(p -> p.getStatus() != null && "REVISION".equals(p.getStatus().name())).count();
+
+        long totalReviews = reviewRepository.countByConferenceId(conferenceId);
+        long completedReviews = reviewRepository.countCompletedByConferenceId(conferenceId);
+
+        long registrations = ticketRepository.countByConference_Id(conferenceId);
+        long checkedIn = ticketRepository.countCheckedInByConferenceId(conferenceId, true);
+
+        double acceptanceRate = submitted > 0 ? Math.round((accepted * 100.0 / submitted) * 10.0) / 10.0 : 0;
+        double reviewRate = totalReviews > 0 ? Math.round((completedReviews * 100.0 / totalReviews) * 10.0) / 10.0 : 0;
+
+        return ConferenceStatsDTO.builder()
+                .totalPapers(total)
+                .submitted(submitted)
+                .underReview(underReview)
+                .accepted(accepted)
+                .rejected(rejected)
+                .revision(revision)
+                .totalReviews((int) totalReviews)
+                .completedReviews((int) completedReviews)
+                .totalRegistrations((int) registrations)
+                .checkedIn((int) checkedIn)
+                .acceptanceRate(acceptanceRate)
+                .reviewCompletionRate(reviewRate)
+                .build();
     }
 
     private User getCurrentAuthenticatedUser() {

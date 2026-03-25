@@ -1,23 +1,18 @@
 package com.capstone.confms.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import com.capstone.confms.utils.enums.PaymentStatus;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "payments")
-public class Payment extends BaseEntity{
+public class Payment extends BaseEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
@@ -31,12 +26,21 @@ public class Payment extends BaseEntity{
     private Ticket ticket;
 
     @Column(name = "amount", nullable = false)
-    private Integer amount;
+    private Long amount;
 
     @Column(name = "provider", nullable = false)
     private String provider;
 
-    @Column(name = "provider_transaction_id", nullable = false)
+    @Column(name = "vnp_txn_ref")
+    private String vnpTxnRef;
+
+    @Column(name = "provider_transaction_id")
     private String providerTransactionId;
 
+    @Column(name = "transaction_time")
+    private LocalDateTime transactionTime;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private PaymentStatus status = PaymentStatus.PENDING;
 }

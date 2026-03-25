@@ -2,6 +2,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.ConferenceDTO;
 import com.capstone.confms.dto.response.ConferenceResponseDTO;
+import com.capstone.confms.dto.response.ConferenceStatsDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.service.ConferenceService;
@@ -13,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
 import java.util.Map;
@@ -88,6 +91,32 @@ public class ConferenceController {
     @Operation(summary = "Cancel a conference")
     public ResponseEntity<ConferenceResponseDTO> cancelConference(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceService.cancelConference(id));
+    }
+
+    @GetMapping("/{id}/stats")
+    @PreAuthorize("hasRole('CHAIR')")
+    @Operation(summary = "Get aggregate statistics for a conference")
+    public ResponseEntity<ConferenceStatsDTO> getConferenceStats(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceService.getConferenceStats(id));
+    }
+
+    // --- PROGRAM SCHEDULE (JSON Blob) ---
+    @GetMapping("/{id}/program")
+    @Operation(summary = "Get conference schedule as raw JSON")
+    public ResponseEntity<String> getProgramSchedule(@PathVariable("id") Integer id) {
+        String json = conferenceService.getProgramSchedule(id);
+        if (json == null || json.trim().isEmpty()) {
+            json = "{\"rooms\":[],\"sessions\":[],\"published\":false}";
+        }
+        return ResponseEntity.ok().header("Content-Type", "application/json").body(json);
+    }
+
+    @PutMapping("/{id}/program")
+    @PreAuthorize("hasRole('CHAIR')")
+    @Operation(summary = "Save conference schedule JSON blob")
+    public ResponseEntity<Void> updateProgramSchedule(@PathVariable("id") Integer id, @RequestBody JsonNode programSchedule) {
+        conferenceService.updateProgramSchedule(id, programSchedule.toString());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping(value = "/{id}/upload-banner", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

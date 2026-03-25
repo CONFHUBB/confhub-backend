@@ -3,9 +3,13 @@ package com.capstone.confms.controller;
 import com.capstone.confms.dto.PaperFileDTO;
 import com.capstone.confms.dto.response.PaperFileResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
+import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.repository.TicketRepository;
+import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.FirebaseStorageService;
 import com.capstone.confms.service.PaperFileService;
+import com.capstone.confms.utils.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,6 +31,8 @@ public class PaperFileController {
 
     private final PaperFileService paperFileService;
     private final FirebaseStorageService firebaseStorageService;
+    private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload a paper file to Firebase Storage under conferences/{conferenceId}/papers/{paperId}/")
@@ -44,11 +50,21 @@ public class PaperFileController {
     }
 
     @PostMapping(value = "/upload-camera-ready", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload a camera-ready file (only for ACCEPTED papers with CAMERA_READY_SUBMISSION enabled)")
+    @Operation(summary = "Upload a camera-ready file (only for ACCEPTED papers, requires paid conference registration)")
     public ResponseEntity<PaperFileResponseDTO> uploadCameraReadyFile(
             @RequestParam("conferenceId") Integer conferenceId,
             @RequestParam("paperId") Integer paperId,
+            @RequestParam("userId") Integer userId,
             @RequestParam("file") MultipartFile file) throws IOException {
+        // Sprint 4 Gate: author must have a PAID ticket to upload camera-ready
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found: " + userId));
+        boolean hasPaidTicket = ticketRepository.existsByUserAndConferenceIdAndPaymentStatus(
+                user, conferenceId, PaymentStatus.COMPLETED);
+        if (!hasPaidTicket) {
+            throw new BadRequestException(
+                    "You must register and pay the conference fee before uploading camera-ready files.");
+        }
         String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
         PaperFileDTO dto = PaperFileDTO.builder()
                 .paperId(paperId)

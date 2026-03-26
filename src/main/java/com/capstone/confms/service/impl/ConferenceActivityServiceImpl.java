@@ -54,13 +54,16 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                 .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + conferenceId));
 
         List<ConferenceActivity> existingActivities = activityRepository.findByConferenceId(conferenceId);
-        if (!existingActivities.isEmpty()) {
-            return; // Already initialized
-        }
+        Set<ActivityType> existingTypes = existingActivities.stream()
+                .map(ConferenceActivity::getActivityType)
+                .collect(Collectors.toSet());
 
         List<ConferenceActivity> activities = new ArrayList<>();
         
         for (ActivityType type : ActivityType.values()) {
+            if (existingTypes.contains(type)) {
+                continue; // Already exists, skip
+            }
             ConferenceActivity activity = new ConferenceActivity();
             activity.setConference(conference);
             activity.setActivityType(type);
@@ -70,7 +73,9 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             activities.add(activity);
         }
 
-        activityRepository.saveAll(activities);
+        if (!activities.isEmpty()) {
+            activityRepository.saveAll(activities);
+        }
     }
 
     @Override
@@ -80,11 +85,9 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             throw new EntityNotFoundException("Conference not found with ID: " + conferenceId);
         }
         
+        // Always ensure all activity types exist (adds missing ones for existing conferences)
+        initializeDefaultActivitiesForConference(conferenceId);
         List<ConferenceActivity> activities = activityRepository.findByConferenceId(conferenceId);
-        if (activities.isEmpty()) {
-            initializeDefaultActivitiesForConference(conferenceId);
-            activities = activityRepository.findByConferenceId(conferenceId);
-        }
 
         // BR-1.6: Auto-close expired activities
         LocalDateTime now = LocalDateTime.now();
@@ -108,11 +111,9 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         Conference conference = conferenceRepository.findById(conferenceId)
                 .orElseThrow(() -> new EntityNotFoundException("Conference not found with ID: " + conferenceId));
 
+        // Ensure all activity types exist (adds missing ones)
+        initializeDefaultActivitiesForConference(conferenceId);
         List<ConferenceActivity> existingActivities = activityRepository.findByConferenceId(conferenceId);
-        if (existingActivities.isEmpty()) {
-            initializeDefaultActivitiesForConference(conferenceId);
-            existingActivities = activityRepository.findByConferenceId(conferenceId);
-        }
 
         Map<ActivityType, ConferenceActivity> activityMap = existingActivities.stream()
                 .collect(Collectors.toMap(ConferenceActivity::getActivityType, a -> a));

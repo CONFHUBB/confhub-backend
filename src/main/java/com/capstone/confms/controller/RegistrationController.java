@@ -46,6 +46,12 @@ public class RegistrationController {
         return ResponseEntity.ok(registrationService.getMyTicket(conferenceId, userId));
     }
 
+    @GetMapping("/my-tickets")
+    @Operation(summary = "Get all tickets for the current user across all conferences")
+    public ResponseEntity<List<TicketResponse>> getMyTickets(@RequestParam Integer userId) {
+        return ResponseEntity.ok(registrationService.getMyTickets(userId));
+    }
+
     @GetMapping("/conferences/{conferenceId}/attendees")
     @Operation(summary = "Get all attendees for a conference (Chair only)")
     public ResponseEntity<List<TicketResponse>> getAttendees(
@@ -57,5 +63,15 @@ public class RegistrationController {
     @Operation(summary = "Check in an attendee by QR code or registration number (Staff/Chair)")
     public ResponseEntity<CheckInResponse> checkIn(@RequestParam String code) {
         return ResponseEntity.ok(registrationService.checkIn(code));
+    }
+
+    @PostMapping("/conferences/{conferenceId}/retry-payment")
+    @Operation(summary = "Retry payment for a pending/failed registration")
+    public ResponseEntity<RegistrationResponse> retryPayment(
+            @PathVariable Integer conferenceId,
+            @RequestParam Integer userId,
+            HttpServletRequest httpRequest) {
+        String clientIp = VnPayUtil.getIpAddress(httpRequest);
+        return ResponseEntity.ok(registrationService.retryPayment(conferenceId, userId, clientIp));
     }
 }

@@ -101,6 +101,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         ticket.setUser(user);
         ticket.setConference(conference);
         ticket.setTicketType(ticketType);
+        ticket.setTicketTypeValue(ticketType.getName());
         ticket.setTicketTypeName(ticketType.getName());
         ticket.setPrice(ticketType.getPrice());
         ticket.setPaperId(request.getPaperId());
@@ -132,6 +133,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             payment.setTicket(saved);
             payment.setAmount(ticketType.getPrice().longValue());
             payment.setProvider("VNPAY");
+            payment.setProviderTransactionId("PENDING");
+            payment.setVnpTxnRef("PENDING");
             payment.setStatus(PaymentStatus.PENDING);
             paymentRepository.save(payment);
 
@@ -155,6 +158,16 @@ public class RegistrationServiceImpl implements RegistrationService {
         return ticketRepository.findByUserAndConferenceId(user, conferenceId)
                 .map(this::mapToTicketResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("You are not registered for this conference."));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketResponse> getMyTickets(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        return ticketRepository.findByUser(user).stream()
+                .map(this::mapToTicketResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -278,6 +291,34 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .ticketTypeName(ticket.getTicketTypeName())
                 .isCheckedIn(true)
                 .message("Check-in successful!")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public RegistrationResponse retryPayment(Integer conferenceId, Integer userId, String clientIp) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        Ticket ticket = ticketRepository.findByUserAndConferenceId(user, conferenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("No registration found for this conference."));
+
+        if (PaymentStatus.COMPLETED.equals(ticket.getPaymentStatus())) {
+            throw new BadRequestException("Payment is already completed.");
+        }
+
+        // Reset to PENDING
+        ticket.setPaymentStatus(PaymentStatus.PENDING);
+        ticketRepository.save(ticket);
+
+        // Generate new VNPay URL
+        String paymentUrl = vnPayIntegrationService.createPaymentUrl(
+                ticket.getPrice().longValue(), clientIp, ticket.getId());
+
+        log.info("Retry payment for ticket {}, conference {}", ticket.getRegistrationNumber(), conferenceId);
+        return RegistrationResponse.builder()
+                .ticket(mapToTicketResponse(ticket))
+                .paymentUrl(paymentUrl)
                 .build();
     }
 

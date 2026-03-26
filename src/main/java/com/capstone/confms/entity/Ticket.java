@@ -32,6 +32,9 @@ public class Ticket extends BaseEntity {
     @JoinColumn(name = "ticket_type_id")
     private TicketType ticketType;
 
+    @Column(name = "ticket_type", nullable = false)
+    private String ticketTypeValue;
+
     @Column(name = "ticket_type_name", nullable = false)
     private String ticketTypeName;
 

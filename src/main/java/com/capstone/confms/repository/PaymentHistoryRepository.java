@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, Long> {
     List<PaymentHistory> findByTicketOrderByRecordedAtDesc(Ticket ticket);
+    List<PaymentHistory> findByTicketInOrderByRecordedAtDesc(List<Ticket> tickets);
     List<PaymentHistory> findByVnpTxnRef(String vnpTxnRef);
 }

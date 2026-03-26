@@ -64,7 +64,8 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/request-otp",
                                 "/api/v1/auth/activate",
                                 "/api/v1/email/accept/**",
-                                "/api/v1/email/decline/**")
+                                "/api/v1/email/decline/**",
+                                "/api/v1/payment/vnpay-callback")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated());

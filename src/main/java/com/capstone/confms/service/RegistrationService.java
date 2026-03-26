@@ -12,10 +12,12 @@ public interface RegistrationService {
     RegistrationResponse register(Integer conferenceId, Integer userId,
                                   RegistrationRequest request, String clientIp);
     TicketResponse getMyTicket(Integer conferenceId, Integer userId);
+    List<TicketResponse> getMyTickets(Integer userId);
     List<TicketResponse> getAttendees(Integer conferenceId);
     void completePayment(Integer ticketId, String vnpTxnRef, String providerTransactionId);
     Payment completePaymentAndGet(Integer ticketId, String vnpTxnRef, String providerTransactionId);
     void failPayment(Integer ticketId, String vnpTxnRef);
     Payment failPaymentAndGet(Integer ticketId, String vnpTxnRef);
     CheckInResponse checkIn(String code);
+    RegistrationResponse retryPayment(Integer conferenceId, Integer userId, String clientIp);
 }

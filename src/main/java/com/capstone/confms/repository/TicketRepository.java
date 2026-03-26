@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface TicketRepository extends JpaRepository<Ticket, Integer> {
     Optional<Ticket> findByUserAndConferenceId(User user, Integer conferenceId);
+    List<Ticket> findByUser(User user);
     boolean existsByUserAndConferenceIdAndPaymentStatus(User user, Integer conferenceId, PaymentStatus paymentStatus);
     List<Ticket> findByConferenceId(Integer conferenceId);
     Optional<Ticket> findByQrCode(String qrCode);

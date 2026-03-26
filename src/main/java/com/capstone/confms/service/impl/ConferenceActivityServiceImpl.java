@@ -2,12 +2,9 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.ActivityAuditLogDTO;
 import com.capstone.confms.dto.ConferenceActivityDTO;
-import com.capstone.confms.dto.NotificationDTO;
 import com.capstone.confms.entity.ActivityAuditLog;
 import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceActivity;
-import com.capstone.confms.entity.ConferenceUserTrack;
-import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
 import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.repository.ActivityAuditLogRepository;
@@ -19,8 +16,6 @@ import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.SubjectAreaRepository;
 import com.capstone.confms.service.ConferenceActivityService;
-import com.capstone.confms.service.EmailService;
-import com.capstone.confms.service.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.scheduling.annotation.Async;
 
 @Service
 @RequiredArgsConstructor
@@ -47,8 +43,7 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     private final PaperRepository paperRepository;
     private final ReviewRepository reviewRepository;
     private final ActivityAuditLogRepository auditLogRepository;
-    private final NotificationService notificationService;
-    private final EmailService emailService;
+    private final ActivityNotificationSender notificationSender;
 
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -159,9 +154,8 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                 if (dto.getIsEnabled() != null) {
                     activity.setIsEnabled(dto.getIsEnabled());
                 }
-                if (dto.getDeadline() != null) {
-                    activity.setDeadline(dto.getDeadline());
-                }
+                // Always update deadline (null means clear it)
+                activity.setDeadline(dto.getDeadline());
                 if (dto.getName() != null && !dto.getName().trim().isEmpty()) {
                     activity.setName(dto.getName());
                 }
@@ -208,8 +202,8 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
 
         if (!auditLogs.isEmpty()) {
             auditLogRepository.saveAll(auditLogs);
-            // ── Send notifications for each change ──
-            sendActivityChangeNotifications(conference, auditLogs);
+            // Send notifications async via separate bean (avoids @Async self-call issue)
+            notificationSender.sendNotifications(conference, auditLogs);
         }
 
         return savedActivities.stream()
@@ -325,76 +319,4 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
         return dto;
     }
 
-    /**
-     * Send in-app notification + email to all conference members when activities change.
-     */
-    private void sendActivityChangeNotifications(Conference conference, List<ActivityAuditLog> auditLogs) {
-        try {
-            // Get all unique users in this conference
-            List<ConferenceUserTrack> members = conferenceUserTrackRepository.findByConference_Id(conference.getId());
-            Set<User> uniqueUsers = members.stream()
-                    .map(ConferenceUserTrack::getUser)
-                    .collect(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(User::getId))));
-
-            if (uniqueUsers.isEmpty()) return;
-
-            for (ActivityAuditLog auditLog : auditLogs) {
-                String activityLabel = formatActivityName(auditLog.getActivityType());
-                String title;
-                String message;
-
-                switch (auditLog.getAction()) {
-                    case "ENABLED" -> {
-                        title = "📢 " + activityLabel + " is now open";
-                        message = "The " + activityLabel + " phase for \"" + conference.getName()
-                                + "\" is now active."
-                                + (auditLog.getNewValue() != null && !"none".equals(auditLog.getNewValue())
-                                ? " Please complete before the deadline." : "");
-                    }
-                    case "DISABLED" -> {
-                        title = "🔒 " + activityLabel + " has closed";
-                        message = "The " + activityLabel + " phase for \"" + conference.getName()
-                                + "\" has been closed.";
-                    }
-                    case "DEADLINE_CHANGED" -> {
-                        String oldDeadline = "none".equals(auditLog.getOldValue()) ? "not set" : auditLog.getOldValue();
-                        String newDeadline = "none".equals(auditLog.getNewValue()) ? "removed" : auditLog.getNewValue();
-                        title = "📅 Deadline updated: " + activityLabel;
-                        message = "The deadline for " + activityLabel + " in \"" + conference.getName()
-                                + "\" has changed from " + oldDeadline + " to " + newDeadline + ".";
-                    }
-                    default -> {
-                        continue;
-                    }
-                }
-
-                String link = "/conference/" + conference.getId() + "/update";
-
-                for (User user : uniqueUsers) {
-                    try {
-                        // In-app notification
-                        NotificationDTO notifDTO = new NotificationDTO();
-                        notifDTO.setUserId(user.getId());
-                        notifDTO.setConferenceId(conference.getId());
-                        notifDTO.setTitle(title);
-                        notifDTO.setMessage(message);
-                        notifDTO.setType("ACTIVITY_UPDATE");
-                        notifDTO.setLink(link);
-                        notificationService.createNotification(notifDTO);
-
-                        // Email notification
-                        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
-                            String emailSubject = "[" + conference.getName() + "] " + title;
-                            emailService.sendSimpleMessage(user.getEmail(), emailSubject, message);
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to send activity notification to user {}: {}", user.getId(), e.getMessage());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to send activity change notifications for conference {}: {}",
-                    conference.getId(), e.getMessage());
-        }
-    }
 }

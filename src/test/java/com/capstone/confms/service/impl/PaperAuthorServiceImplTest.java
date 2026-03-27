@@ -128,7 +128,7 @@ public class PaperAuthorServiceImplTest {
 
     @Test
     void deletePaperAuthorShouldDelete() {
-        when(paperAuthorRepository.existsById(10)).thenReturn(true);
+        when(paperAuthorRepository.findById(10)).thenReturn(Optional.of(paperAuthor));
 
         paperAuthorService.deletePaperAuthor(10);
 

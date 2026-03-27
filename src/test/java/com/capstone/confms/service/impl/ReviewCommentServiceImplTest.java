@@ -81,7 +81,6 @@ public class ReviewCommentServiceImplTest {
     void updateReviewCommentShouldReturnResponse() {
         ReviewCommentDTO dto = ReviewCommentDTO.builder().reviewId(1).content("Updated").isVisibleToAuthor(false).build();
         when(reviewCommentRepository.findById(10)).thenReturn(Optional.of(comment));
-        when(reviewRepository.findById(1)).thenReturn(Optional.of(review));
         when(reviewCommentRepository.save(any(ReviewComment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = reviewCommentService.updateReviewComment(10, dto);

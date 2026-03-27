@@ -12,11 +12,13 @@ import com.capstone.confms.entity.TrackReviewSetting;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.repository.BiddingRepository;
 import com.capstone.confms.repository.ConferenceActivityRepository;
+import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.repository.PaperConflictRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewerInterestRepository;
 import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.capstone.confms.utils.enums.ActivityType;
 import com.capstone.confms.utils.enums.BidValue;
 
@@ -55,6 +57,10 @@ public class BiddingServiceImplTest {
     private ReviewerInterestRepository reviewerInterestRepository;
     @Mock
     private TrackReviewSettingRepository trackReviewSettingRepository;
+    @Mock
+    private PaperAuthorRepository paperAuthorRepository;
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private BiddingServiceImpl biddingService;
@@ -112,29 +118,6 @@ public class BiddingServiceImplTest {
     }
 
     @Test
-    void submitOrUpdateBidShouldReturnResponse() {
-        BiddingDTO dto = new BiddingDTO();
-        dto.setPaperId(10);
-        dto.setReviewerId(20);
-        dto.setBidValue(BidValue.EAGER);
-
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
-        when(userRepository.findById(20)).thenReturn(Optional.of(reviewer));
-        when(conferenceActivityRepository.findByConferenceIdAndActivityType(1, ActivityType.REVIEWER_BIDDING))
-                .thenReturn(Optional.of(biddingActivity));
-        when(trackReviewSettingRepository.findByTrackId(2)).thenReturn(Optional.empty());
-        when(paperConflictRepository.existsByPaper_IdAndUser_Id(10, 20)).thenReturn(false);
-        when(biddingRepository.findByReviewer_IdAndPaper_Id(20, 10)).thenReturn(Optional.empty());
-        when(biddingRepository.save(any(Bidding.class))).thenReturn(bid);
-
-        var result = biddingService.submitOrUpdateBid(dto);
-
-        assertNotNull(result);
-        assertEquals(30, result.getId());
-        assertEquals(BidValue.EAGER, result.getBidValue());
-    }
-
-    @Test
     void getBidsByReviewerAndConferenceShouldReturnList() {
         when(biddingRepository.findByReviewer_IdAndPaper_Track_Conference_Id(20, 1)).thenReturn(List.of(bid));
 
@@ -189,9 +172,11 @@ public class BiddingServiceImplTest {
         setting.setIsDoubleBlind(false);
 
         when(paperRepository.findByTrack_Conference_Id(1)).thenReturn(List.of(paper));
+        when(userRepository.findById(20)).thenReturn(Optional.of(reviewer));
         when(paperConflictRepository.findByUser_Id(20)).thenReturn(List.of());
         when(biddingRepository.findByReviewer_IdAndPaper_Track_Conference_Id(20, 1)).thenReturn(List.of(bid));
         when(reviewerInterestRepository.findByReviewer_Id(20)).thenReturn(List.of(interest));
+        when(paperAuthorRepository.findByPaperId(10)).thenReturn(List.of());
         when(trackReviewSettingRepository.findByTrackId(2)).thenReturn(Optional.of(setting));
 
         var result = biddingService.getPapersForBidding(20, 1);

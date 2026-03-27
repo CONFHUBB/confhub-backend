@@ -8,9 +8,11 @@ import com.capstone.confms.entity.SubjectArea;
 import com.capstone.confms.repository.ConferenceActivityRepository;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceTrackRepository;
+import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.repository.PaperRepository;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.SubjectAreaRepository;
+import com.capstone.confms.repository.ActivityAuditLogRepository;
 import com.capstone.confms.utils.enums.ActivityType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,12 @@ public class ConferenceActivityServiceImplTest {
     private PaperRepository paperRepository;
     @Mock
     private ReviewRepository reviewRepository;
+    @Mock
+    private ConferenceUserTrackRepository conferenceUserTrackRepository;
+    @Mock
+    private ActivityAuditLogRepository auditLogRepository;
+    @Mock
+    private ActivityNotificationSender notificationSender;
 
     @InjectMocks
     private ConferenceActivityServiceImpl conferenceActivityService;
@@ -89,6 +97,7 @@ public class ConferenceActivityServiceImplTest {
     @Test
     void getActivitiesByConferenceIdShouldReturnResponses() {
         when(conferenceRepository.existsById(1)).thenReturn(true);
+        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
         when(conferenceActivityRepository.findByConferenceId(1)).thenReturn(List.of(activity));
 
         var result = conferenceActivityService.getActivitiesByConferenceId(1);
@@ -110,7 +119,7 @@ public class ConferenceActivityServiceImplTest {
         subjectArea.setId(30);
         subjectArea.setTrack(track);
 
-        when(conferenceRepository.existsById(1)).thenReturn(true);
+        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
         when(conferenceActivityRepository.findByConferenceId(1)).thenReturn(List.of(activity));
         when(conferenceTrackRepository.findByConferenceId(1)).thenReturn(List.of(track));
         when(subjectAreaRepository.findByTrackId(10)).thenReturn(List.of(subjectArea));

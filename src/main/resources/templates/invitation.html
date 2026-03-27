@@ -18,7 +18,13 @@
             Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,
         </p>
 
-        <p style="color: #555; font-size: 15px; line-height: 1.6;">
+        <p th:if="${trackName != null and !trackName.isEmpty()}" style="color: #555; font-size: 15px; line-height: 1.6;">
+            You have been invited to participate in the conference
+            <strong th:text="${conferenceName}">[Conference Name]</strong>
+            as a <strong th:text="${role}">[Role]</strong>
+            for the following track(s):
+        </p>
+        <p th:if="${trackName == null or trackName.isEmpty()}" style="color: #555; font-size: 15px; line-height: 1.6;">
             You have been invited to participate in the conference
             <strong th:text="${conferenceName}">[Conference Name]</strong>
             as a <strong th:text="${role}">[Role]</strong>.
@@ -28,7 +34,7 @@
         <div th:if="${trackName != null and !trackName.isEmpty()}"
              style="background-color: #f0f4ff; border-left: 4px solid #3b82f6; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
             <p style="margin: 0; color: #1e40af; font-size: 14px;">
-                <strong>Assigned Track:</strong> <span th:text="${trackName}">[Track Name]</span>
+                <strong>Assigned Track(s):</strong> <span th:text="${trackName}">[Track Name]</span>
             </p>
         </div>
 

@@ -3,6 +3,8 @@ package com.capstone.confms.repository;
 import com.capstone.confms.entity.Ticket;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.utils.enums.PaymentStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,4 +25,28 @@ public interface TicketRepository extends JpaRepository<Ticket, Integer> {
 
     @Query("SELECT COUNT(t) FROM Ticket t WHERE t.conference.id = :conferenceId AND t.isCheckedIn = :isCheckedIn")
     long countCheckedInByConferenceId(@Param("conferenceId") Integer conferenceId, @Param("isCheckedIn") Boolean isCheckedIn);
+
+    /**
+     * Paginated attendee query with optional search (name/email/regNumber) and optional status filter.
+     * Pass null for status to return all payment statuses.
+     * Pass null or blank string for search to skip text filtering.
+     */
+    @Query("""
+        SELECT t FROM Ticket t
+        WHERE t.conference.id = :conferenceId
+          AND (:status IS NULL OR t.paymentStatus = :status)
+          AND (:search IS NULL OR :search = '' OR
+               LOWER(CONCAT(t.user.firstName, ' ', t.user.lastName)) LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(t.user.email) LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(t.registrationNumber) LIKE LOWER(CONCAT('%', :search, '%')))
+        ORDER BY t.createdAt DESC
+        """)
+    Page<Ticket> findAttendees(
+            @Param("conferenceId") Integer conferenceId,
+            @Param("status") PaymentStatus status,
+            @Param("search") String search,
+            Pageable pageable);
+
+    @Query("SELECT COUNT(t) FROM Ticket t WHERE t.conference.id = :conferenceId AND t.paymentStatus = 'COMPLETED'")
+    long countPaidByConferenceId(@Param("conferenceId") Integer conferenceId);
 }

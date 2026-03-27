@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableJpaAuditing
-@EnableAsync
+@EnableAsync(proxyTargetClass = true)
 @EnableScheduling
 @Slf4j
 public class ConfmsApplication {

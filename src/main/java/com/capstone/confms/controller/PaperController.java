@@ -2,7 +2,11 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.*;
 import com.capstone.confms.dto.response.*;
+import com.capstone.confms.entity.Paper;
 import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.repository.ConferenceRepository;
+import com.capstone.confms.repository.PaperRepository;
+import com.capstone.confms.service.EmailService;
 import com.capstone.confms.service.PaperService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/paper")
 @RequiredArgsConstructor
@@ -19,6 +25,9 @@ import org.springframework.web.bind.annotation.*;
 public class PaperController {
 
     private final PaperService paperService;
+    private final EmailService emailService;
+    private final PaperRepository paperRepository;
+    private final ConferenceRepository conferenceRepository;
 
     @PostMapping
     @Operation(summary = "Create a new Paper")
@@ -87,11 +96,40 @@ public class PaperController {
         return ResponseEntity.ok(paperService.restorePaper(id));
     }
 
+    /**
+     * Task 5: Track Chair Filtered View
+     * Optional ?trackIds=1,2,3 — if provided, only papers in those tracks are returned.
+     * Track Chairs supply their own trackIds; full Chairs omit the param to see all.
+     */
     @GetMapping("/conference/{conferenceId}")
-    @Operation(summary = "Get all papers in a conference (for Chair/PC paper management)")
-    public ResponseEntity<java.util.List<PaperResponseDTO>> getPapersByConference(
-            @PathVariable Integer conferenceId) {
+    @Operation(summary = "Get all papers in a conference (optional ?trackIds= filter for Track Chairs)")
+    public ResponseEntity<List<PaperResponseDTO>> getPapersByConference(
+            @PathVariable Integer conferenceId,
+            @RequestParam(required = false) List<Integer> trackIds) {
+        if (trackIds != null && !trackIds.isEmpty()) {
+            List<PaperResponseDTO> filtered = paperRepository
+                    .findByTrack_Conference_IdAndTrack_IdIn(conferenceId, trackIds)
+                    .stream()
+                    .map(p -> paperService.getPaperById(p.getId()))
+                    .toList();
+            return ResponseEntity.ok(filtered);
+        }
         return ResponseEntity.ok(paperService.getPapersByConference(conferenceId));
+    }
+
+    /**
+     * Task 3: Batch Decision Email Notification
+     * POST /api/v1/paper/conference/{conferenceId}/batch-notify
+     * Returns immediately; emails are sent asynchronously in background thread.
+     */
+    @PostMapping("/conference/{conferenceId}/batch-notify")
+    @Operation(summary = "Async batch-send decision emails to all paper authors (Task 3)")
+    public ResponseEntity<String> batchNotifyDecisions(@PathVariable Integer conferenceId) {
+        var conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
+        List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        emailService.sendBatchDecisionNotifications(papers, conference.getName());
+        return ResponseEntity.ok("Batch notification queued for " + papers.size() + " papers.");
     }
 
     @PutMapping("/{id}/review-read-only")
@@ -112,15 +150,15 @@ public class PaperController {
 
     @PutMapping("/bulk-status")
     @Operation(summary = "Bulk update paper status (BR-3.43)")
-    public ResponseEntity<java.util.List<PaperResponseDTO>> bulkUpdatePaperStatus(
-            @RequestBody java.util.List<PaperUpdateStatusDTO> dtos) {
+    public ResponseEntity<List<PaperResponseDTO>> bulkUpdatePaperStatus(
+            @RequestBody List<PaperUpdateStatusDTO> dtos) {
         return ResponseEntity.ok(paperService.bulkUpdatePaperStatus(dtos));
     }
 
     @PutMapping("/bulk-discussion")
     @Operation(summary = "Bulk enable/disable discussion for papers (BR-3.30)")
-    public ResponseEntity<java.util.List<PaperResponseDTO>> bulkToggleDiscussion(
-            @RequestBody java.util.List<Integer> paperIds,
+    public ResponseEntity<List<PaperResponseDTO>> bulkToggleDiscussion(
+            @RequestBody List<Integer> paperIds,
             @RequestParam boolean enabled) {
         return ResponseEntity.ok(paperService.bulkToggleDiscussion(paperIds, enabled));
     }

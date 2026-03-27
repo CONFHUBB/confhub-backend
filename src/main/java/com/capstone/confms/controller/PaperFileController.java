@@ -5,6 +5,7 @@ import com.capstone.confms.dto.response.PaperFileResponseDTO;
 import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.TicketRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.service.FirebaseStorageService;
@@ -33,6 +34,7 @@ public class PaperFileController {
     private final FirebaseStorageService firebaseStorageService;
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload a paper file to Firebase Storage under conferences/{conferenceId}/papers/{paperId}/")
@@ -110,6 +112,38 @@ public class PaperFileController {
     @Operation(summary = "Get Paper File by ID")
     public ResponseEntity<PaperFileResponseDTO> getPaperFileById(@PathVariable Integer id) {
         return ResponseEntity.ok(paperFileService.getPaperFileById(id));
+    }
+
+    /**
+     * Reviewer secure download — only accessible to reviewers who are assigned to the paper.
+     * Returns the list of active (non-camera-ready) files for the paper.
+     * The caller's identity is derived from the JWT via SecurityContextHolder.
+     */
+    @GetMapping("/paper/{paperId}/reviewer-files")
+    @Operation(summary = "Get paper files for an assigned reviewer (auth-gated)")
+    public ResponseEntity<List<PaperFileResponseDTO>> getFilesForReviewer(
+            @PathVariable Integer paperId) {
+        // 1. Extract current user from security context
+        com.capstone.confms.security.services.UserDetailsImpl userDetails =
+                (com.capstone.confms.security.services.UserDetailsImpl)
+                org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication().getPrincipal();
+        Integer reviewerId = userDetails.getId();
+
+        // 2. Verify the caller has a Review assignment for this paper
+        boolean isAssigned = reviewRepository.existsByPaper_IdAndReviewer_Id(paperId, reviewerId);
+        if (!isAssigned) {
+            throw new BadRequestException(
+                    "Access denied: you are not assigned to review this paper.");
+        }
+
+        // 3. Return only active, non-camera-ready files
+        List<PaperFileResponseDTO> files = paperFileService.getFilesByPaperId(paperId)
+                .stream()
+                .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && !Boolean.TRUE.equals(f.getIsCameraReady()))
+                .toList();
+
+        return ResponseEntity.ok(files);
     }
 
     @GetMapping("/paper/{paperId}")

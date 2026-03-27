@@ -6,6 +6,7 @@ import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -36,6 +37,8 @@ public class EmailService {
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     private final ConferenceRepository conferenceRepository;
+
+    private final PaperAuthorRepository paperAuthorRepository;
 
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -142,5 +145,53 @@ public class EmailService {
                 .replace("{Recipient.Name}", (recipient.getFirstName() != null ? recipient.getFirstName() : "") + " " + (recipient.getLastName() != null ? recipient.getLastName() : ""))
                 .replace("{Recipient.Email}", recipient.getEmail() != null ? recipient.getEmail() : "")
                 .replace("{Sender.Email}", fromEmail != null ? fromEmail : "");
+    }
+
+    /**
+     * Task 3: Batch Decision Notification
+     * Sends async email to author of each paper that has a terminal decision status.
+     * Called from ConferenceController after chair finalises decisions.
+     */
+    @Async
+    public void sendBatchDecisionNotifications(List<com.capstone.confms.entity.Paper> papers, String conferenceName) {
+        int sent = 0;
+        for (com.capstone.confms.entity.Paper paper : papers) {
+            String statusLabel = switch (paper.getStatus()) {
+                case ACCEPTED  -> "✅ Accepted";
+                case REJECTED  -> "❌ Rejected";
+                case REVISION  -> "🔄 Revision Required";
+                default        -> null;
+            };
+            if (statusLabel == null) continue; // skip non-decision statuses
+
+            // Send to all PaperAuthor users
+            if (paper.getId() == null) continue;
+            try {
+                String subject = "[" + conferenceName + "] Decision for your paper: " + paper.getTitle();
+                String body = "Dear Author,\n\n"
+                        + "The program committee has reached a decision on your paper:\n\n"
+                        + "  Title : " + paper.getTitle() + "\n"
+                        + "  Decision: " + statusLabel + "\n\n"
+                        + "Please log in to the conference system for details.\n\n"
+                        + "Best regards,\n" + conferenceName + " Organizing Committee";
+
+                // Lookup all authors of this paper
+                var authors = paperAuthorRepository.findByPaperId(paper.getId());
+                for (var pa : authors) {
+                    String email = pa.getUser() != null ? pa.getUser().getEmail() : null;
+                    if (email == null || email.isBlank()) continue;
+                    try {
+                        sendSimpleMessage(email, subject, body);
+                        sent++;
+                    } catch (Exception ex) {
+                        log.error("[BatchDecisionNotify] Could not send to {}: {}", email, ex.getMessage());
+                    }
+                }
+                log.info("[BatchDecisionNotify] Notified {} author(s) for paper #{}", authors.size(), paper.getId());
+            } catch (Exception e) {
+                log.error("[BatchDecisionNotify] Failed for paper #{}: {}", paper.getId(), e.getMessage());
+            }
+        }
+        log.info("[BatchDecisionNotify] Batch complete — processed {}/{} papers for {}", sent, papers.size(), conferenceName);
     }
 }

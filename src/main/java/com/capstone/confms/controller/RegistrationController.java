@@ -2,6 +2,7 @@ package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.request.RegistrationRequest;
 import com.capstone.confms.dto.response.CheckInResponse;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.RegistrationResponse;
 import com.capstone.confms.dto.response.TicketResponse;
 import com.capstone.confms.service.RegistrationService;
@@ -53,10 +54,17 @@ public class RegistrationController {
     }
 
     @GetMapping("/conferences/{conferenceId}/attendees")
-    @Operation(summary = "Get all attendees for a conference (Chair only)")
-    public ResponseEntity<List<TicketResponse>> getAttendees(
-            @PathVariable Integer conferenceId) {
-        return ResponseEntity.ok(registrationService.getAttendees(conferenceId));
+    @Operation(summary = "Get all attendees for a conference (Chair only) — paginated with optional search and status filter")
+    public ResponseEntity<PagedResponse<TicketResponse>> getAttendees(
+            @PathVariable Integer conferenceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new IllegalArgumentException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(registrationService.getAttendeesPageable(conferenceId, page, size, search, status));
     }
 
     @PostMapping("/check-in")

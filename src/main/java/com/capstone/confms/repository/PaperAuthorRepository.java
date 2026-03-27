@@ -18,4 +18,7 @@ public interface PaperAuthorRepository extends JpaRepository<PaperAuthor, Intege
     Page<PaperAuthor> findByPaperId(Integer paperId, Pageable pageable);
 
     boolean existsByPaperIdAndUserId(Integer paperId, Integer userId);
+
+    // Batch-load authors for a set of paper IDs ordered by orderIndex (prevents N+1)
+    List<PaperAuthor> findByPaper_IdInOrderByOrderIndexAsc(List<Integer> paperIds);
 }

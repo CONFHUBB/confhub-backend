@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -78,6 +79,7 @@ public class PaperController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Delete a Paper")
     public ResponseEntity<Void> deletePaper(@PathVariable Integer id) {
         paperService.deletePaper(id);
@@ -91,6 +93,7 @@ public class PaperController {
     }
 
     @PutMapping("/{id}/restore")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Restore a withdrawn paper (BR-2.15, Chair only)")
     public ResponseEntity<PaperResponseDTO> restorePaper(@PathVariable Integer id) {
         return ResponseEntity.ok(paperService.restorePaper(id));
@@ -161,5 +164,21 @@ public class PaperController {
             @RequestBody List<Integer> paperIds,
             @RequestParam boolean enabled) {
         return ResponseEntity.ok(paperService.bulkToggleDiscussion(paperIds, enabled));
+    }
+
+    /**
+     * Public endpoint: Get all PUBLISHED papers with pagination + optional title search.
+     * No auth required — used by the "Published Papers" public page.
+     */
+    @GetMapping("/published")
+    @Operation(summary = "Get all published papers (public, paginated)")
+    public ResponseEntity<PagedResponse<PaperResponseDTO>> getPublishedPapers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        return ResponseEntity.ok(paperService.getPublishedPapers(page, size, search));
     }
 }

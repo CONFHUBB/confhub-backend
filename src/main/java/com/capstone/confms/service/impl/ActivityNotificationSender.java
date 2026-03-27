@@ -9,6 +9,7 @@ import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.service.EmailService;
 import com.capstone.confms.service.NotificationService;
 import com.capstone.confms.utils.enums.ActivityType;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -93,10 +94,23 @@ public class ActivityNotificationSender {
                     }
                 }
 
-                String link = "/conference/" + conference.getId() + "/update";
-
                 for (User user : uniqueUsers) {
                     try {
+                        String link = "/paper";
+                        boolean isChair = members.stream()
+                                .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
+                                        (m.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR ||
+                                         m.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR));
+                        boolean isReviewer = members.stream()
+                                .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
+                                        m.getAssignedRole() == ConferenceTrackRole.REVIEWER);
+
+                        if (isChair) {
+                            link = "/conference/" + conference.getId() + "/update";
+                        } else if (isReviewer) {
+                            link = "/conference/" + conference.getId() + "/reviewer";
+                        }
+
                         NotificationDTO notifDTO = new NotificationDTO();
                         notifDTO.setUserId(user.getId());
                         notifDTO.setConferenceId(conference.getId());

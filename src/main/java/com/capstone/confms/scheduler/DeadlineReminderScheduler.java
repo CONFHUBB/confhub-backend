@@ -8,6 +8,7 @@ import com.capstone.confms.repository.ConferenceActivityRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
 import com.capstone.confms.service.EmailService;
 import com.capstone.confms.service.NotificationService;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -92,9 +93,22 @@ public class DeadlineReminderScheduler {
         String title = "⏰ Deadline approaching: " + activityName;
         String message = "The deadline for \"" + activityName + "\" in \"" + conferenceName
                 + "\" is " + deadlineStr + ". Please complete your work before the deadline.";
-        String link = "/conference/" + conferenceId + "/update";
-
         for (User user : uniqueUsers) {
+            String link = "/paper";
+            boolean isChair = members.stream()
+                    .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
+                            (m.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR ||
+                             m.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR));
+            boolean isReviewer = members.stream()
+                    .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
+                            m.getAssignedRole() == ConferenceTrackRole.REVIEWER);
+
+            if (isChair) {
+                link = "/conference/" + conferenceId + "/update";
+            } else if (isReviewer) {
+                link = "/conference/" + conferenceId + "/reviewer";
+            }
+
             try {
                 // In-app notification
                 NotificationDTO notifDTO = new NotificationDTO();

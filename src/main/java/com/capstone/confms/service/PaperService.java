@@ -43,4 +43,7 @@ public interface PaperService {
 
     // BR-3.30: Bulk discussion toggle
     java.util.List<PaperResponseDTO> bulkToggleDiscussion(java.util.List<Integer> paperIds, boolean enabled);
+
+    // Public: Get all published papers with pagination + optional search
+    PagedResponse<PaperResponseDTO> getPublishedPapers(int page, int size, String search);
 }

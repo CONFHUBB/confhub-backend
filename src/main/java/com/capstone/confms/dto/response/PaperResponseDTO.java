@@ -12,6 +12,7 @@ import java.util.List;
 public class PaperResponseDTO {
     private Integer id;
     private Integer conferenceId;
+    private String conferenceName;
     private Integer trackId;
     private String trackName;
     private Integer primarySubjectAreaId;
@@ -23,4 +24,5 @@ public class PaperResponseDTO {
     private PaperStatus status;
     private Integer submissionFormId;
     private String extraAnswersJson;
+    private List<String> authorNames;
 }

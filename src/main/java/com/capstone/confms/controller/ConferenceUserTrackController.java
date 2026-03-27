@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +25,7 @@ public class ConferenceUserTrackController {
     private final ConferenceUserTrackService conferenceUserTrackService;
 
     @PostMapping("/assign-role")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Assign role to user in a conference track")
     public ResponseEntity<ConferenceUserTrackResponseDTO> assignRole(
             @Valid @RequestBody AssignConferenceUserTrackRequest request) {
@@ -116,6 +118,7 @@ public class ConferenceUserTrackController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Remove a role assignment from a user")
     public ResponseEntity<Void> removeRoleFromUser(@PathVariable Integer id) {
         conferenceUserTrackService.removeRoleFromUser(id);
@@ -123,6 +126,7 @@ public class ConferenceUserTrackController {
     }
 
     @PutMapping("/{id}/resend-invitation")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Resend invitation", description = "Regenerate token and reset invitation to pending. Old email link will be invalidated.")
     public ResponseEntity<ConferenceUserTrackResponseDTO> resendInvitation(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceUserTrackService.resendInvitation(id));

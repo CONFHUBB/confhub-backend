@@ -98,7 +98,7 @@ public class PaperServiceImpl implements PaperService {
                             .title("Paper submitted successfully")
                             .message("Your paper \"" + saved.getTitle() + "\" has been submitted to \"" + track.getConference().getName() + "\".")
                             .type("PAPER_SUBMITTED")
-                            .link("/conference/" + track.getConference().getId() + "/author")
+                            .link("/paper")
                             .isRead(false)
                             .build();
                     notificationRepository.save(notification);
@@ -312,6 +312,58 @@ public class PaperServiceImpl implements PaperService {
             results.add(mapToResponseDTO(paperRepository.save(paper)));
         }
         return results;
+    }
+
+    // ==================== PUBLISHED PAPERS (Public endpoint) ====================
+    @Override
+    @Transactional(readOnly = true)
+    public PagedResponse<PaperResponseDTO> getPublishedPapers(int page, int size, String search) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("submissionTime").descending());
+        String searchParam = (search == null || search.isBlank()) ? null : search.trim();
+        Page<Paper> papers;
+        if (searchParam == null) {
+            papers = paperRepository.findByStatus(PaperStatus.PUBLISHED, pageable);
+        } else {
+            papers = paperRepository.findByStatusAndTitleContainingIgnoreCase(PaperStatus.PUBLISHED, searchParam, pageable);
+        }
+
+        // Collect all paper IDs in one go to batch-load authors (prevents N+1)
+        List<Integer> paperIds = papers.getContent().stream().map(Paper::getId).toList();
+        Map<Integer, List<String>> authorsByPaperId = new java.util.HashMap<>();
+        if (!paperIds.isEmpty()) {
+            List<PaperAuthor> allAuthors = paperAuthorRepository.findByPaper_IdInOrderByOrderIndexAsc(paperIds);
+            for (PaperAuthor pa : allAuthors) {
+                String fullName = pa.getUser().getFirstName() + " " + pa.getUser().getLastName();
+                authorsByPaperId.computeIfAbsent(pa.getPaper().getId(), k -> new ArrayList<>()).add(fullName);
+            }
+        }
+
+        return PaginationUtils.toPagedResponse(papers, paper -> mapToPublishedResponseDTO(paper, authorsByPaperId));
+    }
+
+    private PaperResponseDTO mapToPublishedResponseDTO(Paper entity, Map<Integer, List<String>> authorsByPaperId) {
+        List<Integer> secondaryIds = entity.getSecondarySubjectAreas() != null
+                ? entity.getSecondarySubjectAreas().stream().map(SubjectArea::getId).toList()
+                : List.of();
+        List<String> authorNames = authorsByPaperId.getOrDefault(entity.getId(), List.of());
+        return PaperResponseDTO.builder()
+                .id(entity.getId())
+                .conferenceId(entity.getTrack().getConference().getId())
+                .conferenceName(entity.getTrack().getConference().getName())
+                .trackId(entity.getTrack().getId())
+                .trackName(entity.getTrack().getName())
+                .primarySubjectAreaId(
+                        entity.getPrimarySubjectArea() != null ? entity.getPrimarySubjectArea().getId() : null)
+                .secondarySubjectAreaIds(secondaryIds)
+                .title(entity.getTitle())
+                .abstractField(entity.getAbstractField())
+                .keywords(deserializeKeywords(entity.getKeywordsJson()))
+                .submissionTime(entity.getSubmissionTime())
+                .status(entity.getStatus())
+                .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)
+                .extraAnswersJson(entity.getExtraAnswersJson())
+                .authorNames(authorNames)
+                .build();
     }
 
     // ==================== VALIDATION HELPERS ====================

@@ -32,6 +32,7 @@ public class ConferenceController {
     private final FirebaseStorageService firebaseStorageService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create a new conference")
     public ResponseEntity<ConferenceResponseDTO> createConference(@Valid @RequestBody ConferenceDTO dto) {
         return new ResponseEntity<>(conferenceService.createConference(dto), HttpStatus.CREATED);
@@ -55,12 +56,14 @@ public class ConferenceController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Update conference details")
     public ResponseEntity<ConferenceResponseDTO> updateConference(@Valid @PathVariable Integer id, @RequestBody ConferenceDTO dto) {
         return ResponseEntity.ok(conferenceService.updateConference(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Delete a conference")
     public ResponseEntity<Void> deleteConference(@PathVariable Integer id) {
         conferenceService.deleteConference(id);
@@ -68,6 +71,7 @@ public class ConferenceController {
     }
 
     @PutMapping("/{id}/open-submissions")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Open submissions for a conference by setting status to ONGOING")
     public ResponseEntity<ConferenceResponseDTO> openSubmissions(@PathVariable Integer id) {
         ConferenceResponseDTO response = conferenceService.openSubmissions(id);
@@ -75,6 +79,7 @@ public class ConferenceController {
     }
 
     @PutMapping("/{id}/approve-conference")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Approve for a conference by setting status to SCHEDULED")
     public ResponseEntity<ConferenceResponseDTO> approveConference(@PathVariable Integer id) {
         ConferenceResponseDTO response = conferenceService.approveConference(id);
@@ -82,19 +87,21 @@ public class ConferenceController {
     }
 
     @PutMapping("/{id}/complete")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Complete a conference (ONGOING → COMPLETED)")
     public ResponseEntity<ConferenceResponseDTO> completeConference(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceService.completeConference(id));
     }
 
     @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Cancel a conference")
     public ResponseEntity<ConferenceResponseDTO> cancelConference(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceService.cancelConference(id));
     }
 
     @GetMapping("/{id}/stats")
-    @PreAuthorize("hasRole('CHAIR')")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Get aggregate statistics for a conference")
     public ResponseEntity<ConferenceStatsDTO> getConferenceStats(@PathVariable Integer id) {
         return ResponseEntity.ok(conferenceService.getConferenceStats(id));
@@ -112,7 +119,7 @@ public class ConferenceController {
     }
 
     @PutMapping("/{id}/program")
-    @PreAuthorize("hasRole('CHAIR')")
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Save conference schedule JSON blob")
     public ResponseEntity<Void> updateProgramSchedule(@PathVariable("id") Integer id, @RequestBody JsonNode programSchedule) {
         conferenceService.updateProgramSchedule(id, programSchedule.toString());
@@ -120,6 +127,7 @@ public class ConferenceController {
     }
 
     @PostMapping(value = "/{id}/upload-banner", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
     @Operation(summary = "Upload a banner image for the conference")
     public ResponseEntity<Map<String, String>> uploadBannerImage(
             @PathVariable Integer id,

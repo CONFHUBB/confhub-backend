@@ -200,8 +200,8 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         // Đếm existing assignments
         List<Review> existingReviews = reviewRepository.findByPaper_Track_Conference_Id(conferenceId);
         for (Review review : existingReviews) {
-            paperAssignCount.merge(review.getPaper().getId(), 1, Integer::sum);
-            reviewerAssignCount.merge(review.getReviewer().getId(), 1, Integer::sum);
+            paperAssignCount.merge(review.getPaper().getId(), 1, (a, b) -> a + b);
+            reviewerAssignCount.merge(review.getReviewer().getId(), 1, (a, b) -> a + b);
         }
 
         List<AssignmentPreviewItemDTO> selectedAssignments = new ArrayList<>();
@@ -231,8 +231,8 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
             }
 
             selectedAssignments.add(candidate);
-            paperAssignCount.merge(candidate.getPaperId(), 1, Integer::sum);
-            reviewerAssignCount.merge(candidate.getReviewerId(), 1, Integer::sum);
+            paperAssignCount.merge(candidate.getPaperId(), 1, (a, b) -> a + b);
+            reviewerAssignCount.merge(candidate.getReviewerId(), 1, (a, b) -> a + b);
         }
 
         // 6. Build preview
@@ -419,8 +419,8 @@ public class ReviewerAssignmentServiceImpl implements ReviewerAssignmentService 
         Map<Integer, Integer> reviewersPerPaper = new HashMap<>();
         Map<Integer, Integer> papersPerReviewer = new HashMap<>();
         for (Review review : reviews) {
-            reviewersPerPaper.merge(review.getPaper().getId(), 1, Integer::sum);
-            papersPerReviewer.merge(review.getReviewer().getId(), 1, Integer::sum);
+            reviewersPerPaper.merge(review.getPaper().getId(), 1, (a, b) -> a + b);
+            papersPerReviewer.merge(review.getReviewer().getId(), 1, (a, b) -> a + b);
         }
 
         List<ConferenceUserTrack> reviewerTracks = conferenceUserTrackRepository

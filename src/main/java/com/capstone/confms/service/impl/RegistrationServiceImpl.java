@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.dto.request.RegistrationRequest;
 import com.capstone.confms.dto.response.CheckInResponse;
+import com.capstone.confms.dto.response.PagedResponse;
 import com.capstone.confms.dto.response.RegistrationResponse;
 import com.capstone.confms.dto.response.TicketResponse;
 import com.capstone.confms.entity.*;
@@ -14,6 +15,8 @@ import com.capstone.confms.service.RegistrationService;
 import com.capstone.confms.utils.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -176,6 +179,41 @@ public class RegistrationServiceImpl implements RegistrationService {
         return ticketRepository.findByConferenceId(conferenceId).stream()
                 .map(this::mapToTicketResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PagedResponse<TicketResponse> getAttendeesPageable(
+            Integer conferenceId, int page, int size, String search, String status) {
+
+        // Parse optional payment status filter
+        PaymentStatus paymentStatus = null;
+        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("ALL")) {
+            try {
+                paymentStatus = PaymentStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid payment status value: " + status);
+            }
+        }
+
+        // Normalize search: pass null if blank so JPQL skips the filter
+        String searchTerm = (search == null || search.isBlank()) ? null : search.trim();
+
+        Page<Ticket> resultPage = ticketRepository.findAttendees(
+                conferenceId, paymentStatus, searchTerm, PageRequest.of(page, size));
+
+        List<TicketResponse> content = resultPage.getContent().stream()
+                .map(this::mapToTicketResponse)
+                .collect(Collectors.toList());
+
+        return PagedResponse.<TicketResponse>builder()
+                .content(content)
+                .page(resultPage.getNumber())
+                .size(resultPage.getSize())
+                .totalElements(resultPage.getTotalElements())
+                .totalPages(resultPage.getTotalPages())
+                .last(resultPage.isLast())
+                .build();
     }
 
     @Override

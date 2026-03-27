@@ -2,6 +2,7 @@ package com.capstone.confms.service.impl;
 
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
+import com.capstone.confms.repository.PaperAuthorRepository;
 import com.capstone.confms.service.EmailService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -33,11 +34,14 @@ class EmailServiceImplTest {
     @Mock
     private ConferenceRepository conferenceRepository;
 
+    @Mock
+    private PaperAuthorRepository paperAuthorRepository;
+
     private EmailService emailService;
 
     @BeforeEach
     void setUp() {
-        emailService = new EmailService(emailSender, templateEngine, conferenceUserTrackRepository, conferenceRepository);
+        emailService = new EmailService(emailSender, templateEngine, conferenceUserTrackRepository, conferenceRepository, paperAuthorRepository);
         ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@example.com");
     }
 

@@ -79,7 +79,7 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ConferenceActivityDTO> getActivitiesByConferenceId(Integer conferenceId) {
         if (!conferenceRepository.existsById(conferenceId)) {
             throw new EntityNotFoundException("Conference not found with ID: " + conferenceId);

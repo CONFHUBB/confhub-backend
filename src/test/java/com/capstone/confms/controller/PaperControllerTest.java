@@ -1,6 +1,9 @@
 package com.capstone.confms.controller;
 
 import com.capstone.confms.dto.PaperDTO;
+import com.capstone.confms.repository.ConferenceRepository;
+import com.capstone.confms.repository.PaperRepository;
+import com.capstone.confms.service.EmailService;
 import com.capstone.confms.service.PaperService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,12 +22,18 @@ class PaperControllerTest {
 
     @Mock
     private PaperService paperService;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private PaperRepository paperRepository;
+    @Mock
+    private ConferenceRepository conferenceRepository;
 
     private PaperController paperController;
 
     @BeforeEach
     void setUp() {
-        paperController = new PaperController(paperService);
+        paperController = new PaperController(paperService, emailService, paperRepository, conferenceRepository);
     }
 
     @Test

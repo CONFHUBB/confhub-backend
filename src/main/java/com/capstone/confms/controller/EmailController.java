@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 
 @RestController
@@ -101,16 +103,16 @@ public class EmailController {
             if (cut != null && cut.getUser() != null && Boolean.FALSE.equals(cut.getUser().getIsActive())) {
                 String email = cut.getUser().getEmail();
                 return ResponseEntity.status(302)
-                        .location(URI.create(frontendUrl + "/auth/activate?email=" + email + "&token=" + token))
+                        .location(URI.create(frontendUrl + "/auth/activate?email=" + URLEncoder.encode(email, StandardCharsets.UTF_8) + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)))
                         .build();
             }
 
             return ResponseEntity.status(302)
-                    .location(URI.create(frontendUrl + "/invitation/accepted?token=" + token))
+                    .location(URI.create(frontendUrl + "/invitation/accepted?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)))
                     .build();
         } catch (Exception e) {
             return ResponseEntity.status(302)
-                    .location(URI.create(frontendUrl + "/invitation/error?message=" + e.getMessage()))
+                    .location(URI.create(frontendUrl + "/invitation/error?message=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8)))
                     .build();
         }
     }
@@ -122,11 +124,11 @@ public class EmailController {
         try {
             conferenceUserTrackService.declineByToken(token);
             return ResponseEntity.status(302)
-                    .location(URI.create(frontendUrl + "/invitation/declined?token=" + token))
+                    .location(URI.create(frontendUrl + "/invitation/declined?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)))
                     .build();
         } catch (Exception e) {
             return ResponseEntity.status(302)
-                    .location(URI.create(frontendUrl + "/invitation/error?message=" + e.getMessage()))
+                    .location(URI.create(frontendUrl + "/invitation/error?message=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8)))
                     .build();
         }
     }

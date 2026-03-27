@@ -62,6 +62,14 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ProblemDetail handleForbiddenException(ForbiddenException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problemDetail.setTitle("Forbidden");
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access Denied: You do not have permission to perform this action.");

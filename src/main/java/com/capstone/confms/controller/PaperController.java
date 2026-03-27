@@ -79,7 +79,7 @@ public class PaperController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Delete a Paper")
     public ResponseEntity<Void> deletePaper(@PathVariable Integer id) {
         paperService.deletePaper(id);
@@ -93,7 +93,7 @@ public class PaperController {
     }
 
     @PutMapping("/{id}/restore")
-    @PreAuthorize("hasAnyRole('CHAIR', 'ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Restore a withdrawn paper (BR-2.15, Chair only)")
     public ResponseEntity<PaperResponseDTO> restorePaper(@PathVariable Integer id) {
         return ResponseEntity.ok(paperService.restorePaper(id));

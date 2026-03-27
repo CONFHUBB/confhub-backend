@@ -24,6 +24,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.capstone.confms.exception.ForbiddenException;
+import com.capstone.confms.utils.enums.ConferenceTrackRole;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -151,6 +154,8 @@ public class ConferenceServiceImplTest {
                 .build();
         conference.setStatus(ConferenceStatus.PENDING);
 
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
         when(conferenceRepository.findById(10)).thenReturn(Optional.of(conference));
         when(conferenceRepository.save(any(Conference.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -162,6 +167,8 @@ public class ConferenceServiceImplTest {
 
     @Test
     void deleteConferenceShouldDelete() {
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
         when(conferenceRepository.existsById(10)).thenReturn(true);
 
         conferenceService.deleteConference(10);
@@ -181,6 +188,8 @@ public class ConferenceServiceImplTest {
         when(conferenceUserTrackRepository.findByConference_Id(10)).thenReturn(List.of(member));
         when(userRepository.findById(1)).thenReturn(Optional.of(user));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
 
         var result = conferenceService.openSubmissions(10);
 
@@ -199,6 +208,7 @@ public class ConferenceServiceImplTest {
         when(conferenceUserTrackRepository.findByConference_Id(10)).thenReturn(List.of(member));
         when(userRepository.findById(1)).thenReturn(Optional.of(user));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // approveConference does NOT call requireChairOf — it's ADMIN-only via @PreAuthorize
 
         var result = conferenceService.approveConference(10);
 
@@ -218,6 +228,8 @@ public class ConferenceServiceImplTest {
         when(conferenceUserTrackRepository.findByConference_Id(10)).thenReturn(List.of(member));
         when(userRepository.findById(1)).thenReturn(Optional.of(user));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
 
         var result = conferenceService.completeConference(10);
 
@@ -237,11 +249,37 @@ public class ConferenceServiceImplTest {
         when(conferenceUserTrackRepository.findByConference_Id(10)).thenReturn(List.of(member));
         when(userRepository.findById(1)).thenReturn(Optional.of(user));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
 
         var result = conferenceService.cancelConference(10);
 
         assertNotNull(result);
         assertEquals(ConferenceStatus.CANCELLED, result.getStatus());
+    }
+
+    @Test
+    void updateConferenceShouldThrowForbiddenWhenNotChair() {
+        ConferenceDTO dto = ConferenceDTO.builder()
+                .name("Unauthorized Update")
+                .acronym("UU")
+                .location("HN")
+                .startDate(java.time.LocalDateTime.now().plusDays(20))
+                .endDate(java.time.LocalDateTime.now().plusDays(22))
+                .build();
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(false);
+
+        assertThrows(ForbiddenException.class, () -> conferenceService.updateConference(10, dto));
+    }
+
+    @Test
+    void deleteConferenceShouldThrowForbiddenWhenNotChair() {
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                1, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(false);
+
+        assertThrows(ForbiddenException.class, () -> conferenceService.deleteConference(10));
     }
 }
 

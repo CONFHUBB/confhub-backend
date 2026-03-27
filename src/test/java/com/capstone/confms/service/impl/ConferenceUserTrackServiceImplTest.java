@@ -14,18 +14,24 @@ import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.TrackReviewSettingRepository;
 import com.capstone.confms.repository.UserRepository;
 import com.capstone.confms.utils.enums.ConferenceTrackRole;
+import com.capstone.confms.security.services.UserDetailsImpl;
+import com.capstone.confms.exception.ForbiddenException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,6 +103,17 @@ public class ConferenceUserTrackServiceImplTest {
         chairAssignment.setConferenceTrack(track);
         chairAssignment.setAssignedRole(ConferenceTrackRole.CONFERENCE_CHAIR);
         chairAssignment.setIsAccepted(true);
+
+        // Set up SecurityContext: chairUser (id=2) is the authenticated caller
+        var principal = new UserDetailsImpl(2, chairUser.getEmail(), chairUser.getFirstName(),
+                chairUser.getLastName(), null, "password", true, List.of());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of()));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -185,6 +202,8 @@ public class ConferenceUserTrackServiceImplTest {
         when(userRepository.findById(1)).thenReturn(Optional.of(user));
         when(conferenceRepository.findById(10)).thenReturn(Optional.of(conference));
         when(conferenceTrackRepository.findById(20)).thenReturn(Optional.of(track));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                2, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
         when(conferenceUserTrackRepository.save(any(ConferenceUserTrack.class))).thenAnswer(invocation -> {
             ConferenceUserTrack saved = invocation.getArgument(0);
             saved.setId(30);
@@ -256,6 +275,8 @@ public class ConferenceUserTrackServiceImplTest {
     @Test
     void removeRoleFromUserShouldDeleteAssignment() {
         when(conferenceUserTrackRepository.findById(30)).thenReturn(Optional.of(reviewerAssignment));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                2, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
         when(reviewRepository.countByReviewer_IdAndPaper_Track_Conference_Id(1, 10)).thenReturn(0L);
         when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(1, 10)).thenReturn(List.of(reviewerAssignment));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));

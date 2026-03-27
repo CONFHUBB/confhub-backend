@@ -11,6 +11,7 @@ import com.capstone.confms.entity.Conference;
 import com.capstone.confms.entity.ConferenceTrack;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.exception.ForbiddenException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ReviewRepository;
 import com.capstone.confms.repository.NotificationRepository;
@@ -35,8 +36,11 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.capstone.confms.security.services.UserDetailsImpl;
 
 @Service
 @RequiredArgsConstructor
@@ -168,6 +172,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         @Override
         @Transactional
         public ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request) {
+                requireChairOf(request.getConferenceId());
                 User user = userRepository.findById(request.getUserId())
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "User not found with id " + request.getUserId()));
@@ -416,6 +421,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 ConferenceUserTrack cut = conferenceUserTrackRepository.findById(conferenceUserTrackId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "ConferenceUserTrack not found with id " + conferenceUserTrackId));
+                requireChairOf(cut.getConference().getId());
 
                 // Reset token and expiry — invalidates old link
                 cut.setInvitationToken(UUID.randomUUID().toString());
@@ -464,6 +470,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 ConferenceUserTrack cut = conferenceUserTrackRepository.findById(conferenceUserTrackId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "ConferenceUserTrack not found with id " + conferenceUserTrackId));
+                requireChairOf(cut.getConference().getId());
 
                 // BR-1.9a: Không xóa CONFERENCE_CHAIR cuối cùng
                 if (cut.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR) {
@@ -589,6 +596,23 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         case AUTHOR -> "Author";
                         case ATTENDEE -> "Attendee";
                 };
+        }
+
+        private UserDetailsImpl getCurrentUserDetails() {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+                        throw new BadRequestException("No authenticated user found");
+                }
+                return (UserDetailsImpl) authentication.getPrincipal();
+        }
+
+        private void requireChairOf(Integer conferenceId) {
+                UserDetailsImpl u = getCurrentUserDetails();
+                boolean isChair = conferenceUserTrackRepository
+                                .existsByUser_IdAndConference_IdAndAssignedRole(
+                                                u.getId(), conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
+                if (!isChair) throw new ForbiddenException(
+                                "Only the CONFERENCE_CHAIR of this conference can perform this action.");
         }
 
         /**

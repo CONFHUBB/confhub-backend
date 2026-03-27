@@ -30,7 +30,7 @@ public class SessionRatingController {
     private final UserRepository userRepository;
 
     @PostMapping
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Submit or update a rating for a session (1–5 stars)")
     public ResponseEntity<SessionRatingResponse> rateSession(@Valid @RequestBody SessionRatingRequest req) {
         Integer userId = getCurrentUserId();
@@ -81,7 +81,7 @@ public class SessionRatingController {
     }
 
     @GetMapping("/conference/{conferenceId}/my-rating/{sessionId}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get current user's rating for a specific session")
     public ResponseEntity<SessionRatingResponse> getMyRating(
             @PathVariable Integer conferenceId,

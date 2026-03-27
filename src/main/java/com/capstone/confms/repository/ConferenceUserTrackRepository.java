@@ -27,4 +27,7 @@ public interface ConferenceUserTrackRepository extends JpaRepository<ConferenceU
 
     boolean existsByUserAndConferenceAndAssignedRoleAndConferenceTrack(
             User user, Conference conference, ConferenceTrackRole assignedRole, ConferenceTrack conferenceTrack);
-}
+
+    boolean existsByUser_IdAndConference_IdAndAssignedRole(
+            Integer userId, Integer conferenceId, ConferenceTrackRole role);
+}

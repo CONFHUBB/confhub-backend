@@ -9,6 +9,7 @@ import com.capstone.confms.entity.ConferenceUserTrack;
 import com.capstone.confms.entity.Paper;
 import com.capstone.confms.entity.User;
 import com.capstone.confms.exception.BadRequestException;
+import com.capstone.confms.exception.ForbiddenException;
 import com.capstone.confms.exception.ResourceNotFoundException;
 import com.capstone.confms.repository.ConferenceRepository;
 import com.capstone.confms.repository.ConferenceUserTrackRepository;
@@ -108,6 +109,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public ConferenceResponseDTO updateConference(Integer id, ConferenceDTO dto) {
+        requireChairOf(id);
         Conference existing = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
@@ -123,6 +125,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public void deleteConference(Integer id) {
+        requireChairOf(id);
         log.warn("Deleting conference ID: {}", id);
         if (!repository.existsById(id)) {
             throw new ResourceNotFoundException("Cannot delete. Conference not found with id " + id);
@@ -133,6 +136,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public ConferenceResponseDTO openSubmissions(Integer id) {
+        requireChairOf(id);
         log.info("Opening submissions for conference ID: {}", id);
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
@@ -171,6 +175,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public ConferenceResponseDTO completeConference(Integer id) {
+        requireChairOf(id);
         log.info("Completing conference ID: {}", id);
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
@@ -190,6 +195,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional
     public ConferenceResponseDTO cancelConference(Integer id) {
+        requireChairOf(id);
         log.info("Cancelling conference ID: {}", id);
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
@@ -216,6 +222,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     @Override
     public void updateProgramSchedule(Integer conferenceId, String programScheduleJson) {
+        requireChairOrProgramChairOf(conferenceId);
         Conference conf = repository.findById(conferenceId)
             .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
         conf.setProgramSchedule(programScheduleJson);
@@ -225,6 +232,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     @Transactional(readOnly = true)
     public ConferenceStatsDTO getConferenceStats(Integer conferenceId) {
+        requireChairOrProgramChairOf(conferenceId);
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
         int total = papers.size();
         int submitted = (int) papers.stream().filter(p -> !"DRAFT".equals(p.getStatus() != null ? p.getStatus().name() : "")).count();
@@ -266,6 +274,35 @@ public class ConferenceServiceImpl implements ConferenceService {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new BadRequestException("User not found"));
+    }
+
+    private UserDetailsImpl getCurrentUserDetails() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("No authenticated user found");
+        }
+        return (UserDetailsImpl) authentication.getPrincipal();
+    }
+
+    private void requireChairOf(Integer conferenceId) {
+        UserDetailsImpl u = getCurrentUserDetails();
+        boolean isChair = conferenceUserTrackRepository
+                .existsByUser_IdAndConference_IdAndAssignedRole(
+                        u.getId(), conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
+        if (!isChair) throw new ForbiddenException(
+                "Only the CONFERENCE_CHAIR of this conference can perform this action.");
+    }
+
+    private void requireChairOrProgramChairOf(Integer conferenceId) {
+        UserDetailsImpl u = getCurrentUserDetails();
+        boolean ok = conferenceUserTrackRepository
+                .existsByUser_IdAndConference_IdAndAssignedRole(
+                        u.getId(), conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR)
+                || conferenceUserTrackRepository
+                        .existsByUser_IdAndConference_IdAndAssignedRole(
+                                u.getId(), conferenceId, ConferenceTrackRole.PROGRAM_CHAIR);
+        if (!ok) throw new ForbiddenException(
+                "Only CONFERENCE_CHAIR or PROGRAM_CHAIR of this conference can perform this action.");
     }
 
     private void mapDtoToEntity(ConferenceDTO dto, Conference entity) {

@@ -22,7 +22,7 @@ public class DocumentController {
     private final DocumentGenerationService documentGenerationService;
 
     @GetMapping("/papers/{id}/acceptance-letter")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> getAcceptanceLetter(@PathVariable Integer id) {
         Integer userId = getCurrentUserId();
         try {
@@ -34,7 +34,7 @@ public class DocumentController {
     }
 
     @GetMapping("/tickets/{id}/invoice")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> getInvoice(@PathVariable Integer id) {
         Integer userId = getCurrentUserId();
         try {
@@ -46,7 +46,7 @@ public class DocumentController {
     }
 
     @GetMapping("/tickets/{id}/visa-letter")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> getVisaLetter(@PathVariable Integer id) {
         Integer userId = getCurrentUserId();
         try {
@@ -58,7 +58,7 @@ public class DocumentController {
     }
 
     @GetMapping("/tickets/{id}/certificate")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> getCertificate(@PathVariable Integer id) {
         Integer userId = getCurrentUserId();
         try {

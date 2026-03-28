@@ -1,0 +1,39 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy Firebase credentials
+        run: |
+          mkdir -p src/main/resources
+          cp /state/partition1/devops/secrets/firebase-adminsdk.json \
+             src/main/resources/filestorage-71871-firebase-adminsdk-fbsvc-7ba8487811.json
+
+      - name: Build and Deploy via Docker Compose
+        run: |
+          # Dừng container cũ nếu có
+          docker compose down || true
+          
+          # Built một jar và docker hình ảnh mới tinh (không lưu cache mã nguồn)
+          docker compose build --no-cache
+          
+          # Đưa ứng dụng vào chạy ngầm ở port 8080 host
+          docker compose up -d
+
+      - name: Clean up unused docker data
+        run: docker image prune -f
+
+      - name: Health Check
+        run: |
+          echo "Waiting 30 seconds for Spring Boot container to initialize..."
+          sleep 30
+          curl -f http://localhost:8080/actuator/health || exit 1

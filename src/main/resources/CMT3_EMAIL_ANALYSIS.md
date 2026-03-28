@@ -1,4 +1,4 @@
-# PHÂN TÍCH HỆ THỐNG EMAIL CMT3 & SO SÁNH VỚI CONFMS
+# PHÂN TÍCH HỆ THỐNG EMAIL CMT3 & SO SÁNH VỚI CONFHUB
 
 > Nguồn: [CMT3 Documentation](https://cmt3.research.microsoft.com/docs/help/index.html)
 
@@ -254,9 +254,9 @@ Tất cả email (mọi loại) đều được log lại:
 
 ---
 
-## 7. SO SÁNH VỚI CONFMS HIỆN TẠI
+## 7. SO SÁNH VỚI CONFHUB HIỆN TẠI
 
-| Tính năng | CMT3 | confms-backend | Trạng thái |
+| Tính năng | CMT3 | confhub-backend | Trạng thái |
 |---|---|---|---|
 | Gửi email text đơn giản | ✅ | ✅ `EmailService.sendSimpleMessage()` | ✅ |
 | Invitation email HTML | ✅ | ✅ `EmailService.sendInvitationEmail()` | ⚠️ Cơ bản |

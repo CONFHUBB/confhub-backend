@@ -2,7 +2,7 @@
 
 > Tham khảo: [CMT3 Review Settings](https://cmt3.research.microsoft.com/docs/help/chair/review-settings.html),
 > [CMT3 Author Submission](https://cmt3.research.microsoft.com/docs/help/author/author-submission-form.html)  
-> So sánh với: confms-backend hiện tại
+> So sánh với: confhub-backend hiện tại
 
 ---
 

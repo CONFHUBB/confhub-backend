@@ -1,0 +1,43 @@
+package com.capstone.confhub.service;
+
+import com.capstone.confhub.dto.request.AssignConferenceUserTrackRequest;
+import com.capstone.confhub.dto.response.ConferenceResponseDTO;
+import com.capstone.confhub.dto.response.ConferenceUserTrackResponseDTO;
+import com.capstone.confhub.dto.response.PagedResponse;
+import com.capstone.confhub.dto.response.UserResponseDTO;
+import com.capstone.confhub.dto.response.UserWithRolesResponseDTO;
+
+import java.util.List;
+
+public interface ConferenceUserTrackService {
+
+    ConferenceUserTrackResponseDTO assignRoleToUserTrack(AssignConferenceUserTrackRequest request);
+
+    PagedResponse<UserResponseDTO> getTrackChairsByConferenceId(Integer conferenceId, int page, int size);
+
+    PagedResponse<ConferenceResponseDTO> getChairedConferencesByUserId(Integer userId, int page, int size);
+
+    PagedResponse<ConferenceResponseDTO> getOrganizedConferencesByUserId(Integer userId, int page, int size);
+
+    PagedResponse<ConferenceResponseDTO> getReviewerConferencesByUserId(Integer userId, int page, int size);
+
+    List<ConferenceUserTrackResponseDTO> getUserRoleAssignments(Integer userId);
+
+    ConferenceUserTrackResponseDTO acceptInvitation(Integer userId, Integer conferenceId, Integer reviewerQuota);
+
+    ConferenceUserTrackResponseDTO declineInvitation(Integer userId, Integer conferenceId);
+
+    ConferenceUserTrackResponseDTO acceptByToken(String token, Integer reviewerQuota);
+
+    ConferenceUserTrackResponseDTO declineByToken(String token);
+
+    ConferenceUserTrackResponseDTO resendInvitation(Integer conferenceUserTrackId);
+
+    PagedResponse<UserWithRolesResponseDTO> getConferenceUsersWithRoles(Integer conferenceId, int page, int size);
+
+    void removeRoleFromUser(Integer conferenceUserTrackId);
+
+    ConferenceUserTrackResponseDTO updateReviewerQuota(Integer userId, Integer conferenceId, Integer reviewerQuota);
+
+    Integer getReviewerQuota(Integer userId, Integer conferenceId);
+}

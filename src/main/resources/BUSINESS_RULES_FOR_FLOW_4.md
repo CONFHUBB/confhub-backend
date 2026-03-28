@@ -3,11 +3,11 @@
 > Tham khảo: [CMT3 Meta-Review](https://cmt3.research.microsoft.com/docs/help/chair/chairtasks-metareview.html),
 > [CMT3 Author Notification](https://cmt3.research.microsoft.com/docs/help/chair/author-notification.html),
 > [CMT3 Camera-Ready](https://cmt3.research.microsoft.com/docs/help/chair/camera-ready.html)  
-> So sánh với: confms-backend hiện tại
+> So sánh với: confhub-backend hiện tại
 
 > [!IMPORTANT]
-> **ConfMS KHÔNG có role Meta-Reviewer riêng.** Program Chair / Conference Chair trực tiếp thực hiện meta-review.
-> Trong CMT3, meta-reviewer (Area Chair) là role riêng — ConfMS đơn giản hóa bằng cách gộp vào Program Chair.
+> **ConfHub KHÔNG có role Meta-Reviewer riêng.** Program Chair / Conference Chair trực tiếp thực hiện meta-review.
+> Trong CMT3, meta-reviewer (Area Chair) là role riêng — ConfHub đơn giản hóa bằng cách gộp vào Program Chair.
 
 ---
 

@@ -1,7 +1,7 @@
 # FLOW 3 IMPLEMENTATION PLAN: Reviewer Bid Bài / Review Bài
 
 > Kế hoạch thực thi toàn bộ Flow 3 dựa trên `BUSINESS_RULES_FOR_FLOW_3.md` (BR-3.1 → BR-3.53)
-> So sánh với code hiện tại trong `confms-backend` và `confms-frontend`
+> So sánh với code hiện tại trong `confhub-backend` và `confhub-frontend`
 
 ---
 

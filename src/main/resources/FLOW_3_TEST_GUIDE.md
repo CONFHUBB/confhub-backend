@@ -9,14 +9,14 @@
 
 ### Chạy Backend
 ```bash
-cd d:\Coding\confms-backendx
+cd d:\Coding\confhub-backendx
 ./mvnw spring-boot:run
 ```
 Backend chạy tại: `http://localhost:8080`
 
 ### Chạy Frontend
 ```bash
-cd D:\Coding\confms-frontend
+cd D:\Coding\confhub-frontend
 npm run dev
 ```
 Frontend chạy tại: `http://localhost:3000`

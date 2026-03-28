@@ -1,0 +1,8 @@
+package com.capstone.confhub.utils.enums;
+
+public enum PaymentStatus {
+    PENDING,
+    COMPLETED,
+    FAILED,
+    REFUNDED
+}

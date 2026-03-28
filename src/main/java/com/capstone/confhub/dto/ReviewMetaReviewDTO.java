@@ -1,0 +1,18 @@
+package com.capstone.confhub.dto;
+
+import com.capstone.confhub.utils.enums.Decision;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+
+@Data
+@Builder
+@RequiredArgsConstructor
+@AllArgsConstructor
+public class ReviewMetaReviewDTO {
+    private Integer paperId;
+    private Integer userId;
+    private Decision finalDecision;
+    private String reason;
+}

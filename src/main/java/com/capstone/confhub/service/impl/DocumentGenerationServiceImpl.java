@@ -1,0 +1,187 @@
+package com.capstone.confhub.service.impl;
+
+import com.capstone.confhub.entity.Conference;
+import com.capstone.confhub.entity.Paper;
+import com.capstone.confhub.entity.Ticket;
+import com.capstone.confhub.entity.User;
+import com.capstone.confhub.repository.PaperAuthorRepository;
+import com.capstone.confhub.repository.PaperRepository;
+import com.capstone.confhub.repository.TicketRepository;
+import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.service.DocumentGenerationService;
+import com.capstone.confhub.utils.enums.PaperStatus;
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.PdfWriter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+@Service
+@RequiredArgsConstructor
+public class DocumentGenerationServiceImpl implements DocumentGenerationService {
+
+    private final PaperRepository paperRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
+    private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    public byte[] generateAcceptanceLetter(Integer paperId, Integer userId) {
+        Paper paper = paperRepository.findById(paperId).orElseThrow(() -> new RuntimeException("Paper not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Guard: paper must be ACCEPTED or PUBLISHED
+        if (paper.getStatus() != PaperStatus.ACCEPTED && paper.getStatus() != PaperStatus.PUBLISHED) {
+            throw new RuntimeException("Acceptance letter is only available for accepted papers");
+        }
+        // Guard: requesting user must be an author of this paper
+        if (!paperAuthorRepository.existsByPaperIdAndUserId(paperId, userId)) {
+            throw new com.capstone.confhub.exception.ForbiddenException("Access denied: you are not listed as an author of this paper");
+        }
+
+        Conference conference = paper.getTrack().getConference();
+
+        return createPdfStream(document -> {
+            addHeader(document, conference);
+            addCurrentDate(document);
+            addGreeting(document, user);
+
+            Paragraph content = new Paragraph(
+                    String.format("We are pleased to inform you that your paper titled \"%s\" has been ACCEPTED for presentation at %s.",
+                            paper.getTitle(), conference.getName()),
+                    FontFactory.getFont(FontFactory.HELVETICA, 12));
+            content.setSpacingBefore(20f);
+            document.add(content);
+
+            Paragraph p2 = new Paragraph(
+                    "Please proceed to complete your registration and submit your camera-ready version according to the conference deadlines.",
+                    FontFactory.getFont(FontFactory.HELVETICA, 12));
+            p2.setSpacingBefore(10f);
+            document.add(p2);
+
+            addSignature(document, conference);
+        });
+    }
+
+    @Override
+    public byte[] generateInvoice(Integer ticketId, Integer userId) {
+        Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new RuntimeException("Ticket not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!ticket.getUser().getId().equals(userId)) {
+            throw new com.capstone.confhub.exception.ForbiddenException("Access denied: you are not the owner of this ticket");
+        }
+
+        Conference conference = ticket.getTicketType().getConference();
+
+        return createPdfStream(document -> {
+            addHeader(document, conference);
+            addCurrentDate(document);
+            
+            Paragraph title = new Paragraph("INVOICE / RECEIPT", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18));
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingBefore(20f);
+            title.setSpacingAfter(20f);
+            document.add(title);
+
+            document.add(new Paragraph("Billed To: " + user.getFirstName() + " " + user.getLastName()));
+            document.add(new Paragraph("Email: " + user.getEmail()));
+            
+            document.add(new Paragraph("\nPayment Details:"));
+            document.add(new Paragraph("Ticket Type: " + ticket.getTicketType().getName()));
+            document.add(new Paragraph(String.format("Amount Paid: %,.0f %s", ticket.getTicketType().getPrice(), ticket.getTicketType().getCurrency())));
+            document.add(new Paragraph("Registration Number: " + ticket.getRegistrationNumber()));
+            
+            String payDateStr = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+            document.add(new Paragraph("Date of Payment: " + payDateStr));
+            
+            Paragraph p2 = new Paragraph("\nThank you for your payment.");
+            document.add(p2);
+        });
+    }
+
+    @Override
+    public byte[] generateCertificate(Integer ticketId, Integer userId) {
+        Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new RuntimeException("Ticket not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!ticket.getUser().getId().equals(userId)) {
+            throw new com.capstone.confhub.exception.ForbiddenException("Access denied: you are not the owner of this ticket");
+        }
+
+        Conference conference = ticket.getTicketType().getConference();
+
+        return createPdfStream(document -> {
+            Paragraph title = new Paragraph("CERTIFICATE OF ATTENDANCE", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 24));
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingBefore(80f);
+            title.setSpacingAfter(40f);
+            document.add(title);
+
+            Paragraph content = new Paragraph(
+                    String.format("This is to certify that\n\n%s %s\n\nsuccessfully attended the\n\n%s\n\nheld at %s.",
+                            user.getFirstName(), user.getLastName(), conference.getName(), conference.getLocation()),
+                    FontFactory.getFont(FontFactory.HELVETICA, 16));
+            content.setAlignment(Element.ALIGN_CENTER);
+            document.add(content);
+
+            addSignature(document, conference);
+        });
+    }
+
+    private byte[] createPdfStream(PdfContentGenerator generator) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4, 50, 50, 50, 50);
+            PdfWriter.getInstance(document, baos);
+            document.open();
+            generator.generate(document);
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate PDF document", e);
+        }
+    }
+
+    private void addHeader(Document document, Conference conference) throws DocumentException {
+        Paragraph header = new Paragraph(conference.getName(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16));
+        header.setAlignment(Element.ALIGN_CENTER);
+        document.add(header);
+        
+        if (conference.getWebsiteUrl() != null) {
+            Paragraph website = new Paragraph(conference.getWebsiteUrl(), FontFactory.getFont(FontFactory.HELVETICA, 10));
+            website.setAlignment(Element.ALIGN_CENTER);
+            document.add(website);
+        }
+        document.add(new Paragraph("\n"));
+    }
+
+    private void addCurrentDate(Document document) throws DocumentException {
+        Paragraph date = new Paragraph("Date: " + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE), 
+                FontFactory.getFont(FontFactory.HELVETICA, 12));
+        date.setAlignment(Element.ALIGN_RIGHT);
+        document.add(date);
+    }
+
+    private void addGreeting(Document document, User user) throws DocumentException {
+        Paragraph greeting = new Paragraph(String.format("Dear %s %s,", user.getFirstName(), user.getLastName()), 
+                FontFactory.getFont(FontFactory.HELVETICA, 12));
+        greeting.setSpacingBefore(20f);
+        document.add(greeting);
+    }
+
+    private void addSignature(Document document, Conference conference) throws DocumentException {
+        Paragraph signature = new Paragraph("\n\nSincerely,\n\nOrganizing Committee\n" + conference.getName(), 
+                FontFactory.getFont(FontFactory.HELVETICA, 12));
+        signature.setAlignment(Element.ALIGN_RIGHT);
+        signature.setSpacingBefore(40f);
+        document.add(signature);
+    }
+
+    @FunctionalInterface
+    private interface PdfContentGenerator {
+        void generate(Document document) throws Exception;
+    }
+}

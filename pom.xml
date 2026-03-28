@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.capstone</groupId>
-	<artifactId>confms</artifactId>
+	<artifactId>confhub</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>confms</name>
-	<description>CONFMS project for capstone</description>
+	<name>confhub</name>
+	<description>CONFHUB project for capstone</description>
 	<url/>
 	<licenses>
 		<license/>

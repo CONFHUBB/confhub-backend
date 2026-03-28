@@ -1,7 +1,7 @@
 # 📋 MVP Functional Requirements — Checklist
 
 > **Cập nhật:** 2026-03-27  
-> **Dự án:** ConfMS — Conference Management System  
+> **Dự án:** ConfHub — Conference Management System  
 > **Nguồn gốc:** Đề cương đăng ký đồ án  
 > **Legend:**  
 > ✅ = Đã implement (BE + FE)  

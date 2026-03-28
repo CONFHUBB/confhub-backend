@@ -1,7 +1,7 @@
 # BUSINESS RULES FOR FLOW 1: Tạo & Config Conference / Mời Members
 
 > Tham khảo: [CMT3 Docs](https://cmt3.research.microsoft.com/docs/help/index.html)  
-> So sánh với: confms-backend hiện tại
+> So sánh với: confhub-backend hiện tại
 
 ---
 

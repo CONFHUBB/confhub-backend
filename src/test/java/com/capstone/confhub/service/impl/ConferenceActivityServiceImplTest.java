@@ -8,9 +8,11 @@ import com.capstone.confhub.entity.SubjectArea;
 import com.capstone.confhub.repository.ConferenceActivityRepository;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
+import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.repository.PaperRepository;
 import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
+import com.capstone.confhub.repository.ActivityAuditLogRepository;
 import com.capstone.confhub.utils.enums.ActivityType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,12 @@ public class ConferenceActivityServiceImplTest {
     private PaperRepository paperRepository;
     @Mock
     private ReviewRepository reviewRepository;
+    @Mock
+    private ConferenceUserTrackRepository conferenceUserTrackRepository;
+    @Mock
+    private ActivityAuditLogRepository auditLogRepository;
+    @Mock
+    private ActivityNotificationSender notificationSender;
 
     @InjectMocks
     private ConferenceActivityServiceImpl conferenceActivityService;
@@ -57,7 +65,7 @@ public class ConferenceActivityServiceImplTest {
     void setUp() {
         conference = new Conference();
         conference.setId(1);
-        conference.setName("ConfHub 2025");
+        conference.setName("ConfMS 2025");
 
         track = new ConferenceTrack();
         track.setId(10);
@@ -89,6 +97,7 @@ public class ConferenceActivityServiceImplTest {
     @Test
     void getActivitiesByConferenceIdShouldReturnResponses() {
         when(conferenceRepository.existsById(1)).thenReturn(true);
+        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
         when(conferenceActivityRepository.findByConferenceId(1)).thenReturn(List.of(activity));
 
         var result = conferenceActivityService.getActivitiesByConferenceId(1);
@@ -110,7 +119,7 @@ public class ConferenceActivityServiceImplTest {
         subjectArea.setId(30);
         subjectArea.setTrack(track);
 
-        when(conferenceRepository.existsById(1)).thenReturn(true);
+        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
         when(conferenceActivityRepository.findByConferenceId(1)).thenReturn(List.of(activity));
         when(conferenceTrackRepository.findByConferenceId(1)).thenReturn(List.of(track));
         when(subjectAreaRepository.findByTrackId(10)).thenReturn(List.of(subjectArea));

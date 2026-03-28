@@ -20,7 +20,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,6 +90,14 @@ class NotificationServiceImplTest {
         assertEquals(10, result.getId());
         assertEquals(1, result.getUserId());
         assertEquals(2, result.getConferenceId());
+        assertEquals("Conf", result.getConferenceName());
+        assertEquals("TYPE", result.getType());
+        assertEquals("/link", result.getLink());
+        assertFalse(result.getIsRead());
+
+        verify(userRepository).findById(1);
+        verify(conferenceRepository).findById(2);
+        verify(notificationRepository).save(any(Notification.class));
     }
 
     @Test
@@ -100,6 +110,21 @@ class NotificationServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
         assertEquals(0, result.getPage());
+        assertEquals(20, result.getSize());
+        assertEquals(1L, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+        assertTrue(result.isLast());
+
+        var item = result.getContent().get(0);
+        assertEquals(10, item.getId());
+        assertEquals(1, item.getUserId());
+        assertEquals(2, item.getConferenceId());
+        assertEquals("Conf", item.getConferenceName());
+        assertEquals("Title", item.getTitle());
+        assertEquals("Message", item.getMessage());
+        assertEquals("TYPE", item.getType());
+        assertEquals("/link", item.getLink());
+        assertFalse(item.getIsRead());
     }
 
     @Test
@@ -109,6 +134,7 @@ class NotificationServiceImplTest {
         long count = notificationService.getUnreadCount(1);
 
         assertEquals(5L, count);
+        verify(notificationRepository).countByUser_IdAndIsReadFalse(1);
     }
 
     @Test
@@ -119,7 +145,12 @@ class NotificationServiceImplTest {
         var result = notificationService.markAsRead(10);
 
         assertNotNull(result);
-        assertEquals(true, result.getIsRead());
+        assertTrue(result.getIsRead());
+        assertEquals(10, result.getId());
+        assertEquals(1, result.getUserId());
+        assertEquals(2, result.getConferenceId());
+        verify(notificationRepository).findById(10);
+        verify(notificationRepository).save(any(Notification.class));
     }
 
     @Test
@@ -130,7 +161,9 @@ class NotificationServiceImplTest {
 
         notificationService.markAllAsRead(1);
 
-        verify(notificationRepository).saveAll(any(List.class));
+        assertTrue(unread1.getIsRead());
+        assertTrue(unread2.getIsRead());
+        verify(notificationRepository).saveAll(List.of(unread1, unread2));
     }
 
     @Test
@@ -139,6 +172,7 @@ class NotificationServiceImplTest {
 
         notificationService.deleteNotification(10);
 
+        verify(notificationRepository).existsById(10);
         verify(notificationRepository).deleteById(10);
     }
 }

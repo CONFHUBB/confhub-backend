@@ -80,8 +80,8 @@ public class UserProfile extends BaseEntity {
     @Column(name = "google_scholar_link")
     private String googleScholarLink;
 
-    @Column(name = "orcid_id")
-    private String orcidId;
+    @Column(name = "orcid")
+    private String orcid;
 
     @Column(name = "semantic_scholar_id")
     private String semanticScholarId;

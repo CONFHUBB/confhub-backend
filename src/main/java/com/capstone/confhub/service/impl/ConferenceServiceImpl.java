@@ -25,8 +25,13 @@ import com.capstone.confhub.utils.PaginationUtils;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 import com.capstone.confhub.entity.Notification;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -224,10 +229,77 @@ public class ConferenceServiceImpl implements ConferenceService {
     @Override
     public void updateProgramSchedule(Integer conferenceId, String programScheduleJson) {
         requireChairOrProgramChairOf(conferenceId);
+
+        // Parse and validate schedule for overlaps
+        if (programScheduleJson != null && !programScheduleJson.isBlank()) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode root = mapper.readTree(programScheduleJson);
+                JsonNode days = root.path("schedule").path("days");
+                if (days.isArray()) {
+                    for (JsonNode day : days) {
+                        String date = day.path("date").asText();
+                        JsonNode sessions = day.path("sessions");
+                        if (sessions.isArray()) {
+                            List<JsonNode> sessionNodes = new ArrayList<>();
+                            sessions.forEach(sessionNodes::add);
+
+                            Map<String, List<JsonNode>> locSessions = new HashMap<>();
+                            List<JsonNode> globalSessions = new ArrayList<>();
+
+                            for (JsonNode s : sessionNodes) {
+                                if (s.path("isGlobal").asBoolean()) {
+                                    globalSessions.add(s);
+                                } else {
+                                    String locId = s.path("locationId").asText();
+                                    locSessions.computeIfAbsent(locId, k -> new ArrayList<>()).add(s);
+                                }
+                            }
+
+                            // Check global overlaps
+                            checkOverlap(globalSessions, date);
+                            // Combine global + local and check overlaps per location
+                            for (Map.Entry<String, List<JsonNode>> entry : locSessions.entrySet()) {
+                                List<JsonNode> combined = new ArrayList<>(entry.getValue());
+                                combined.addAll(globalSessions);
+                                checkOverlap(combined, date);
+                            }
+                        }
+                    }
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new BadRequestException("Invalid program schedule JSON format.");
+            }
+        }
+
         Conference conf = repository.findById(conferenceId)
             .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
         conf.setProgramSchedule(programScheduleJson);
         repository.save(conf);
+    }
+
+    private void checkOverlap(List<JsonNode> sessions, String date) {
+        if (sessions.size() < 2) return;
+        
+        sessions.sort((s1, s2) -> {
+            String t1 = s1.path("startTime").asText();
+            String t2 = s2.path("startTime").asText();
+            return t1.compareTo(t2);
+        });
+
+        for (int i = 0; i < sessions.size() - 1; i++) {
+            JsonNode current = sessions.get(i);
+            JsonNode next = sessions.get(i + 1);
+            
+            String currentEnd = current.path("endTime").asText();
+            String nextStart = next.path("startTime").asText();
+            
+            if (currentEnd.compareTo(nextStart) > 0) {
+                String title1 = current.path("title").asText();
+                String title2 = next.path("title").asText();
+                throw new BadRequestException("Time overlap detected on " + date + " between '" + title1 + "' and '" + title2 + "'. Please adjust the schedule.");
+            }
+        }
     }
 
     @Override
@@ -311,7 +383,9 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setLocation(dto.getLocation());
         entity.setStartDate(dto.getStartDate());
         entity.setEndDate(dto.getEndDate());
-        entity.setCreatedAt(LocalDateTime.now());
+        if (entity.getId() == null) {
+            entity.setCreatedAt(LocalDateTime.now());
+        }
         entity.setWebsiteUrl(dto.getWebsiteUrl());
         entity.setArea(dto.getArea());
         entity.setSocietySponsor(dto.getSocietySponsor());

@@ -93,8 +93,8 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getGoogleScholarLink() != null) {
             entity.setGoogleScholarLink(request.getGoogleScholarLink());
         }
-        if (request.getOrcidId() != null) {
-            entity.setOrcidId(request.getOrcidId());
+        if (request.getOrcid() != null) {
+            entity.setOrcid(request.getOrcid());
         }
         if (request.getSemanticScholarId() != null) {
             entity.setSemanticScholarId(request.getSemanticScholarId());
@@ -120,7 +120,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .websiteUrl(entity.getWebsiteUrl())
                 .dblpId(entity.getDblpId())
                 .googleScholarLink(entity.getGoogleScholarLink())
-                .orcidId(entity.getOrcidId())
+                .orcid(entity.getOrcid())
                 .semanticScholarId(entity.getSemanticScholarId())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())

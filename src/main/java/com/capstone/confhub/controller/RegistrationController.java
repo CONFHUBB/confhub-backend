@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -81,5 +82,15 @@ public class RegistrationController {
             HttpServletRequest httpRequest) {
         String clientIp = VnPayUtil.getIpAddress(httpRequest);
         return ResponseEntity.ok(registrationService.retryPayment(conferenceId, userId, clientIp));
+    }
+
+    @PostMapping("/conferences/{conferenceId}/refund")
+    @PreAuthorize("@conferenceSecurity.hasRole(#conferenceId, T(com.capstone.confhub.utils.enums.ConferenceRole).CHAIR)")
+    @Operation(summary = "Refund a returned ticket (Chair only)")
+    public ResponseEntity<Void> refundTicket(
+            @PathVariable Integer conferenceId,
+            @RequestParam Integer ticketId) {
+        registrationService.refundTicket(conferenceId, ticketId);
+        return ResponseEntity.ok().build();
     }
 }

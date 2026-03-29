@@ -35,7 +35,7 @@ public class UserProfileResponseDTO {
     private String websiteUrl;
     private String dblpId;
     private String googleScholarLink;
-    private String orcidId;
+    private String orcid;
     private String semanticScholarId;
 
     private LocalDateTime createdAt;

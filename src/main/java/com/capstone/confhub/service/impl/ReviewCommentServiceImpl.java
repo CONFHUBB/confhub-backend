@@ -19,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
+import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 
 @Service
 @Slf4j
@@ -30,6 +33,8 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
     private final ReviewRepository reviewRepository;
     private final PaperRepository paperRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,7 +57,57 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
             }
         }
 
-        return mapToResponseDTO(reviewCommentRepository.save(entity));
+        ReviewComment saved = reviewCommentRepository.save(entity);
+
+        // --- Notification Logic for Discussions ---
+        if (Boolean.TRUE.equals(dto.getIsDiscussionPost()) && entity.getPaper() != null && entity.getUser() != null) {
+            try {
+                Paper paper = entity.getPaper();
+                Conference conference = paper.getTrack().getConference();
+                String senderName = entity.getUser().getFirstName() + " " + entity.getUser().getLastName();
+                
+                Set<User> usersToNotify = new HashSet<>();
+
+                // Notify all reviewers assigned to this paper (except the sender)
+                List<Review> paperReviews = reviewRepository.findByPaper_Id(paper.getId());
+                for (Review r : paperReviews) {
+                    if (r.getReviewer() != null && !r.getReviewer().getId().equals(entity.getUser().getId())) {
+                        usersToNotify.add(r.getReviewer());
+                    }
+                }
+
+                // Notify Program Chairs and Conference Chairs
+                List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.CONFERENCE_CHAIR);
+                List<ConferenceUserTrack> pChairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.PROGRAM_CHAIR);
+                chairs.forEach(c -> { if (!c.getUser().getId().equals(entity.getUser().getId())) usersToNotify.add(c.getUser()); });
+                pChairs.forEach(c -> { if (!c.getUser().getId().equals(entity.getUser().getId())) usersToNotify.add(c.getUser()); });
+
+                // Construct message & link
+                boolean isReply = entity.getParentCommentId() != null;
+                String title = isReply ? "New Discussion Reply" : "New Discussion Comment";
+                String message = senderName + (isReply ? " replied to" : " commented on") + " the discussion for paper \"" + paper.getTitle() + "\"";
+                String link = "/conference/" + conference.getId() + "/reviewer";
+
+                // Save notifications
+                for (User targetUser : usersToNotify) {
+                    notificationRepository.save(Notification.builder()
+                            .user(targetUser)
+                            .conference(conference)
+                            .title(title)
+                            .message(message)
+                            .type(isReply ? "DISCUSSION_REPLY" : "DISCUSSION_COMMENT")
+                            .link(link)
+                            .isRead(false)
+                            .build());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to create discussion notification: {}", e.getMessage());
+            }
+        }
+
+        return mapToResponseDTO(saved);
     }
 
     @Override

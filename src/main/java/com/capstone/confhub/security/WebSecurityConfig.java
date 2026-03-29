@@ -24,13 +24,16 @@ public class WebSecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
     private final AuthTokenFilter authTokenFilter;
+    private final RateLimitingFilter rateLimitingFilter;
 
     public WebSecurityConfig(UserDetailsServiceImpl userDetailsService,
             AuthEntryPointJwt unauthorizedHandler,
-            AuthTokenFilter authTokenFilter) {
+            AuthTokenFilter authTokenFilter,
+            RateLimitingFilter rateLimitingFilter) {
         this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;
         this.authTokenFilter = authTokenFilter;
+        this.rateLimitingFilter = rateLimitingFilter;
     }
 
     @Bean
@@ -68,9 +71,14 @@ public class WebSecurityConfig {
                                 "/api/v1/payment/vnpay-callback")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/conferences",
+                                "/api/v1/conferences/**",
+                                "/api/v1/paper/published").permitAll()
                         .anyRequest().authenticated());
 
-        http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(authTokenFilter, RateLimitingFilter.class);
 
         return http.build();
     }

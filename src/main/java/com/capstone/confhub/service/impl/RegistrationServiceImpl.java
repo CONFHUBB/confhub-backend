@@ -360,6 +360,38 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public void refundTicket(Integer conferenceId, Integer ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found: " + ticketId));
+
+        if (!ticket.getConference().getId().equals(conferenceId)) {
+            throw new BadRequestException("Ticket does not belong to this conference.");
+        }
+
+        if (PaymentStatus.REFUNDED.equals(ticket.getPaymentStatus())) {
+            throw new BadRequestException("Ticket is already refunded.");
+        }
+
+        ticket.setPaymentStatus(PaymentStatus.REFUNDED);
+        ticketRepository.save(ticket);
+
+        paymentRepository.findByTicket(ticket).ifPresent(payment -> {
+            payment.setStatus(PaymentStatus.REFUNDED);
+            payment.setTransactionTime(LocalDateTime.now());
+            paymentRepository.save(payment);
+        });
+
+        TicketType tt = ticket.getTicketType();
+        if (tt != null && tt.getQuantitySold() > 0) {
+            tt.setQuantitySold(tt.getQuantitySold() - 1);
+            ticketTypeRepository.save(tt);
+        }
+
+        log.info("Ticket {} refunded for conference {}", ticket.getRegistrationNumber(), conferenceId);
+    }
+
     // ========== Helpers ==========
 
     private TicketResponse mapToTicketResponse(Ticket t) {

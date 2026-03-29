@@ -20,7 +20,8 @@ jobs:
 
       - name: Build and Deploy via Docker Compose
         run: |
-          # Dừng container cũ nếu có
+          # Dừng và xoá container cũ nếu có
+          docker rm -f confhub-backend || true
           docker compose down || true
           
           # Built một jar và docker hình ảnh mới tinh (không lưu cache mã nguồn)

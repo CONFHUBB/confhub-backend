@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
+import com.capstone.confhub.utils.enums.ActivityType;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 
 @Service
@@ -35,6 +36,7 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final ConferenceActivityRepository conferenceActivityRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -50,10 +52,15 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
         ReviewComment entity = new ReviewComment();
         mapDtoToEntity(dto, entity);
 
-        // Validate: if discussion post, paper must have discussion enabled
+        // Validate: discussion posts require REVIEW_DISCUSSION activity to be active
         if (Boolean.TRUE.equals(dto.getIsDiscussionPost()) && entity.getPaper() != null) {
-            if (!Boolean.TRUE.equals(entity.getPaper().getIsDiscussionEnabled())) {
-                throw new BadRequestException("Discussion is not enabled for this paper");
+            Integer conferenceId = entity.getPaper().getTrack().getConference().getId();
+            boolean activityEnabled = conferenceActivityRepository
+                    .findByConferenceIdAndActivityType(conferenceId, ActivityType.REVIEW_DISCUSSION)
+                    .map(a -> Boolean.TRUE.equals(a.getIsEnabled()))
+                    .orElse(false);
+            if (!activityEnabled) {
+                throw new BadRequestException("Discussion phase is not active for this conference");
             }
         }
 

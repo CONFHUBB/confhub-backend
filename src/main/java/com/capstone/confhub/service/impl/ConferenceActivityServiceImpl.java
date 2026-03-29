@@ -15,6 +15,7 @@ import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.repository.PaperRepository;
 import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
+import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.service.ConferenceActivityService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     private final ReviewRepository reviewRepository;
     private final ActivityAuditLogRepository auditLogRepository;
     private final ActivityNotificationSender notificationSender;
+    private final TrackReviewSettingRepository trackReviewSettingRepository;
 
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -288,6 +290,20 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                 if (reviews.isEmpty()) {
                     throw new BadRequestException(
                             "Cannot enable REVIEW_DISCUSSION: no reviews exist yet");
+                }
+                // Auto-enable discussion on all papers if setting is turned on
+                var tracks = conferenceTrackRepository.findByConferenceId(conferenceId);
+                boolean shouldAutoEnable = tracks.stream()
+                        .anyMatch(t -> trackReviewSettingRepository.findByTrackId(t.getId())
+                                .map(s -> Boolean.TRUE.equals(s.getEnableAllPapersForDiscussion()))
+                                .orElse(false));
+                if (shouldAutoEnable) {
+                    var allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
+                    for (var paper : allPapers) {
+                        paper.setIsDiscussionEnabled(true);
+                    }
+                    paperRepository.saveAll(allPapers);
+                    log.info("Auto-enabled discussion for {} papers in conference {}", allPapers.size(), conferenceId);
                 }
             }
             default -> {

@@ -184,9 +184,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             Sheet sheet = wb.createSheet("Tracks");
             writeHeaders(sheet, TRACK_HEADERS, headerStyle);
             String[][] samples = {
-                    {"Machine Learning", "Papers about ML algorithms", "100"},
-                    {"NLP", "Papers about text processing", "80"},
-                    {"Computer Vision", "Papers about image analysis", "60"}
+                    {"Machine Learning", "Papers about ML algorithms"},
+                    {"NLP", "Papers about text processing"},
+                    {"Computer Vision", "Papers about image analysis"}
             };
             for (int r = 0; r < samples.length; r++) {
                 Row row = sheet.createRow(r + 1);
@@ -461,7 +461,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                             .title("You have been invited as " + roleName)
                             .message("You have been invited to join \"" + conference.getName() + "\" as " + roleName + ".")
                             .type("INVITATION")
-                            .link("/conference/reviewer-select")
+                            .link("/my-profile/invitations")
                             .isRead(false)
                             .build();
                     notificationRepository.save(notification);

@@ -3,6 +3,8 @@ package com.capstone.confhub.service.impl;
 import com.capstone.confhub.dto.request.UserEmailRequest;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.entity.UserEmail;
+import com.capstone.confhub.exception.BadRequestException;
+import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.UserEmailRepository;
 import com.capstone.confhub.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,12 +19,16 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class UserEmailServiceImplTest {
+
+    private static final int USER_ID = 1;
+    private static final int EMAIL_ID = 10;
 
     @Mock
     private UserEmailRepository userEmailRepository;
@@ -38,10 +44,10 @@ public class UserEmailServiceImplTest {
     @BeforeEach
     void setUp() {
         user = new User();
-        user.setId(1);
+        user.setId(USER_ID);
 
         userEmail = new UserEmail();
-        userEmail.setId(10);
+        userEmail.setId(EMAIL_ID);
         userEmail.setUser(user);
         userEmail.setEmail("user@example.com");
         userEmail.setIsPrimary(false);
@@ -55,35 +61,79 @@ public class UserEmailServiceImplTest {
 
     @Test
     void getEmailsByUserIdShouldReturnList() {
-        when(userRepository.existsById(1)).thenReturn(true);
-        when(userEmailRepository.findByUserId(1)).thenReturn(List.of(userEmail));
+        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userEmailRepository.findByUserId(USER_ID)).thenReturn(List.of(userEmail));
 
-        var result = userEmailService.getEmailsByUserId(1);
+        var result = userEmailService.getEmailsByUserId(USER_ID);
 
         assertNotNull(result);
         assertEquals(1, result.size());
     }
 
     @Test
+    void getEmailsByUserIdShouldThrowWhenUserNotFound() {
+        when(userRepository.existsById(USER_ID)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> userEmailService.getEmailsByUserId(USER_ID));
+    }
+
+    @Test
     void addEmailShouldReturnResponse() {
         UserEmailRequest request = UserEmailRequest.builder().email("user@example.com").build();
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(userEmailRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(userEmailRepository.save(any(UserEmail.class))).thenReturn(userEmail);
 
-        var result = userEmailService.addEmail(1, request);
+        var result = userEmailService.addEmail(USER_ID, request);
 
         assertNotNull(result);
-        assertEquals(10, result.getId());
+        assertEquals(EMAIL_ID, result.getId());
+    }
+
+    @Test
+    void addEmailShouldThrowWhenUserNotFound() {
+        UserEmailRequest request = UserEmailRequest.builder().email("user@example.com").build();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> userEmailService.addEmail(USER_ID, request));
+    }
+
+    @Test
+    void addEmailShouldThrowWhenEmailAlreadyUsed() {
+        UserEmailRequest request = UserEmailRequest.builder().email("user@example.com").build();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userEmailRepository.existsByEmail("user@example.com")).thenReturn(true);
+
+        assertThrows(BadRequestException.class,
+                () -> userEmailService.addEmail(USER_ID, request));
     }
 
     @Test
     void deleteEmailShouldDelete() {
-        when(userEmailRepository.findById(10)).thenReturn(Optional.of(userEmail));
+        when(userEmailRepository.findById(EMAIL_ID)).thenReturn(Optional.of(userEmail));
 
-        userEmailService.deleteEmail(10);
+        userEmailService.deleteEmail(EMAIL_ID);
 
-        verify(userEmailRepository).deleteById(10);
+        verify(userEmailRepository).deleteById(EMAIL_ID);
+    }
+
+    @Test
+    void deleteEmailShouldThrowWhenEmailNotFound() {
+        when(userEmailRepository.findById(EMAIL_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> userEmailService.deleteEmail(EMAIL_ID));
+    }
+
+    @Test
+    void deleteEmailShouldThrowWhenDeletingPrimaryEmail() {
+        userEmail.setIsPrimary(true);
+        when(userEmailRepository.findById(EMAIL_ID)).thenReturn(Optional.of(userEmail));
+
+        assertThrows(BadRequestException.class,
+                () -> userEmailService.deleteEmail(EMAIL_ID));
     }
 
     @Test
@@ -95,14 +145,22 @@ public class UserEmailServiceImplTest {
         oldPrimary.setIsPrimary(true);
         oldPrimary.setIsVerified(true);
 
-        when(userEmailRepository.findById(10)).thenReturn(Optional.of(userEmail));
-        when(userEmailRepository.findByUserId(1)).thenReturn(List.of(oldPrimary, userEmail));
+        when(userEmailRepository.findById(EMAIL_ID)).thenReturn(Optional.of(userEmail));
+        when(userEmailRepository.findByUserId(USER_ID)).thenReturn(List.of(oldPrimary, userEmail));
         when(userEmailRepository.save(any(UserEmail.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = userEmailService.setPrimaryEmail(10);
+        var result = userEmailService.setPrimaryEmail(EMAIL_ID);
 
         assertNotNull(result);
         assertEquals(true, result.getIsPrimary());
+    }
+
+    @Test
+    void setPrimaryEmailShouldThrowWhenEmailNotFound() {
+        when(userEmailRepository.findById(EMAIL_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> userEmailService.setPrimaryEmail(EMAIL_ID));
     }
 }
 

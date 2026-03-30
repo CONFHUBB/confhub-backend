@@ -45,10 +45,10 @@ public class Paper extends BaseEntity {
     )
     private List<SubjectArea> secondarySubjectAreas = new ArrayList<>();
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = false, length = 1000)
     private String title;
 
-    @Column(name = "abstract", nullable = false)
+    @Column(name = "abstract", nullable = false, columnDefinition = "TEXT")
     private String abstractField;
 
     @Column(name = "keywords", columnDefinition = "TEXT")

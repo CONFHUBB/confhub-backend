@@ -518,6 +518,15 @@ public class PaperServiceImpl implements PaperService {
             }
         }
 
+        // Fetch actual author names unless masked
+        List<String> authorNames = List.of();
+        if (!shouldMask) {
+            List<PaperAuthor> authors = paperAuthorRepository.findByPaper_IdOrderByOrderIndexAsc(entity.getId());
+            authorNames = authors.stream()
+                    .map(pa -> pa.getUser().getFirstName() + " " + pa.getUser().getLastName())
+                    .toList();
+        }
+
         return PaperResponseDTO.builder()
                 .id(entity.getId())
                 .conferenceId(entity.getTrack().getConference().getId())
@@ -534,7 +543,7 @@ public class PaperServiceImpl implements PaperService {
                 .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)
                 .extraAnswersJson(entity.getExtraAnswersJson())
                 .isDoubleBlind(isDoubleBlind)
-                .authorNames(shouldMask ? List.of() : null)
+                .authorNames(authorNames)
                 .build();
     }
 

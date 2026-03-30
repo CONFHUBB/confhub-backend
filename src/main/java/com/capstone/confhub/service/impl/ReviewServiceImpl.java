@@ -42,11 +42,14 @@ public class ReviewServiceImpl implements ReviewService {
     private final NotificationRepository notificationRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
+    private final ReviewVersionRepository reviewVersionRepository;
+    private final ReviewVersionAnswerRepository reviewVersionAnswerRepository;
+
     // BR-3.14: Valid review status transitions
     private static final Map<ReviewStatus, Set<ReviewStatus>> VALID_TRANSITIONS = Map.of(
             ReviewStatus.ASSIGNED, Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.COMPLETED, ReviewStatus.DECLINED),
             ReviewStatus.IN_PROGRESS, Set.of(ReviewStatus.COMPLETED),
-            ReviewStatus.COMPLETED, Set.of(),
+            ReviewStatus.COMPLETED, Set.of(ReviewStatus.IN_PROGRESS), // Updated to allow re-evaluation / versioning
             ReviewStatus.DECLINED, Set.of()
     );
 
@@ -79,6 +82,8 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id " + id));
 
+        ReviewStatus oldStatus = review.getStatus();
+
         // BR-3.14: Validate status transition nếu status thay đổi
         if (dto.getStatus() != null && dto.getStatus() != review.getStatus()) {
             validateStatusTransition(review.getStatus(), dto.getStatus());
@@ -94,9 +99,14 @@ public class ReviewServiceImpl implements ReviewService {
 
         mapDtoToEntity(dto, review);
         Review saved = reviewRepository.save(review);
+        
+        // Snapshot logic for Review Versions
+        if (dto.getStatus() == ReviewStatus.COMPLETED && oldStatus != ReviewStatus.COMPLETED) {
+            createReviewVersionSnapshot(saved);
+        }
 
         // Notification: review completed → notify chairs
-        if (dto.getStatus() == ReviewStatus.COMPLETED) {
+        if (dto.getStatus() == ReviewStatus.COMPLETED && oldStatus != ReviewStatus.COMPLETED) {
             try {
                 Conference conference = saved.getPaper().getTrack().getConference();
                 String reviewerName = saved.getReviewer().getFirstName() + " " + saved.getReviewer().getLastName();
@@ -168,6 +178,35 @@ public class ReviewServiceImpl implements ReviewService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewVersionResponseDTO> getReviewVersions(Integer reviewId) {
+        List<ReviewVersion> versions = reviewVersionRepository.findByReview_IdOrderByVersionNumberAsc(reviewId);
+        return versions.stream().map(version -> {
+            List<ReviewVersionAnswer> answers = reviewVersionAnswerRepository.findByReviewVersion_Id(version.getId());
+            List<ReviewVersionAnswerResponseDTO> answerDTOs = answers.stream().map(a -> ReviewVersionAnswerResponseDTO.builder()
+                    .id(a.getId())
+                    .reviewVersionId(version.getId())
+                    .questionId(a.getQuestion().getId())
+                    .questionText(a.getQuestion().getText())
+                    .questionType(a.getQuestion().getType().name())
+                    .answerValue(a.getAnswerValue())
+                    .selectedChoiceId(a.getSelectedChoice() != null ? a.getSelectedChoice().getId() : null)
+                    .selectedChoiceText(a.getSelectedChoice() != null ? a.getSelectedChoice().getText() : null)
+                    .build()
+            ).toList();
+
+            return ReviewVersionResponseDTO.builder()
+                    .id(version.getId())
+                    .reviewId(version.getReview().getId())
+                    .versionNumber(version.getVersionNumber())
+                    .totalScore(version.getTotalScore())
+                    .submittedAt(version.getSubmittedAt())
+                    .answers(answerDTOs)
+                    .build();
+        }).toList();
     }
 
     // ==================== Validation Helpers ====================
@@ -244,6 +283,32 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         return BigDecimal.valueOf(totalScore / scoredAnswers).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private void createReviewVersionSnapshot(Review review) {
+        Integer nextVersionNumber = reviewVersionRepository.countByReview_Id(review.getId()) + 1;
+        
+        ReviewVersion version = new ReviewVersion();
+        version.setReview(review);
+        version.setVersionNumber(nextVersionNumber);
+        version.setTotalScore(review.getTotalScore());
+        version.setSubmittedAt(LocalDateTime.now());
+        version.setCreatedAt(LocalDateTime.now());
+        version.setUpdatedAt(LocalDateTime.now());
+        
+        ReviewVersion savedVersion = reviewVersionRepository.save(version);
+        
+        List<ReviewAnswer> currentAnswers = reviewAnswerRepository.findByReview_Id(review.getId());
+        for (ReviewAnswer answer : currentAnswers) {
+            ReviewVersionAnswer versionAnswer = new ReviewVersionAnswer();
+            versionAnswer.setReviewVersion(savedVersion);
+            versionAnswer.setQuestion(answer.getQuestion());
+            versionAnswer.setAnswerValue(answer.getAnswerValue());
+            versionAnswer.setSelectedChoice(answer.getSelectedChoice());
+            versionAnswer.setCreatedAt(LocalDateTime.now());
+            versionAnswer.setUpdatedAt(LocalDateTime.now());
+            reviewVersionAnswerRepository.save(versionAnswer);
+        }
     }
 
     // ==================== Mapping ====================

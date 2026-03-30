@@ -21,4 +21,7 @@ public interface PaperAuthorRepository extends JpaRepository<PaperAuthor, Intege
 
     // Batch-load authors for a set of paper IDs ordered by orderIndex (prevents N+1)
     List<PaperAuthor> findByPaper_IdInOrderByOrderIndexAsc(List<Integer> paperIds);
+
+    // Single paper — ordered by orderIndex
+    List<PaperAuthor> findByPaper_IdOrderByOrderIndexAsc(Integer paperId);
 }

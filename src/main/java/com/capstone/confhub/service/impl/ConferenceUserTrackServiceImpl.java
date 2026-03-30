@@ -197,30 +197,23 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 entity.setTokenExpiresAt(LocalDateTime.now().plusDays(7));
                 ConferenceUserTrack saved = conferenceUserTrackRepository.save(entity);
 
-                // Auto-create notification — only if not already sent for this user+conference
-                boolean alreadyNotified = notificationRepository
-                                .existsByUser_IdAndConference_IdAndType(user.getId(), conference.getId(), "INVITATION");
-                if (!alreadyNotified) {
-                        String roleName = formatRoleName(request.getAssignedRole());
-                        String link = request.getAssignedRole() == ConferenceTrackRole.REVIEWER
-                                        ? "/conference/reviewer-select"
-                                        : "/conference/" + conference.getId();
-                        Notification notification = Notification.builder()
-                                        .user(user)
-                                        .conference(conference)
-                                        .title("You have been invited as " + roleName)
-                                        .message("You have been invited to join \"" + conference.getName() + "\" as "
-                                                        + roleName + ".")
-                                        .type("INVITATION")
-                                        .link(link)
-                                        .isRead(false)
-                                        .build();
-                        notificationRepository.save(notification);
-                }
+                // Always create invitation notification (even for re-invited users)
+                String roleName = formatRoleName(request.getAssignedRole());
+                String link = "/my-profile/invitations";
+                Notification notification = Notification.builder()
+                                .user(user)
+                                .conference(conference)
+                                .title("You have been invited as " + roleName)
+                                .message("You have been invited to join \"" + conference.getName() + "\" as "
+                                                + roleName + ".")
+                                .type("INVITATION")
+                                .link(link)
+                                .isRead(false)
+                                .build();
+                notificationRepository.save(notification);
 
                 // Auto-send invitation email
                 try {
-                        String roleName = formatRoleName(request.getAssignedRole());
                         String trackName = track != null ? track.getName() : null;
                         String trackLabel = trackName != null ? " — " + trackName : "";
                         String acceptLink = baseUrl + "/api/v1/email/accept/" + saved.getInvitationToken();
@@ -500,25 +493,41 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         }
                 }
 
-                // Notify the removed user
+                // Always notify the removed user (per-role notification)
                 String roleName = formatRoleName(cut.getAssignedRole());
-                boolean hasOtherRolesInConference = conferenceUserTrackRepository
-                                .findAllByUser_IdAndConference_Id(cut.getUser().getId(), cut.getConference().getId())
-                                .stream().anyMatch(c -> !c.getId().equals(conferenceUserTrackId));
-                if (!hasOtherRolesInConference) {
-                        // Only notify when removing the last role entry (avoid spam for multi-track
-                        // removals)
-                        Notification notification = Notification.builder()
-                                        .user(cut.getUser())
-                                        .conference(cut.getConference())
-                                        .title("Your " + roleName + " role has been removed")
-                                        .message("Your " + roleName + " role in \"" + cut.getConference().getName()
-                                                        + "\" has been removed by the conference chair.")
-                                        .type("ROLE_REMOVED")
-                                        .link("/conference/" + cut.getConference().getId())
-                                        .isRead(false)
-                                        .build();
-                        notificationRepository.save(notification);
+                String trackLabel = cut.getConferenceTrack() != null
+                                ? " (Track: " + cut.getConferenceTrack().getName() + ")"
+                                : "";
+                Notification notification = Notification.builder()
+                                .user(cut.getUser())
+                                .conference(cut.getConference())
+                                .title("Your " + roleName + " role has been removed")
+                                .message("Your " + roleName + " role" + trackLabel + " in \""
+                                                + cut.getConference().getName()
+                                                + "\" has been removed by the conference chair.")
+                                .type("ROLE_REMOVED")
+                                .link("/conference/" + cut.getConference().getId())
+                                .isRead(false)
+                                .build();
+                notificationRepository.save(notification);
+
+                // Send removal email
+                try {
+                        User removedUser = cut.getUser();
+                        String fullName = (removedUser.getFirstName() != null ? removedUser.getFirstName() : "") + " "
+                                        + (removedUser.getLastName() != null ? removedUser.getLastName() : "");
+                        emailService.sendSimpleMessage(
+                                        removedUser.getEmail(),
+                                        "Role Removed — " + cut.getConference().getName(),
+                                        "Dear " + fullName.trim() + ",\n\n"
+                                                        + "Your " + roleName + " role" + trackLabel + " in \""
+                                                        + cut.getConference().getName()
+                                                        + "\" has been removed by the conference chair.\n\n"
+                                                        + "If you believe this was a mistake, please contact the conference organizer.\n\n"
+                                                        + "Best regards,\nConfHub System");
+                } catch (Exception e) {
+                        log.error("Failed to send role-removal email to {}: {}", cut.getUser().getEmail(),
+                                        e.getMessage());
                 }
 
                 conferenceUserTrackRepository.deleteById(conferenceUserTrackId);

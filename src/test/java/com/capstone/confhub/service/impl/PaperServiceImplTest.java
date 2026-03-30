@@ -12,6 +12,8 @@ import com.capstone.confhub.entity.Paper;
 import com.capstone.confhub.entity.PaperAuthor;
 import com.capstone.confhub.entity.SubjectArea;
 import com.capstone.confhub.entity.User;
+import com.capstone.confhub.exception.BadRequestException;
+import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.ConferenceActivityRepository;
 import com.capstone.confhub.repository.ConferenceSubmissionFormRepository;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
@@ -21,6 +23,7 @@ import com.capstone.confhub.repository.PaperAuthorRepository;
 import com.capstone.confhub.repository.PaperRepository;
 import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
+import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.utils.enums.ActivityType;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
@@ -43,12 +46,23 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PaperServiceImplTest {
+
+    private static final int CONFERENCE_ID = 1;
+    private static final int TRACK_ID = 2;
+    private static final int PRIMARY_AREA_ID = 3;
+    private static final int SUBMISSION_FORM_ID = 4;
+    private static final int USER_ID = 1;
+    private static final int CHAIR_ID = 9;
+    private static final int PAPER_ID = 10;
+    private static final String TITLE = "Paper Title";
+    private static final String ABSTRACT = "Abstract";
 
     @Mock
     private PaperRepository paperRepository;
@@ -70,6 +84,8 @@ class PaperServiceImplTest {
     private ReviewRepository reviewRepository;
     @Mock
     private NotificationRepository notificationRepository;
+    @Mock
+    private TrackReviewSettingRepository trackReviewSettingRepository;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -85,33 +101,38 @@ class PaperServiceImplTest {
     @BeforeEach
     void setUp() {
         conference = new Conference();
-        conference.setId(1);
+        conference.setId(CONFERENCE_ID);
         conference.setName("ConfHub 2025");
 
         track = new ConferenceTrack();
-        track.setId(2);
+        track.setId(TRACK_ID);
         track.setConference(conference);
 
         primaryArea = new SubjectArea();
-        primaryArea.setId(3);
+        primaryArea.setId(PRIMARY_AREA_ID);
         primaryArea.setName("AI");
+        track.setName("AI Track");
 
         submissionForm = new ConferenceSubmissionForm();
-        submissionForm.setId(4);
+        submissionForm.setId(SUBMISSION_FORM_ID);
         submissionForm.setConference(conference);
         submissionForm.setDefinitionJson("{}");
 
         paper = new Paper();
-        paper.setId(10);
+        paper.setId(PAPER_ID);
         paper.setTrack(track);
         paper.setPrimarySubjectArea(primaryArea);
         paper.setSecondarySubjectAreas(List.of());
         paper.setSubmissionForm(submissionForm);
-        paper.setTitle("Paper Title");
-        paper.setAbstractField("Abstract");
+        paper.setTitle(TITLE);
+        paper.setAbstractField(ABSTRACT);
         paper.setKeywordsJson("[\"AI\"]");
         paper.setStatus(PaperStatus.SUBMITTED);
         paper.setSubmissionTime(Instant.now());
+    }
+
+    private void stubTrackReviewSettingLookup() {
+        when(trackReviewSettingRepository.findByTrackId(TRACK_ID)).thenReturn(Optional.empty());
     }
 
     @Test
@@ -121,12 +142,13 @@ class PaperServiceImplTest {
 
     @Test
     void createPaperShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
         PaperDTO dto = PaperDTO.builder()
-                .conferenceTrackId(2)
-                .primarySubjectAreaId(3)
-                .submissionFormId(4)
-                .title("Paper Title")
-                .abstractField("Abstract")
+                .conferenceTrackId(TRACK_ID)
+                .primarySubjectAreaId(PRIMARY_AREA_ID)
+                .submissionFormId(SUBMISSION_FORM_ID)
+                .title(TITLE)
+                .abstractField(ABSTRACT)
                 .keywords(List.of("AI"))
                 .build();
         ConferenceActivity activity = new ConferenceActivity();
@@ -134,29 +156,51 @@ class PaperServiceImplTest {
         activity.setIsEnabled(true);
         activity.setDeadline(LocalDateTime.now().plusDays(1));
 
-        when(conferenceTrackRepository.findById(2)).thenReturn(Optional.of(track));
-        when(conferenceActivityRepository.findByConferenceIdAndActivityType(1, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
-        when(subjectAreaRepository.findById(3)).thenReturn(Optional.of(primaryArea));
-        when(conferenceSubmissionFormRepository.findById(4)).thenReturn(Optional.of(submissionForm));
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(conferenceActivityRepository.findByConferenceIdAndActivityType(CONFERENCE_ID, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
+        when(subjectAreaRepository.findById(PRIMARY_AREA_ID)).thenReturn(Optional.of(primaryArea));
+        when(conferenceSubmissionFormRepository.findById(SUBMISSION_FORM_ID)).thenReturn(Optional.of(submissionForm));
         when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> {
             Paper saved = invocation.getArgument(0);
-            saved.setId(10);
+            saved.setId(PAPER_ID);
             return saved;
         });
 
         var result = paperService.createPaper(dto);
 
         assertNotNull(result);
-        assertEquals(10, result.getId());
+        assertEquals(PAPER_ID, result.getId());
         assertEquals(PaperStatus.SUBMITTED, result.getStatus());
     }
 
     @Test
-    void updatePaperShouldReturnResponse() {
+    void createPaperShouldThrowWhenSubmissionDeadlinePassed() {
         PaperDTO dto = PaperDTO.builder()
-                .conferenceTrackId(2)
-                .primarySubjectAreaId(3)
-                .submissionFormId(4)
+                .conferenceTrackId(TRACK_ID)
+                .primarySubjectAreaId(PRIMARY_AREA_ID)
+                .submissionFormId(SUBMISSION_FORM_ID)
+                .title(TITLE)
+                .abstractField(ABSTRACT)
+                .keywords(List.of("AI"))
+                .build();
+        ConferenceActivity activity = new ConferenceActivity();
+        activity.setActivityType(ActivityType.PAPER_SUBMISSION);
+        activity.setIsEnabled(true);
+        activity.setDeadline(LocalDateTime.now().minusMinutes(1));
+
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(conferenceActivityRepository.findByConferenceIdAndActivityType(CONFERENCE_ID, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
+
+        assertThrows(BadRequestException.class, () -> paperService.createPaper(dto));
+    }
+
+    @Test
+    void updatePaperShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
+        PaperDTO dto = PaperDTO.builder()
+                .conferenceTrackId(TRACK_ID)
+                .primarySubjectAreaId(PRIMARY_AREA_ID)
+                .submissionFormId(SUBMISSION_FORM_ID)
                 .title("Updated Title")
                 .abstractField("Updated Abstract")
                 .keywords(List.of("ML"))
@@ -166,43 +210,81 @@ class PaperServiceImplTest {
         activity.setIsEnabled(true);
         activity.setDeadline(LocalDateTime.now().plusDays(1));
 
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
-        when(conferenceActivityRepository.findByConferenceIdAndActivityType(1, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
-        when(conferenceTrackRepository.findById(2)).thenReturn(Optional.of(track));
-        when(subjectAreaRepository.findById(3)).thenReturn(Optional.of(primaryArea));
-        when(conferenceSubmissionFormRepository.findById(4)).thenReturn(Optional.of(submissionForm));
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
+        when(conferenceActivityRepository.findByConferenceIdAndActivityType(CONFERENCE_ID, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(subjectAreaRepository.findById(PRIMARY_AREA_ID)).thenReturn(Optional.of(primaryArea));
+        when(conferenceSubmissionFormRepository.findById(SUBMISSION_FORM_ID)).thenReturn(Optional.of(submissionForm));
         when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = paperService.updatePaper(10, dto);
+        var result = paperService.updatePaper(PAPER_ID, dto);
 
         assertNotNull(result);
         assertEquals("Updated Title", result.getTitle());
     }
 
     @Test
+    void updatePaperShouldThrowWhenPaperUnderReview() {
+        paper.setStatus(PaperStatus.UNDER_REVIEW);
+        PaperDTO dto = PaperDTO.builder()
+                .conferenceTrackId(TRACK_ID)
+                .title("Updated Title")
+                .build();
+        ConferenceActivity activity = new ConferenceActivity();
+        activity.setActivityType(ActivityType.PAPER_SUBMISSION);
+        activity.setIsEnabled(true);
+        activity.setDeadline(LocalDateTime.now().plusDays(1));
+
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
+        when(conferenceActivityRepository.findByConferenceIdAndActivityType(CONFERENCE_ID, ActivityType.PAPER_SUBMISSION)).thenReturn(Optional.of(activity));
+
+        assertThrows(BadRequestException.class, () -> paperService.updatePaper(PAPER_ID, dto));
+    }
+
+    @Test
     void updatePaperStatusShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
         paper.setStatus(PaperStatus.SUBMITTED);
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
         when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = paperService.updatePaperStatus(10, PaperUpdateStatusDTO.builder().status(PaperStatus.UNDER_REVIEW).build());
+        var result = paperService.updatePaperStatus(PAPER_ID, PaperUpdateStatusDTO.builder().status(PaperStatus.UNDER_REVIEW).build());
 
         assertNotNull(result);
         assertEquals(PaperStatus.UNDER_REVIEW, result.getStatus());
     }
 
     @Test
-    void getPaperByIdShouldReturnResponse() {
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
+    void updatePaperStatusShouldThrowWhenTransitionIsInvalid() {
+        paper.setStatus(PaperStatus.REJECTED);
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
 
-        var result = paperService.getPaperById(10);
+        assertThrows(BadRequestException.class,
+                () -> paperService.updatePaperStatus(PAPER_ID,
+                        PaperUpdateStatusDTO.builder().status(PaperStatus.UNDER_REVIEW).build()));
+    }
+
+    @Test
+    void getPaperByIdShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
+
+        var result = paperService.getPaperById(PAPER_ID);
 
         assertNotNull(result);
-        assertEquals(10, result.getId());
+        assertEquals(PAPER_ID, result.getId());
+    }
+
+    @Test
+    void getPaperByIdShouldThrowWhenNotFound() {
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> paperService.getPaperById(PAPER_ID));
     }
 
     @Test
     void getAllPapersShouldReturnPagedResponse() {
+        stubTrackReviewSettingLookup();
         var page = new PageImpl<>(List.of(paper), PageRequest.of(0, 20), 1);
         when(paperRepository.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
 
@@ -213,59 +295,115 @@ class PaperServiceImplTest {
     }
 
     @Test
+    void getAllPapersShouldReturnEmptyPage() {
+        var page = new PageImpl<Paper>(List.of(), PageRequest.of(0, 20), 0);
+        when(paperRepository.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
+
+        var result = paperService.getAllPapers(0, 20);
+
+        assertNotNull(result);
+        assertEquals(0, result.getContent().size());
+    }
+
+    @Test
     void getPapersByAuthorShouldReturnPagedResponse() {
+        stubTrackReviewSettingLookup();
         PaperAuthor paperAuthor = new PaperAuthor();
         paperAuthor.setId(11);
         paperAuthor.setPaper(paper);
         var page = new PageImpl<>(List.of(paperAuthor), PageRequest.of(0, 20), 1);
-        when(paperAuthorRepository.findByUserId(1, PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("createdAt").descending()))).thenReturn(page);
+        when(paperAuthorRepository.findByUserId(USER_ID, PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("createdAt").descending()))).thenReturn(page);
 
-        var result = paperService.getPapersByAuthor(1, 0, 20);
+        var result = paperService.getPapersByAuthor(USER_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
     }
 
     @Test
+    void getPapersByAuthorShouldReturnEmptyPage() {
+        var page = new PageImpl<PaperAuthor>(List.of(), PageRequest.of(0, 20), 0);
+        when(paperAuthorRepository.findByUserId(USER_ID, PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("createdAt").descending()))).thenReturn(page);
+
+        var result = paperService.getPapersByAuthor(USER_ID, 0, 20);
+
+        assertNotNull(result);
+        assertEquals(0, result.getContent().size());
+    }
+
+    @Test
     void deletePaperShouldDelete() {
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
-        when(reviewRepository.countByPaper_Id(10)).thenReturn(0L);
+        when(paperRepository.existsById(PAPER_ID)).thenReturn(true);
+        when(reviewRepository.countByPaper_Id(PAPER_ID)).thenReturn(0L);
 
-        paperService.deletePaper(10);
+        paperService.deletePaper(PAPER_ID);
 
-        verify(paperRepository).deleteById(10);
+        verify(paperRepository).deleteById(PAPER_ID);
+    }
+
+    @Test
+    void deletePaperShouldThrowWhenPaperNotFound() {
+        when(paperRepository.existsById(PAPER_ID)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> paperService.deletePaper(PAPER_ID));
+    }
+
+    @Test
+    void deletePaperShouldThrowWhenPaperHasReviews() {
+        when(paperRepository.existsById(PAPER_ID)).thenReturn(true);
+        when(reviewRepository.countByPaper_Id(PAPER_ID)).thenReturn(2L);
+
+        assertThrows(BadRequestException.class, () -> paperService.deletePaper(PAPER_ID));
     }
 
     @Test
     void withdrawPaperShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
         User chair = new User();
-        chair.setId(9);
+        chair.setId(CHAIR_ID);
         ConferenceUserTrack chairAssignment = new ConferenceUserTrack();
         chairAssignment.setUser(chair);
         chairAssignment.setConference(conference);
 
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
         when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(1, ConferenceTrackRole.CONFERENCE_CHAIR))
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
                 .thenReturn(List.of(chairAssignment));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = paperService.withdrawPaper(10);
+        var result = paperService.withdrawPaper(PAPER_ID);
 
         assertNotNull(result);
         assertEquals(PaperStatus.WITHDRAWN, result.getStatus());
     }
 
     @Test
+    void withdrawPaperShouldThrowWhenStatusIsPublished() {
+        paper.setStatus(PaperStatus.PUBLISHED);
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
+
+        assertThrows(BadRequestException.class, () -> paperService.withdrawPaper(PAPER_ID));
+    }
+
+    @Test
     void restorePaperShouldReturnResponse() {
+        stubTrackReviewSettingLookup();
         paper.setStatus(PaperStatus.WITHDRAWN);
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
         when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = paperService.restorePaper(10);
+        var result = paperService.restorePaper(PAPER_ID);
 
         assertNotNull(result);
         assertEquals(PaperStatus.SUBMITTED, result.getStatus());
+    }
+
+    @Test
+    void restorePaperShouldThrowWhenPaperIsNotWithdrawn() {
+        paper.setStatus(PaperStatus.SUBMITTED);
+        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
+
+        assertThrows(BadRequestException.class, () -> paperService.restorePaper(PAPER_ID));
     }
 }
 

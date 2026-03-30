@@ -72,7 +72,12 @@ public class FirebaseStorageServiceImpl implements FirebaseStorageService {
         if (metadata != null && metadata.containsKey("firebaseStorageDownloadTokens")) {
             return metadata.get("firebaseStorageDownloadTokens");
         }
-        return blob.getMediaLink();
+        // Generate a new download token and persist it on the blob
+        String newToken = UUID.randomUUID().toString();
+        Map<String, String> newMetadata = metadata != null ? new java.util.HashMap<>(metadata) : new java.util.HashMap<>();
+        newMetadata.put("firebaseStorageDownloadTokens", newToken);
+        blob.toBuilder().setMetadata(newMetadata).build().update();
+        return newToken;
     }
 
     @Override

@@ -257,9 +257,96 @@ public class PaperServiceImpl implements PaperService {
     @Transactional(readOnly = true)
     public List<PaperResponseDTO> getPapersByConference(Integer conferenceId) {
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
-        return papers.stream()
-                .map(this::mapToResponseDTO)
-                .collect(java.util.stream.Collectors.toList());
+        if (papers.isEmpty()) return List.of();
+
+        // ── Batch pre-load to avoid N+1 ──
+        List<Integer> paperIds = papers.stream().map(Paper::getId).toList();
+        Set<Integer> trackIds = papers.stream().map(p -> p.getTrack().getId()).collect(java.util.stream.Collectors.toSet());
+
+        // 1) Batch load review settings for all tracks
+        Map<Integer, Boolean> doubleBlindByTrack = new HashMap<>();
+        for (Integer trackId : trackIds) {
+            doubleBlindByTrack.put(trackId,
+                    trackReviewSettingRepository.findByTrackId(trackId)
+                            .map(s -> Boolean.TRUE.equals(s.getIsDoubleBlind()))
+                            .orElse(true));
+        }
+
+        // 2) Batch load all authors for all papers
+        List<PaperAuthor> allAuthors = paperAuthorRepository.findByPaper_IdInOrderByOrderIndexAsc(paperIds);
+        Map<Integer, List<String>> authorNamesByPaperId = new HashMap<>();
+        Map<Integer, Set<Integer>> authorUserIdsByPaperId = new HashMap<>();
+        for (PaperAuthor pa : allAuthors) {
+            int pid = pa.getPaper().getId();
+            authorNamesByPaperId.computeIfAbsent(pid, k -> new ArrayList<>())
+                    .add(pa.getUser().getFirstName() + " " + pa.getUser().getLastName());
+            authorUserIdsByPaperId.computeIfAbsent(pid, k -> new HashSet<>())
+                    .add(pa.getUser().getId());
+        }
+
+        // 3) Determine current user context once
+        Integer currentUserId = null;
+        boolean isAdminOrStaff = false;
+        boolean isChair = false;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            isAdminOrStaff = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_STAFF"));
+            if (!isAdminOrStaff && auth.getPrincipal() instanceof UserDetailsImpl userDetails) {
+                currentUserId = userDetails.getId();
+                List<ConferenceUserTrack> roles = conferenceUserTrackRepository
+                        .findAllByUser_IdAndConference_Id(currentUserId, conferenceId);
+                isChair = roles.stream().anyMatch(r ->
+                        r.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR ||
+                        r.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR);
+            }
+        }
+
+        // 4) Map all papers using pre-loaded data
+        final Integer userId = currentUserId;
+        final boolean finalIsAdminOrStaff = isAdminOrStaff;
+        final boolean finalIsChair = isChair;
+
+        return papers.stream().map(entity -> {
+            int trackId = entity.getTrack().getId();
+            boolean isDoubleBlind = doubleBlindByTrack.getOrDefault(trackId, true);
+
+            boolean shouldMask = false;
+            if (isDoubleBlind && !finalIsAdminOrStaff && !finalIsChair) {
+                if (userId == null) {
+                    shouldMask = true;
+                } else {
+                    Set<Integer> authorUserIds = authorUserIdsByPaperId.getOrDefault(entity.getId(), Set.of());
+                    shouldMask = !authorUserIds.contains(userId);
+                }
+            }
+
+            List<String> authorNames = shouldMask ? List.of()
+                    : authorNamesByPaperId.getOrDefault(entity.getId(), List.of());
+
+            List<Integer> secondaryIds = entity.getSecondarySubjectAreas() != null
+                    ? entity.getSecondarySubjectAreas().stream().map(SubjectArea::getId).toList()
+                    : List.of();
+
+            return PaperResponseDTO.builder()
+                    .id(entity.getId())
+                    .conferenceId(entity.getTrack().getConference().getId())
+                    .trackId(trackId)
+                    .trackName(entity.getTrack().getName())
+                    .primarySubjectAreaId(
+                            entity.getPrimarySubjectArea() != null ? entity.getPrimarySubjectArea().getId() : null)
+                    .secondarySubjectAreaIds(secondaryIds)
+                    .title(entity.getTitle())
+                    .abstractField(entity.getAbstractField())
+                    .keywords(deserializeKeywords(entity.getKeywordsJson()))
+                    .submissionTime(entity.getSubmissionTime())
+                    .status(entity.getStatus())
+                    .submissionFormId(entity.getSubmissionForm() != null ? entity.getSubmissionForm().getId() : null)
+                    .extraAnswersJson(entity.getExtraAnswersJson())
+                    .isDoubleBlind(isDoubleBlind)
+                    .authorNames(authorNames)
+                    .build();
+        }).collect(java.util.stream.Collectors.toList());
     }
 
     // ==================== TOGGLE REVIEW READ-ONLY (BR-3.28) ====================

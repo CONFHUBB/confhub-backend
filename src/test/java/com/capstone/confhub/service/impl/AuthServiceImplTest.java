@@ -225,6 +225,7 @@ class AuthServiceImplTest {
         assertNull(user.getOtpExpiration());
     }
 
+
     private void setAuthenticatedUser(Integer userId) {
         UserDetailsImpl principal = new UserDetailsImpl(
                 userId,

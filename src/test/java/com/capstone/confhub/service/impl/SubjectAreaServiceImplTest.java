@@ -249,4 +249,14 @@ class SubjectAreaServiceImplTest {
         assertThrows(EntityNotFoundException.class,
                 () -> subjectAreaService.deleteSubjectArea(SUBJECT_AREA_ID));
     }
+
+    @Test
+    void deleteSubjectArea_NotFound() {
+        when(subjectAreaRepository.existsById(999)).thenReturn(false);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.persistence.EntityNotFoundException.class,
+            () -> subjectAreaService.deleteSubjectArea(999)
+        );
+    }
 }

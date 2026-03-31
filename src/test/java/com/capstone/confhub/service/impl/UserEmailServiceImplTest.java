@@ -162,8 +162,14 @@ public class UserEmailServiceImplTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> userEmailService.setPrimaryEmail(EMAIL_ID));
     }
+
+    @Test
+    void deleteUserEmail_NotFound() {
+        when(userEmailRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(
+            ResourceNotFoundException.class,
+            () -> userEmailService.deleteEmail(999)
+        );
+    }
 }
-
-
-
-

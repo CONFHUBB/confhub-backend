@@ -36,6 +36,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -186,8 +187,16 @@ public class BiddingServiceImplTest {
         assertEquals(10, result.get(0).getPaperId());
         assertEquals(BidValue.EAGER, result.get(0).getCurrentBid());
     }
+
+    @Test
+    void submitOrUpdateBid_PaperNotFound() {
+        com.capstone.confhub.dto.BiddingDTO dto = new com.capstone.confhub.dto.BiddingDTO();
+        dto.setPaperId(999);
+        when(paperRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(
+            com.capstone.confhub.exception.ResourceNotFoundException.class,
+            () -> biddingService.submitOrUpdateBid(dto)
+        );
+    }
 }
-
-
-
-

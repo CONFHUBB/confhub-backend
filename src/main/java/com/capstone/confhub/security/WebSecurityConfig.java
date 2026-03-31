@@ -74,7 +74,8 @@ public class WebSecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/v1/conferences",
                                 "/api/v1/conferences/**",
-                                "/api/v1/paper/published").permitAll()
+                                "/api/v1/paper/published",
+                                "/api/v1/paper-file/paper/**").permitAll()
                         .anyRequest().authenticated());
 
         http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);

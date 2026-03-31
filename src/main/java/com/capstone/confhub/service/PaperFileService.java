@@ -18,6 +18,8 @@ public interface PaperFileService {
 
     PaperFileResponseDTO createCameraReadyFile(PaperFileDTO dto);
 
+    PaperFileResponseDTO createCopyrightSubmission(PaperFileDTO dto);
+
     void approveCameraReady(Integer paperId);
 
     java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);

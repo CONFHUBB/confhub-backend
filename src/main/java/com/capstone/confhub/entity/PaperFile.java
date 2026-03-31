@@ -37,4 +37,7 @@ public class PaperFile extends BaseEntity {
     @Column(name = "is_camera_ready", nullable = false)
     private Boolean isCameraReady = false;
 
+    @Column(name = "is_copyright_submission", nullable = false)
+    private Boolean isCopyrightSubmission = false;
+
 }

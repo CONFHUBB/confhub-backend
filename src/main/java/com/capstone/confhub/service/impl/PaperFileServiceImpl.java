@@ -128,6 +128,49 @@ public class PaperFileServiceImpl implements PaperFileService {
 
     @Override
     @Transactional
+    public PaperFileResponseDTO createCopyrightSubmission(PaperFileDTO dto) {
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        // Validate: only ACCEPTED papers can upload copyright
+        if (paper.getStatus() != PaperStatus.ACCEPTED) {
+            throw new BadRequestException(
+                    "Copyright submission is only allowed for papers with status ACCEPTED. Current status: "
+                            + paper.getStatus());
+        }
+
+        // Validate: CAMERA_READY_SUBMISSION activity must be enabled (copyright shares the same phase)
+        Integer conferenceId = paper.getTrack().getConference().getId();
+        ConferenceActivity activity = conferenceActivityRepository
+                .findByConferenceIdAndActivityType(conferenceId, ActivityType.CAMERA_READY_SUBMISSION)
+                .orElseThrow(() -> new BadRequestException(
+                        "Camera-ready / copyright submission activity is not configured for this conference."));
+
+        if (!Boolean.TRUE.equals(activity.getIsEnabled())) {
+            throw new BadRequestException("Camera-ready / copyright submission is not currently enabled.");
+        }
+
+        // Check deadline
+        if (activity.getDeadline() != null && LocalDateTime.now().isAfter(activity.getDeadline())) {
+            throw new BadRequestException("Camera-ready / copyright submission deadline has passed.");
+        }
+
+        PaperFile entity = new PaperFile();
+        entity.setPaper(paper);
+        entity.setUrl(dto.getUrl());
+        entity.setIsActive(true);
+        entity.setIsCameraReady(false);
+        entity.setIsCopyrightSubmission(true);
+        entity.setIsRevision(false);
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+
+        log.info("Copyright submission uploaded for paper {} in conference {}", paper.getId(), conferenceId);
+        return mapToPaperFileResponseDTO(paperFileRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
     public void approveCameraReady(Integer paperId) {
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + paperId));
@@ -176,6 +219,7 @@ public class PaperFileServiceImpl implements PaperFileService {
         entity.setIsActive(dto.getIsActive());
         entity.setIsCameraReady(dto.getIsCameraReady() != null ? dto.getIsCameraReady() : false);
         entity.setIsRevision(dto.getIsRevision() != null ? dto.getIsRevision() : false);
+        entity.setIsCopyrightSubmission(dto.getIsCopyrightSubmission() != null ? dto.getIsCopyrightSubmission() : false);
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
@@ -190,6 +234,7 @@ public class PaperFileServiceImpl implements PaperFileService {
                 .isActive(entity.getIsActive())
                 .isCameraReady(entity.getIsCameraReady())
                 .isRevision(entity.getIsRevision())
+                .isCopyrightSubmission(entity.getIsCopyrightSubmission())
                 .build();
     }
 }

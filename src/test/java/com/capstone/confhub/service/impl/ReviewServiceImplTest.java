@@ -40,6 +40,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -151,7 +152,14 @@ class ReviewServiceImplTest {
 
         verify(reviewRepository).deleteById(10);
     }
+
+    @Test
+    void getReviewById_ReviewNotFound() {
+        when(reviewRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(
+            com.capstone.confhub.exception.ResourceNotFoundException.class,
+            () -> reviewService.getReviewById(999)
+        );
+    }
 }
-
-
-

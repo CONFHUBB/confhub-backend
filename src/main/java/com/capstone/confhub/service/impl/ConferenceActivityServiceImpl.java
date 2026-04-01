@@ -151,6 +151,19 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             }
         }
 
+        // ── Build proposed state (merge incoming DTOs onto existing entities) ──
+        Map<ActivityType, LocalDateTime> proposedDeadlines = new HashMap<>();
+        for (ConferenceActivity a : existingActivities) {
+            proposedDeadlines.put(a.getActivityType(), a.getDeadline());
+        }
+        for (ConferenceActivityDTO dto : activityDTOs) {
+            proposedDeadlines.put(dto.getActivityType(), dto.getDeadline());
+        }
+
+        // ── Validate deadline rules BEFORE mutating entities ──
+        validateDeadlineOrder(proposedDeadlines);
+        validateDeadlinesNotInPast(activityDTOs, oldDeadlineState);
+
         for (ConferenceActivityDTO dto : activityDTOs) {
             ConferenceActivity activity = activityMap.get(dto.getActivityType());
             if (activity != null) {
@@ -308,6 +321,73 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             }
             default -> {
                 // AUTHOR_NOTIFICATION và CAMERA_READY_SUBMISSION: không có ràng buộc đặc biệt
+            }
+        }
+    }
+
+    /**
+     * Strict chronological ordering: if both activity A (earlier phase) and B (later phase)
+     * have deadlines, then deadline(A) must be strictly before deadline(B).
+     */
+    private void validateDeadlineOrder(Map<ActivityType, LocalDateTime> deadlines) {
+        // Ordered lifecycle phases
+        ActivityType[] orderedPhases = {
+                ActivityType.PAPER_SUBMISSION,
+                ActivityType.REVIEWER_BIDDING,
+                ActivityType.REVIEW_SUBMISSION,
+                ActivityType.REVIEW_DISCUSSION,
+                ActivityType.AUTHOR_NOTIFICATION,
+                ActivityType.CAMERA_READY_SUBMISSION,
+                ActivityType.REGISTRATION,
+                ActivityType.EVENT_DAY
+        };
+
+        // Collect (index, deadline) pairs where deadline is non-null
+        List<int[]> indexDeadlinePairs = new ArrayList<>(); // store index only
+        List<LocalDateTime> deadlineValues = new ArrayList<>();
+        for (int i = 0; i < orderedPhases.length; i++) {
+            LocalDateTime dl = deadlines.get(orderedPhases[i]);
+            if (dl != null) {
+                indexDeadlinePairs.add(new int[]{i});
+                deadlineValues.add(dl);
+            }
+        }
+
+        // Check pairwise: each consecutive pair with deadlines must be strictly ascending
+        for (int k = 0; k < deadlineValues.size() - 1; k++) {
+            LocalDateTime earlier = deadlineValues.get(k);
+            LocalDateTime later = deadlineValues.get(k + 1);
+            if (!earlier.isBefore(later)) {
+                int idxA = indexDeadlinePairs.get(k)[0];
+                int idxB = indexDeadlinePairs.get(k + 1)[0];
+                throw new BadRequestException(String.format(
+                        "Deadline conflict: '%s' deadline (%s) must be before '%s' deadline (%s).",
+                        formatActivityName(orderedPhases[idxA]),
+                        earlier.format(DEADLINE_FORMAT),
+                        formatActivityName(orderedPhases[idxB]),
+                        later.format(DEADLINE_FORMAT)
+                ));
+            }
+        }
+    }
+
+    /**
+     * Newly-set deadlines (changed from null or from a different value) must be in the future.
+     */
+    private void validateDeadlinesNotInPast(
+            List<ConferenceActivityDTO> dtos,
+            Map<ActivityType, LocalDateTime> oldDeadlines) {
+        LocalDateTime now = LocalDateTime.now();
+        for (ConferenceActivityDTO dto : dtos) {
+            if (dto.getDeadline() == null) continue; // clearing is always allowed
+            LocalDateTime oldDl = oldDeadlines.get(dto.getActivityType());
+            // Only validate if the deadline is actually being changed
+            if (!dto.getDeadline().equals(oldDl) && dto.getDeadline().isBefore(now)) {
+                throw new BadRequestException(String.format(
+                        "Cannot set deadline for '%s' in the past (%s). Please choose a future date.",
+                        formatActivityName(dto.getActivityType()),
+                        dto.getDeadline().format(DEADLINE_FORMAT)
+                ));
             }
         }
     }

@@ -40,4 +40,7 @@ public class PaperFile extends BaseEntity {
     @Column(name = "is_copyright_submission", nullable = false)
     private Boolean isCopyrightSubmission = false;
 
+    @Column(name = "is_supplementary", nullable = false)
+    private Boolean isSupplementary = false;
+
 }

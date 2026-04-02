@@ -106,7 +106,7 @@ public class ActivityNotificationSender {
                                         m.getAssignedRole() == ConferenceTrackRole.REVIEWER);
 
                         if (isChair) {
-                            link = "/conference/" + conference.getId() + "/update";
+                            link = "/conference/" + conference.getId() + "/update?tab=features-activity-timeline";
                         } else if (isReviewer) {
                             link = "/conference/" + conference.getId() + "/reviewer";
                         }

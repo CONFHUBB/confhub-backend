@@ -87,7 +87,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .title("Conference created successfully")
                 .message("Your conference \"" + savedConference.getName() + "\" has been created and is pending approval.")
                 .type("CONFERENCE_CREATED")
-                .link("/conference/" + savedConference.getId() + "/update")
+                .link("/conference/" + savedConference.getId() + "/update?tab=dashboard")
                 .isRead(false)
                 .build();
         notificationRepository.save(notification);

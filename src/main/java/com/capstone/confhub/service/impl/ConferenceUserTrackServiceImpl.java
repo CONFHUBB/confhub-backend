@@ -273,7 +273,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                         .message(user.getEmail() + " has accepted the " + roleName + " role in \""
                                                         + conference.getName() + "\".")
                                         .type("ROLE_ACCEPTED")
-                                        .link("/conference/" + conferenceId + "/update")
+                                        .link("/conference/" + conferenceId + "/update?tab=features-members")
                                         .isRead(false)
                                         .build();
                         notificationRepository.save(notification);
@@ -309,7 +309,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                         .message(user.getEmail() + " has declined the " + roleName + " role in \""
                                                         + conference.getName() + "\".")
                                         .type("ROLE_DECLINED")
-                                        .link("/conference/" + conferenceId + "/update")
+                                        .link("/conference/" + conferenceId + "/update?tab=features-members")
                                         .isRead(false)
                                         .build();
                         notificationRepository.save(notification);
@@ -358,7 +358,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                         .message(user.getEmail() + " has accepted the " + roleName + " role in \""
                                                         + conference.getName() + "\".")
                                         .type("ROLE_ACCEPTED")
-                                        .link("/conference/" + conference.getId() + "/update")
+                                        .link("/conference/" + conference.getId() + "/update?tab=features-members")
                                         .isRead(false)
                                         .build();
                         notificationRepository.save(notification);
@@ -402,7 +402,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                         .message(user.getEmail() + " has declined the " + roleName + " role in \""
                                                         + conference.getName() + "\".")
                                         .type("ROLE_DECLINED")
-                                        .link("/conference/" + conference.getId() + "/update")
+                                        .link("/conference/" + conference.getId() + "/update?tab=features-members")
                                         .isRead(false)
                                         .build();
                         notificationRepository.save(notification);

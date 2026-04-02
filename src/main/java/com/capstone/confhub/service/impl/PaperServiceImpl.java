@@ -98,7 +98,7 @@ public class PaperServiceImpl implements PaperService {
                             .title("Paper submitted successfully")
                             .message("Your paper \"" + saved.getTitle() + "\" has been submitted to \"" + track.getConference().getName() + "\".")
                             .type("PAPER_SUBMITTED")
-                            .link("/paper")
+                            .link("/paper/" + saved.getId())
                             .isRead(false)
                             .build();
                     notificationRepository.save(notification);
@@ -225,7 +225,7 @@ public class PaperServiceImpl implements PaperService {
                         .title("Paper withdrawn")
                         .message("Paper \"" + saved.getTitle() + "\" has been withdrawn from \"" + conference.getName() + "\".")
                         .type("PAPER_WITHDRAWN")
-                        .link("/conference/" + conference.getId() + "/update")
+                        .link("/conference/" + conference.getId() + "/update?tab=features-paper-management")
                         .isRead(false)
                         .build();
                 notificationRepository.save(notification);

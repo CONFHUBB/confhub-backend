@@ -123,7 +123,7 @@ public class PaperAuthorServiceImpl implements PaperAuthorService {
                     .title("You have been removed as co-author")
                     .message("You have been removed as a co-author from the paper \"" + paper.getTitle() + "\".")
                     .type("AUTHOR_REMOVED")
-                    .link("/paper")
+                    .link("/paper/" + paper.getId())
                     .isRead(false)
                     .build();
             notificationRepository.save(notification);

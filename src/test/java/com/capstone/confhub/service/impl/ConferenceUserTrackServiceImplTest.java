@@ -5,6 +5,7 @@ import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.ConferenceTrack;
 import com.capstone.confhub.entity.ConferenceUserTrack;
 import com.capstone.confhub.entity.Notification;
+import com.capstone.confhub.entity.TrackReviewSetting;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
@@ -13,9 +14,12 @@ import com.capstone.confhub.repository.NotificationRepository;
 import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 import com.capstone.confhub.security.services.UserDetailsImpl;
+import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ForbiddenException;
+import com.capstone.confhub.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +35,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -38,6 +43,13 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class ConferenceUserTrackServiceImplTest {
+
+    private static final int USER_ID = 1;
+    private static final int CHAIR_USER_ID = 2;
+    private static final int CONFERENCE_ID = 10;
+    private static final int TRACK_ID = 20;
+    private static final int REVIEWER_ASSIGNMENT_ID = 30;
+    private static final int CHAIR_ASSIGNMENT_ID = 31;
 
     @Mock
     private ConferenceUserTrackRepository conferenceUserTrackRepository;
@@ -53,6 +65,8 @@ public class ConferenceUserTrackServiceImplTest {
     private NotificationRepository notificationRepository;
     @Mock
     private TrackReviewSettingRepository trackReviewSettingRepository;
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private ConferenceUserTrackServiceImpl conferenceUserTrackService;
@@ -67,29 +81,29 @@ public class ConferenceUserTrackServiceImplTest {
     @BeforeEach
     void setUp() {
         user = new User();
-        user.setId(1);
+        user.setId(USER_ID);
         user.setFirstName("Jane");
         user.setLastName("Doe");
         user.setEmail("jane@example.com");
         user.setIsActive(true);
 
         chairUser = new User();
-        chairUser.setId(2);
+        chairUser.setId(CHAIR_USER_ID);
         chairUser.setFirstName("Chair");
         chairUser.setLastName("User");
         chairUser.setEmail("chair@example.com");
 
         conference = new Conference();
-        conference.setId(10);
+        conference.setId(CONFERENCE_ID);
         conference.setName("ConfHub 2025");
         conference.setAcronym("CMS");
 
         track = new ConferenceTrack();
-        track.setId(20);
+        track.setId(TRACK_ID);
         track.setConference(conference);
 
         reviewerAssignment = new ConferenceUserTrack();
-        reviewerAssignment.setId(30);
+        reviewerAssignment.setId(REVIEWER_ASSIGNMENT_ID);
         reviewerAssignment.setUser(user);
         reviewerAssignment.setConference(conference);
         reviewerAssignment.setConferenceTrack(track);
@@ -97,15 +111,15 @@ public class ConferenceUserTrackServiceImplTest {
         reviewerAssignment.setIsAccepted(true);
 
         chairAssignment = new ConferenceUserTrack();
-        chairAssignment.setId(31);
+        chairAssignment.setId(CHAIR_ASSIGNMENT_ID);
         chairAssignment.setUser(chairUser);
         chairAssignment.setConference(conference);
         chairAssignment.setConferenceTrack(track);
         chairAssignment.setAssignedRole(ConferenceTrackRole.CONFERENCE_CHAIR);
         chairAssignment.setIsAccepted(true);
 
-        // Set up SecurityContext: chairUser (id=2) is the authenticated caller
-        var principal = new UserDetailsImpl(2, chairUser.getEmail(), chairUser.getFirstName(),
+        // Set up SecurityContext: chair user is the authenticated caller.
+        var principal = new UserDetailsImpl(CHAIR_USER_ID, chairUser.getEmail(), chairUser.getFirstName(),
                 chairUser.getLastName(), null, "password", true, List.of());
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
@@ -129,11 +143,43 @@ public class ConferenceUserTrackServiceImplTest {
         programChair.setConference(conference);
         programChair.setAssignedRole(ConferenceTrackRole.PROGRAM_CHAIR);
 
-        when(conferenceRepository.findById(10)).thenReturn(Optional.of(conference));
-        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(10, ConferenceTrackRole.PROGRAM_CHAIR))
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.PROGRAM_CHAIR))
                 .thenReturn(List.of(programChair));
 
-        var result = conferenceUserTrackService.getTrackChairsByConferenceId(10, 0, 20);
+        var result = conferenceUserTrackService.getTrackChairsByConferenceId(CONFERENCE_ID, 0, 20);
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+    }
+
+    @Test
+    void getTrackChairsByConferenceIdShouldThrowWhenConferenceMissing() {
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.getTrackChairsByConferenceId(CONFERENCE_ID, 0, 20));
+    }
+
+    @Test
+    void getTrackChairsByConferenceIdShouldReturnDistinctUsers() {
+        ConferenceUserTrack first = new ConferenceUserTrack();
+        first.setId(40);
+        first.setUser(chairUser);
+        first.setConference(conference);
+        first.setAssignedRole(ConferenceTrackRole.PROGRAM_CHAIR);
+
+        ConferenceUserTrack second = new ConferenceUserTrack();
+        second.setId(41);
+        second.setUser(chairUser);
+        second.setConference(conference);
+        second.setAssignedRole(ConferenceTrackRole.PROGRAM_CHAIR);
+
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.PROGRAM_CHAIR))
+                .thenReturn(List.of(first, second));
+
+        var result = conferenceUserTrackService.getTrackChairsByConferenceId(CONFERENCE_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
@@ -146,35 +192,51 @@ public class ConferenceUserTrackServiceImplTest {
         programChair.setConference(conference);
         programChair.setAssignedRole(ConferenceTrackRole.PROGRAM_CHAIR);
 
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(1, ConferenceTrackRole.PROGRAM_CHAIR))
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(USER_ID, ConferenceTrackRole.PROGRAM_CHAIR))
                 .thenReturn(List.of(programChair));
 
-        var result = conferenceUserTrackService.getChairedConferencesByUserId(1, 0, 20);
+        var result = conferenceUserTrackService.getChairedConferencesByUserId(USER_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
+    }
+
+    @Test
+    void getChairedConferencesByUserIdShouldThrowWhenUserMissing() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.getChairedConferencesByUserId(USER_ID, 0, 20));
     }
 
     @Test
     void getOrganizedConferencesByUserIdShouldReturnConferences() {
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(1, ConferenceTrackRole.CONFERENCE_CHAIR))
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(USER_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
                 .thenReturn(List.of(chairAssignment));
 
-        var result = conferenceUserTrackService.getOrganizedConferencesByUserId(1, 0, 20);
+        var result = conferenceUserTrackService.getOrganizedConferencesByUserId(USER_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
     }
 
     @Test
+    void getOrganizedConferencesByUserIdShouldThrowWhenUserMissing() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.getOrganizedConferencesByUserId(USER_ID, 0, 20));
+    }
+
+    @Test
     void getReviewerConferencesByUserIdShouldReturnAcceptedConferences() {
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(1, ConferenceTrackRole.REVIEWER))
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(USER_ID, ConferenceTrackRole.REVIEWER))
                 .thenReturn(List.of(reviewerAssignment));
 
-        var result = conferenceUserTrackService.getReviewerConferencesByUserId(1, 0, 20);
+        var result = conferenceUserTrackService.getReviewerConferencesByUserId(USER_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
@@ -182,108 +244,277 @@ public class ConferenceUserTrackServiceImplTest {
 
     @Test
     void getUserRoleAssignmentsShouldReturnAssignments() {
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(conferenceUserTrackRepository.findByUser_Id(1)).thenReturn(List.of(reviewerAssignment));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceUserTrackRepository.findByUser_Id(USER_ID)).thenReturn(List.of(reviewerAssignment));
 
-        var result = conferenceUserTrackService.getUserRoleAssignments(1);
+        var result = conferenceUserTrackService.getUserRoleAssignments(USER_ID);
 
         assertNotNull(result);
         assertEquals(1, result.size());
     }
 
     @Test
-    void assignRoleToUserTrackShouldReturnResponse() {
+    void getUserRoleAssignmentsShouldThrowWhenUserMissing() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.getUserRoleAssignments(USER_ID));
+    }
+
+    @Test
+    void assignRoleToUserTrackShouldReturnResponse() throws Exception {
         AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
-        request.setUserId(1);
-        request.setConferenceId(10);
-        request.setTrackId(20);
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(TRACK_ID);
         request.setAssignedRole(ConferenceTrackRole.REVIEWER);
 
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(conferenceRepository.findById(10)).thenReturn(Optional.of(conference));
-        when(conferenceTrackRepository.findById(20)).thenReturn(Optional.of(track));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
         when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
-                2, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
         when(conferenceUserTrackRepository.save(any(ConferenceUserTrack.class))).thenAnswer(invocation -> {
             ConferenceUserTrack saved = invocation.getArgument(0);
-            saved.setId(30);
+            saved.setId(REVIEWER_ASSIGNMENT_ID);
             return saved;
         });
-        when(notificationRepository.existsByUser_IdAndConference_IdAndType(1, 10, "INVITATION")).thenReturn(false);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = conferenceUserTrackService.assignRoleToUserTrack(request);
 
         assertNotNull(result);
-        assertEquals(30, result.getId());
+        assertEquals(REVIEWER_ASSIGNMENT_ID, result.getId());
         assertEquals(ConferenceTrackRole.REVIEWER, result.getAssignedRole());
+        verify(emailService).sendInvitationEmail(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void assignRoleToUserTrackShouldThrowWhenUserMissing() {
+        AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(TRACK_ID);
+        request.setAssignedRole(ConferenceTrackRole.REVIEWER);
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> conferenceUserTrackService.assignRoleToUserTrack(request));
+    }
+
+    @Test
+    void assignRoleToUserTrackShouldAllowNullTrackForConferenceLevelRole() {
+        AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(null);
+        request.setAssignedRole(ConferenceTrackRole.ATTENDEE);
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceUserTrackRepository.save(any(ConferenceUserTrack.class))).thenAnswer(invocation -> {
+            ConferenceUserTrack saved = invocation.getArgument(0);
+            saved.setId(REVIEWER_ASSIGNMENT_ID);
+            return saved;
+        });
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = conferenceUserTrackService.assignRoleToUserTrack(request);
+
+        assertNotNull(result);
+        assertEquals(ConferenceTrackRole.ATTENDEE, result.getAssignedRole());
+        assertNull(result.getConferenceTrackId());
+    }
+
+    @Test
+    void assignRoleToUserTrackShouldThrowWhenCallerNotChair() {
+        AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(TRACK_ID);
+        request.setAssignedRole(ConferenceTrackRole.REVIEWER);
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(false);
+
+        assertThrows(ForbiddenException.class, () -> conferenceUserTrackService.assignRoleToUserTrack(request));
     }
 
     @Test
     void acceptInvitationShouldReturnResponse() {
         ConferenceUserTrack pending = new ConferenceUserTrack();
-        pending.setId(30);
+        pending.setId(REVIEWER_ASSIGNMENT_ID);
         pending.setUser(user);
         pending.setConference(conference);
         pending.setAssignedRole(ConferenceTrackRole.REVIEWER);
         pending.setIsAccepted(false);
+        pending.setConferenceTrack(track);
 
-        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(1, 10)).thenReturn(List.of(pending));
+        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(USER_ID, CONFERENCE_ID)).thenReturn(List.of(pending));
         when(conferenceUserTrackRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(10, ConferenceTrackRole.CONFERENCE_CHAIR))
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
                 .thenReturn(List.of(chairAssignment));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = conferenceUserTrackService.acceptInvitation(1, 10, null);
+        var result = conferenceUserTrackService.acceptInvitation(USER_ID, CONFERENCE_ID, null);
 
         assertNotNull(result);
         assertEquals(true, result.getIsAccepted());
     }
 
     @Test
+    void acceptInvitationShouldThrowWhenAssignmentMissing() {
+        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(USER_ID, CONFERENCE_ID)).thenReturn(List.of());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.acceptInvitation(USER_ID, CONFERENCE_ID, null));
+    }
+
+    @Test
+    void acceptInvitationShouldSetQuotaWhenAllowedByTrackSetting() {
+        ConferenceUserTrack pending = new ConferenceUserTrack();
+        pending.setId(REVIEWER_ASSIGNMENT_ID);
+        pending.setUser(user);
+        pending.setConference(conference);
+        pending.setAssignedRole(ConferenceTrackRole.REVIEWER);
+        pending.setIsAccepted(false);
+        pending.setConferenceTrack(track);
+
+        TrackReviewSetting setting = new TrackReviewSetting();
+        setting.setAllowReviewerQuota(true);
+
+        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(USER_ID, CONFERENCE_ID)).thenReturn(List.of(pending));
+        when(trackReviewSettingRepository.findByTrackId(TRACK_ID)).thenReturn(Optional.of(setting));
+        when(conferenceUserTrackRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
+                .thenReturn(List.of(chairAssignment));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = conferenceUserTrackService.acceptInvitation(USER_ID, CONFERENCE_ID, 5);
+
+        assertNotNull(result);
+        assertEquals(true, result.getIsAccepted());
+        assertEquals(5, result.getReviewerQuota());
+    }
+
+    @Test
     void declineInvitationShouldReturnResponse() {
         ConferenceUserTrack pending = new ConferenceUserTrack();
-        pending.setId(30);
+        pending.setId(REVIEWER_ASSIGNMENT_ID);
         pending.setUser(user);
         pending.setConference(conference);
         pending.setAssignedRole(ConferenceTrackRole.REVIEWER);
         pending.setIsAccepted(true);
 
-        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(1, 10)).thenReturn(List.of(pending));
+        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(USER_ID, CONFERENCE_ID)).thenReturn(List.of(pending));
         when(conferenceUserTrackRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(10, ConferenceTrackRole.CONFERENCE_CHAIR))
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
                 .thenReturn(List.of(chairAssignment));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = conferenceUserTrackService.declineInvitation(1, 10);
+        var result = conferenceUserTrackService.declineInvitation(USER_ID, CONFERENCE_ID);
 
         assertNotNull(result);
         assertEquals(false, result.getIsAccepted());
     }
 
     @Test
-    void getConferenceUsersWithRolesShouldReturnGroupedUsers() {
-        when(conferenceRepository.findById(10)).thenReturn(Optional.of(conference));
-        when(conferenceUserTrackRepository.findByConference_Id(10)).thenReturn(List.of(reviewerAssignment, chairAssignment));
+    void declineInvitationShouldThrowWhenAssignmentMissing() {
+        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(USER_ID, CONFERENCE_ID)).thenReturn(List.of());
 
-        var result = conferenceUserTrackService.getConferenceUsersWithRoles(10, 0, 20);
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.declineInvitation(USER_ID, CONFERENCE_ID));
+    }
+
+    @Test
+    void getConferenceUsersWithRolesShouldReturnGroupedUsers() {
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceUserTrackRepository.findByConference_Id(CONFERENCE_ID)).thenReturn(List.of(reviewerAssignment, chairAssignment));
+
+        var result = conferenceUserTrackService.getConferenceUsersWithRoles(CONFERENCE_ID, 0, 20);
 
         assertNotNull(result);
         assertEquals(2, result.getContent().size());
     }
 
     @Test
+    void getConferenceUsersWithRolesShouldThrowWhenConferenceMissing() {
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.getConferenceUsersWithRoles(CONFERENCE_ID, 0, 20));
+    }
+
+    @Test
     void removeRoleFromUserShouldDeleteAssignment() {
-        when(conferenceUserTrackRepository.findById(30)).thenReturn(Optional.of(reviewerAssignment));
+        when(conferenceUserTrackRepository.findById(REVIEWER_ASSIGNMENT_ID)).thenReturn(Optional.of(reviewerAssignment));
         when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
-                2, 10, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
-        when(reviewRepository.countByReviewer_IdAndPaper_Track_Conference_Id(1, 10)).thenReturn(0L);
-        when(conferenceUserTrackRepository.findAllByUser_IdAndConference_Id(1, 10)).thenReturn(List.of(reviewerAssignment));
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(reviewRepository.countByReviewer_IdAndPaper_Track_Conference_Id(USER_ID, CONFERENCE_ID)).thenReturn(0L);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        conferenceUserTrackService.removeRoleFromUser(30);
+        conferenceUserTrackService.removeRoleFromUser(REVIEWER_ASSIGNMENT_ID);
 
-        verify(conferenceUserTrackRepository).deleteById(30);
+        verify(conferenceUserTrackRepository).deleteById(REVIEWER_ASSIGNMENT_ID);
+        verify(emailService).sendSimpleMessage(any(), any(), any());
+    }
+
+    @Test
+    void removeRoleFromUserShouldThrowWhenAssignmentMissing() {
+        when(conferenceUserTrackRepository.findById(REVIEWER_ASSIGNMENT_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> conferenceUserTrackService.removeRoleFromUser(REVIEWER_ASSIGNMENT_ID));
+    }
+
+    @Test
+    void removeRoleFromUserShouldThrowWhenCallerNotChair() {
+        when(conferenceUserTrackRepository.findById(REVIEWER_ASSIGNMENT_ID)).thenReturn(Optional.of(reviewerAssignment));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(false);
+
+        assertThrows(ForbiddenException.class,
+                () -> conferenceUserTrackService.removeRoleFromUser(REVIEWER_ASSIGNMENT_ID));
+    }
+
+    @Test
+    void removeRoleFromUserShouldThrowWhenRemovingLastConferenceChair() {
+        when(conferenceUserTrackRepository.findById(CHAIR_ASSIGNMENT_ID)).thenReturn(Optional.of(chairAssignment));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(conferenceUserTrackRepository.findByConference_IdAndAssignedRole(CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR))
+                .thenReturn(List.of(chairAssignment));
+
+        assertThrows(BadRequestException.class,
+                () -> conferenceUserTrackService.removeRoleFromUser(CHAIR_ASSIGNMENT_ID));
+    }
+
+    @Test
+    void removeRoleFromUserShouldThrowWhenReviewerHasAssignments() {
+        when(conferenceUserTrackRepository.findById(REVIEWER_ASSIGNMENT_ID)).thenReturn(Optional.of(reviewerAssignment));
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(reviewRepository.countByReviewer_IdAndPaper_Track_Conference_Id(USER_ID, CONFERENCE_ID)).thenReturn(2L);
+
+        assertThrows(BadRequestException.class,
+                () -> conferenceUserTrackService.removeRoleFromUser(REVIEWER_ASSIGNMENT_ID));
+    }
+
+    @Test
+    void getReviewerConferencesByUserIdShouldSkipUnacceptedAssignments() {
+        reviewerAssignment.setIsAccepted(false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceUserTrackRepository.findByUser_IdAndAssignedRole(USER_ID, ConferenceTrackRole.REVIEWER))
+                .thenReturn(List.of(reviewerAssignment));
+
+        var result = conferenceUserTrackService.getReviewerConferencesByUserId(USER_ID, 0, 20);
+
+        assertNotNull(result);
+        assertEquals(0, result.getContent().size());
     }
 }
 

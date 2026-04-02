@@ -77,6 +77,32 @@ public class PaperFileController {
         return new ResponseEntity<>(paperFileService.createCameraReadyFile(dto), HttpStatus.CREATED);
     }
 
+    @PostMapping(value = "/upload-copyright", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a copyright submission file (only for ACCEPTED papers, requires paid conference registration)")
+    public ResponseEntity<PaperFileResponseDTO> uploadCopyrightFile(
+            @RequestParam("conferenceId") Integer conferenceId,
+            @RequestParam("paperId") Integer paperId,
+            @RequestParam("userId") Integer userId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        // Gate: author must have a PAID ticket to upload copyright
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found: " + userId));
+        boolean hasPaidTicket = ticketRepository.existsByUserAndConferenceIdAndPaymentStatus(
+                user, conferenceId, PaymentStatus.COMPLETED);
+        if (!hasPaidTicket) {
+            throw new BadRequestException(
+                    "You must register and pay the conference fee before uploading copyright submission files.");
+        }
+        String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
+        PaperFileDTO dto = PaperFileDTO.builder()
+                .paperId(paperId)
+                .url(downloadUrl)
+                .isActive(true)
+                .isCopyrightSubmission(true)
+                .build();
+        return new ResponseEntity<>(paperFileService.createCopyrightSubmission(dto), HttpStatus.CREATED);
+    }
+
     @PostMapping("/approve-camera-ready/{paperId}")
     @Operation(summary = "Approve camera-ready submission — transitions paper status from ACCEPTED to PUBLISHED")
     public ResponseEntity<Void> approveCameraReady(@PathVariable Integer paperId) {

@@ -3,6 +3,7 @@ package com.capstone.confhub.service.impl;
 import com.capstone.confhub.dto.request.TicketTypeRequest;
 import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.TicketType;
+import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.TicketTypeRepository;
 import com.capstone.confhub.utils.enums.TicketCategory;
@@ -22,6 +23,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -29,6 +32,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TicketTypeServiceImplTest {
+
+    private static final int CONFERENCE_ID = 1;
+    private static final int TICKET_TYPE_ID = 10;
 
     @Mock
     private TicketTypeRepository ticketTypeRepository;
@@ -43,7 +49,7 @@ class TicketTypeServiceImplTest {
     @BeforeEach
     void setUp() {
         conference = new Conference();
-        conference.setId(1);
+        conference.setId(CONFERENCE_ID);
         conference.setName("Conf");
     }
 
@@ -58,19 +64,19 @@ class TicketTypeServiceImplTest {
         request.setIsActive(null);
         request.setMaxQuantity(100);
 
-        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
         when(ticketTypeRepository.save(any(TicketType.class))).thenAnswer(invocation -> {
             TicketType entity = invocation.getArgument(0);
-            entity.setId(10);
+            entity.setId(TICKET_TYPE_ID);
             entity.setQuantitySold(5);
             return entity;
         });
 
-        var result = ticketTypeService.create(1, request);
+        var result = ticketTypeService.create(CONFERENCE_ID, request);
 
         assertNotNull(result);
-        assertEquals(10, result.getId());
-        assertEquals(1, result.getConferenceId());
+        assertEquals(TICKET_TYPE_ID, result.getId());
+        assertEquals(CONFERENCE_ID, result.getConferenceId());
         assertEquals("VND", result.getCurrency());
         assertTrue(result.getIsActive());
         assertEquals(95, result.getAvailableSlots());
@@ -81,9 +87,20 @@ class TicketTypeServiceImplTest {
     }
 
     @Test
+    void createShouldThrowWhenConferenceNotFound() {
+        TicketTypeRequest request = new TicketTypeRequest();
+        request.setName("Early Bird");
+
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> ticketTypeService.create(CONFERENCE_ID, request));
+    }
+
+    @Test
     void updateShouldReturnUpdatedResponse() {
         TicketType existing = new TicketType();
-        existing.setId(10);
+        existing.setId(TICKET_TYPE_ID);
         existing.setConference(conference);
         existing.setQuantitySold(0);
 
@@ -96,17 +113,28 @@ class TicketTypeServiceImplTest {
         request.setIsActive(false);
         request.setMaxQuantity(50);
 
-        when(ticketTypeRepository.findById(10)).thenReturn(Optional.of(existing));
+        when(ticketTypeRepository.findById(TICKET_TYPE_ID)).thenReturn(Optional.of(existing));
         when(ticketTypeRepository.save(any(TicketType.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = ticketTypeService.update(10, request);
+        var result = ticketTypeService.update(TICKET_TYPE_ID, request);
 
         assertNotNull(result);
         assertEquals("Standard", result.getName());
         assertEquals("USD", result.getCurrency());
         assertFalse(result.getIsActive());
-        verify(ticketTypeRepository).findById(10);
+        verify(ticketTypeRepository).findById(TICKET_TYPE_ID);
         verify(ticketTypeRepository).save(existing);
+    }
+
+    @Test
+    void updateShouldThrowWhenTicketTypeNotFound() {
+        TicketTypeRequest request = new TicketTypeRequest();
+        request.setName("Standard");
+
+        when(ticketTypeRepository.findById(TICKET_TYPE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> ticketTypeService.update(TICKET_TYPE_ID, request));
     }
 
     @Test
@@ -122,13 +150,13 @@ class TicketTypeServiceImplTest {
         ticketType.setQuantitySold(1);
         ticketType.setMaxQuantity(10);
 
-        when(ticketTypeRepository.findByConferenceIdAndIsActiveTrue(1)).thenReturn(List.of(ticketType));
+        when(ticketTypeRepository.findByConferenceIdAndIsActiveTrue(CONFERENCE_ID)).thenReturn(List.of(ticketType));
 
-        var result = ticketTypeService.getByConference(1, true);
+        var result = ticketTypeService.getByConference(CONFERENCE_ID, true);
 
         assertEquals(1, result.size());
         assertEquals("Early Bird", result.get(0).getName());
-        verify(ticketTypeRepository).findByConferenceIdAndIsActiveTrue(1);
+        verify(ticketTypeRepository).findByConferenceIdAndIsActiveTrue(CONFERENCE_ID);
     }
 
     @Test
@@ -143,13 +171,23 @@ class TicketTypeServiceImplTest {
         ticketType.setIsActive(false);
         ticketType.setQuantitySold(0);
 
-        when(ticketTypeRepository.findByConferenceId(1)).thenReturn(List.of(ticketType));
+        when(ticketTypeRepository.findByConferenceId(CONFERENCE_ID)).thenReturn(List.of(ticketType));
 
-        var result = ticketTypeService.getByConference(1, false);
+        var result = ticketTypeService.getByConference(CONFERENCE_ID, false);
 
         assertEquals(1, result.size());
         assertEquals("Standard", result.get(0).getName());
-        verify(ticketTypeRepository).findByConferenceId(1);
+        verify(ticketTypeRepository).findByConferenceId(CONFERENCE_ID);
+    }
+
+    @Test
+    void getByConferenceShouldReturnEmptyWhenNoTicketTypes() {
+        when(ticketTypeRepository.findByConferenceId(CONFERENCE_ID)).thenReturn(List.of());
+
+        var result = ticketTypeService.getByConference(CONFERENCE_ID, false);
+
+        assertNotNull(result);
+        assertEquals(0, result.size());
     }
 
     @Test
@@ -160,6 +198,13 @@ class TicketTypeServiceImplTest {
 
         verify(ticketTypeRepository).existsById(5);
         verify(ticketTypeRepository).deleteById(5);
+    }
+
+    @Test
+    void deleteShouldThrowWhenTicketTypeNotFound() {
+        when(ticketTypeRepository.existsById(5)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> ticketTypeService.delete(5));
     }
 
     @Test
@@ -182,6 +227,27 @@ class TicketTypeServiceImplTest {
         assertEquals(0, result.getAvailableSlots());
         assertTrue(result.getIsSoldOut());
         assertTrue(result.getIsDeadlinePassed());
+    }
+
+    @Test
+    void mapToResponseShouldHandleUnlimitedTickets() {
+        TicketType ticketType = new TicketType();
+        ticketType.setId(7);
+        ticketType.setConference(conference);
+        ticketType.setName("Unlimited");
+        ticketType.setPrice(BigDecimal.valueOf(1200000));
+        ticketType.setCurrency("VND");
+        ticketType.setCategory(TicketCategory.STANDARD);
+        ticketType.setIsActive(true);
+        ticketType.setMaxQuantity(null);
+        ticketType.setQuantitySold(3);
+        ticketType.setDeadline(LocalDateTime.now().plusDays(3));
+
+        var result = ticketTypeService.mapToResponse(ticketType);
+
+        assertNull(result.getAvailableSlots());
+        assertFalse(result.getIsSoldOut());
+        assertFalse(result.getIsDeadlinePassed());
     }
 }
 

@@ -136,7 +136,27 @@ class ConferenceTrackServiceImplTest {
 
         verify(conferenceTrackRepository).deleteById(10);
     }
+
+    @Test
+    void createTrackShouldThrowExceptionWhenConferenceNotFound() {
+        ConferenceTrackDTO dto = new ConferenceTrackDTO();
+        dto.setConferenceId(999);
+        when(conferenceRepository.findById(999)).thenReturn(Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.persistence.EntityNotFoundException.class,
+            () -> conferenceTrackService.createTrack(dto)
+        );
+    }
+
+    @Test
+    void updateTrackShouldThrowExceptionWhenTrackNotFound() {
+        ConferenceTrackDTO dto = new ConferenceTrackDTO();
+        when(conferenceTrackRepository.findById(999)).thenReturn(Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.persistence.EntityNotFoundException.class,
+            () -> conferenceTrackService.updateTrack(999, dto)
+        );
+    }
 }
-
-
-

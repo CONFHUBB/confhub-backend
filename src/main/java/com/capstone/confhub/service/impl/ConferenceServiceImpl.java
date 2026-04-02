@@ -251,8 +251,11 @@ public class ConferenceServiceImpl implements ConferenceService {
                                 if (s.path("isGlobal").asBoolean()) {
                                     globalSessions.add(s);
                                 } else {
-                                    String locId = s.path("locationId").asText();
-                                    locSessions.computeIfAbsent(locId, k -> new ArrayList<>()).add(s);
+                                    String loc = s.has("location") ? s.path("location").asText() : s.path("locationId").asText();
+                                    if (loc == null || loc.isBlank()) {
+                                        loc = "unassigned-" + s.path("id").asText();
+                                    }
+                                    locSessions.computeIfAbsent(loc, k -> new ArrayList<>()).add(s);
                                 }
                             }
 
@@ -417,6 +420,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .bannerImageUrl(entity.getBannerImageUrl())
                 .contactInformation(entity.getContactInformation())
                 .chairEmails(entity.getChairEmails())
+                .programSchedule(entity.getProgramSchedule())
                 .build();
     }
 

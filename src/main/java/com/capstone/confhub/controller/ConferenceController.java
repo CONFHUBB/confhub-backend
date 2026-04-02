@@ -119,21 +119,27 @@ public class ConferenceController {
     }
 
     // --- PROGRAM SCHEDULE (JSON Blob) ---
-    @GetMapping("/{id}/program")
+    @GetMapping(value = "/{id}/program", produces = "application/json")
     @Operation(summary = "Get conference schedule as raw JSON")
     public ResponseEntity<String> getProgramSchedule(@PathVariable("id") Integer id) {
         String json = conferenceService.getProgramSchedule(id);
         if (json == null || json.trim().isEmpty()) {
             json = "{\"rooms\":[],\"sessions\":[],\"published\":false}";
         }
-        return ResponseEntity.ok().header("Content-Type", "application/json").body(json);
+        return ResponseEntity.ok(json);
     }
 
     @PutMapping("/{id}/program")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Save conference schedule JSON blob")
-    public ResponseEntity<Void> updateProgramSchedule(@PathVariable("id") Integer id, @RequestBody JsonNode programSchedule) {
-        conferenceService.updateProgramSchedule(id, programSchedule.toString());
+    public ResponseEntity<Void> updateProgramSchedule(@PathVariable("id") Integer id, @RequestBody java.util.Map<String, Object> programSchedule) {
+        String jsonStr;
+        try {
+            jsonStr = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(programSchedule);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Error processing JSON", e);
+        }
+        conferenceService.updateProgramSchedule(id, jsonStr);
         return ResponseEntity.ok().build();
     }
 

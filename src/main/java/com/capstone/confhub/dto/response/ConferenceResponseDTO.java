@@ -27,4 +27,5 @@ public class ConferenceResponseDTO {
     private String bannerImageUrl;
     private String contactInformation;
     private String chairEmails;
+    private String programSchedule;
 }

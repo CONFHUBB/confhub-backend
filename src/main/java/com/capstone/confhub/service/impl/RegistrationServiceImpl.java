@@ -392,6 +392,26 @@ public class RegistrationServiceImpl implements RegistrationService {
         log.info("Ticket {} refunded for conference {}", ticket.getRegistrationNumber(), conferenceId);
     }
 
+    @Override
+    @Transactional
+    public void cancelPendingTicket(Integer conferenceId, Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        Ticket ticket = ticketRepository.findByUserAndConferenceId(user, conferenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("No registration found for this conference."));
+
+        if (PaymentStatus.COMPLETED.equals(ticket.getPaymentStatus()) || PaymentStatus.REFUNDED.equals(ticket.getPaymentStatus())) {
+            throw new BadRequestException("Cannot cancel a completed or refunded ticket.");
+        }
+
+        // Fully delete pending payment and ticket to allow re-registration
+        paymentRepository.findByTicket(ticket).ifPresent(paymentRepository::delete);
+        ticketRepository.delete(ticket);
+
+        log.info("Cancelled pending ticket {} for user {} at conference {}", ticket.getRegistrationNumber(), userId, conferenceId);
+    }
+
     // ========== Helpers ==========
 
     private TicketResponse mapToTicketResponse(Ticket t) {

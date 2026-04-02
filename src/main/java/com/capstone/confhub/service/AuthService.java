@@ -4,6 +4,7 @@ import com.capstone.confhub.dto.UserDTO;
 import com.capstone.confhub.dto.request.ActivateAccountRequest;
 import com.capstone.confhub.dto.request.ChangePasswordRequest;
 import com.capstone.confhub.dto.request.ForgotPasswordRequest;
+import com.capstone.confhub.dto.request.GoogleAuthRequest;
 import com.capstone.confhub.dto.request.LoginRequest;
 import com.capstone.confhub.dto.request.ResetPasswordRequest;
 import com.capstone.confhub.dto.response.JwtResponse;
@@ -23,4 +24,6 @@ public interface AuthService {
     MessageResponse resetPassword(ResetPasswordRequest request);
 
     JwtResponse activateAccount(ActivateAccountRequest request);
+
+    JwtResponse authenticateWithGoogle(GoogleAuthRequest request);
 }

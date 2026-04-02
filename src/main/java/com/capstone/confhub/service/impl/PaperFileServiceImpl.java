@@ -44,8 +44,43 @@ public class PaperFileServiceImpl implements PaperFileService {
     @Override
     @Transactional
     public PaperFileResponseDTO createPaperFile(PaperFileDTO dto) {
+        // Auto-archive existing active manuscript files for this paper
+        List<PaperFile> existingActive = paperFileRepository.findByPaper_Id(dto.getPaperId()).stream()
+                .filter(f -> Boolean.TRUE.equals(f.getIsActive())
+                        && !Boolean.TRUE.equals(f.getIsCameraReady())
+                        && !Boolean.TRUE.equals(f.getIsCopyrightSubmission())
+                        && !Boolean.TRUE.equals(f.getIsSupplementary()))
+                .toList();
+        for (PaperFile old : existingActive) {
+            old.setIsActive(false);
+            old.setUpdatedAt(LocalDateTime.now());
+            paperFileRepository.save(old);
+            log.info("Auto-archived old manuscript file {} for paper {}", old.getId(), dto.getPaperId());
+        }
+
         PaperFile entity = new PaperFile();
         mapDtoToPaperFileEntity(dto, entity);
+        return mapToPaperFileResponseDTO(paperFileRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public PaperFileResponseDTO createSupplementaryFile(PaperFileDTO dto) {
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
+        PaperFile entity = new PaperFile();
+        entity.setPaper(paper);
+        entity.setUrl(dto.getUrl());
+        entity.setIsActive(true);
+        entity.setIsCameraReady(false);
+        entity.setIsRevision(false);
+        entity.setIsCopyrightSubmission(false);
+        entity.setIsSupplementary(true);
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+
+        log.info("Supplementary file uploaded for paper {}", paper.getId());
         return mapToPaperFileResponseDTO(paperFileRepository.save(entity));
     }
 
@@ -80,6 +115,32 @@ public class PaperFileServiceImpl implements PaperFileService {
             throw new ResourceNotFoundException("Cannot delete. PaperFile not found with id " + id);
         }
         paperFileRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public PaperFileResponseDTO setActiveFile(Integer fileId) {
+        PaperFile target = paperFileRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("PaperFile not found with id " + fileId));
+
+        // Deactivate all other manuscript files for this paper
+        List<PaperFile> allManuscripts = paperFileRepository.findByPaper_Id(target.getPaper().getId()).stream()
+                .filter(f -> !Boolean.TRUE.equals(f.getIsCameraReady())
+                        && !Boolean.TRUE.equals(f.getIsCopyrightSubmission())
+                        && !Boolean.TRUE.equals(f.getIsSupplementary()))
+                .toList();
+
+        for (PaperFile pf : allManuscripts) {
+            pf.setIsActive(false);
+            pf.setUpdatedAt(LocalDateTime.now());
+            paperFileRepository.save(pf);
+        }
+
+        // Activate the target file
+        target.setIsActive(true);
+        target.setUpdatedAt(LocalDateTime.now());
+        log.info("Set file {} as active manuscript for paper {}", fileId, target.getPaper().getId());
+        return mapToPaperFileResponseDTO(paperFileRepository.save(target));
     }
 
     // ===================== Camera-Ready Methods =====================
@@ -220,6 +281,7 @@ public class PaperFileServiceImpl implements PaperFileService {
         entity.setIsCameraReady(dto.getIsCameraReady() != null ? dto.getIsCameraReady() : false);
         entity.setIsRevision(dto.getIsRevision() != null ? dto.getIsRevision() : false);
         entity.setIsCopyrightSubmission(dto.getIsCopyrightSubmission() != null ? dto.getIsCopyrightSubmission() : false);
+        entity.setIsSupplementary(dto.getIsSupplementary() != null ? dto.getIsSupplementary() : false);
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
@@ -235,6 +297,7 @@ public class PaperFileServiceImpl implements PaperFileService {
                 .isCameraReady(entity.getIsCameraReady())
                 .isRevision(entity.getIsRevision())
                 .isCopyrightSubmission(entity.getIsCopyrightSubmission())
+                .isSupplementary(entity.getIsSupplementary())
                 .build();
     }
 }

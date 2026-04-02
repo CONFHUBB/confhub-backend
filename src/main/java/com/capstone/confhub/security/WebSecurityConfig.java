@@ -66,6 +66,7 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/request-otp",
                                 "/api/v1/auth/activate",
+                                "/api/v1/auth/google",
                                 "/api/v1/email/accept/**",
                                 "/api/v1/email/decline/**",
                                 "/api/v1/payment/vnpay-callback")
@@ -74,6 +75,8 @@ public class WebSecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/v1/conferences",
                                 "/api/v1/conferences/**",
+                                "/api/v1/conferences-track/**",
+                                "/api/v1/subject-areas/**",
                                 "/api/v1/paper/published",
                                 "/api/v1/paper-file/paper/**").permitAll()
                         .anyRequest().authenticated());

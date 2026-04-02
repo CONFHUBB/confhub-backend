@@ -4,6 +4,7 @@ import com.capstone.confhub.dto.UserDTO;
 import com.capstone.confhub.dto.request.ActivateAccountRequest;
 import com.capstone.confhub.dto.request.ChangePasswordRequest;
 import com.capstone.confhub.dto.request.ForgotPasswordRequest;
+import com.capstone.confhub.dto.request.GoogleAuthRequest;
 import com.capstone.confhub.dto.request.LoginRequest;
 import com.capstone.confhub.dto.request.ResetPasswordRequest;
 import com.capstone.confhub.service.AuthService;
@@ -55,5 +56,10 @@ public class AuthController {
     @PostMapping("/activate")
     public ResponseEntity<JwtResponse> activateAccount(@Valid @RequestBody ActivateAccountRequest request) {
         return ResponseEntity.ok(authService.activateAccount(request));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<JwtResponse> authenticateWithGoogle(@Valid @RequestBody GoogleAuthRequest request) {
+        return ResponseEntity.ok(authService.authenticateWithGoogle(request));
     }
 }

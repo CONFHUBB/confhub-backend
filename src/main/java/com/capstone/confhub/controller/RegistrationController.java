@@ -93,4 +93,13 @@ public class RegistrationController {
         registrationService.refundTicket(conferenceId, ticketId);
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/conferences/{conferenceId}/cancel-pending")
+    @Operation(summary = "Cancel a pending or failed registration so the user can register again")
+    public ResponseEntity<Void> cancelPendingTicket(
+            @PathVariable Integer conferenceId,
+            @RequestParam Integer userId) {
+        registrationService.cancelPendingTicket(conferenceId, userId);
+        return ResponseEntity.ok().build();
+    }
 }

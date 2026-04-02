@@ -123,7 +123,7 @@ public class ReviewServiceImpl implements ReviewService {
                                 .title("Review completed by " + reviewerName)
                                 .message(reviewerName + " has completed their review for \"" + saved.getPaper().getTitle() + "\".")
                                 .type("REVIEW_COMPLETED")
-                                .link("/conference/" + conference.getId() + "/update")
+                                .link("/conference/" + conference.getId() + "/update?tab=features-review-management")
                                 .isRead(false).build());
                     }
                 }
@@ -134,7 +134,7 @@ public class ReviewServiceImpl implements ReviewService {
                                 .title("Review completed by " + reviewerName)
                                 .message(reviewerName + " has completed their review for \"" + saved.getPaper().getTitle() + "\".")
                                 .type("REVIEW_COMPLETED")
-                                .link("/conference/" + conference.getId() + "/update")
+                                .link("/conference/" + conference.getId() + "/update?tab=features-review-management")
                                 .isRead(false).build());
                     }
                 }

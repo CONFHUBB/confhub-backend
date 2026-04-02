@@ -1,5 +1,6 @@
 package com.capstone.confhub.entity;
 
+import com.capstone.confhub.utils.enums.PlagiarismStatus;
 import com.capstone.confhub.utils.enums.PaperStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -74,4 +75,15 @@ public class Paper extends BaseEntity {
     @Column(name = "is_discussion_enabled", nullable = false)
     private Boolean isDiscussionEnabled = false;
 
+    // ==================== Plagiarism Fields ====================
+
+    @Column(name = "plagiarism_score")
+    private Double plagiarismScore;
+
+    @Column(name = "plagiarism_status")
+    @Enumerated(EnumType.STRING)
+    private PlagiarismStatus plagiarismStatus;
+
+    @Column(name = "plagiarism_details", columnDefinition = "TEXT")
+    private String plagiarismDetailsJson;
 }

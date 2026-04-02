@@ -4,6 +4,7 @@ import com.capstone.confhub.dto.UserDTO;
 import com.capstone.confhub.dto.request.ActivateAccountRequest;
 import com.capstone.confhub.dto.request.ChangePasswordRequest;
 import com.capstone.confhub.dto.request.ForgotPasswordRequest;
+import com.capstone.confhub.dto.request.GoogleAuthRequest;
 import com.capstone.confhub.dto.request.LoginRequest;
 import com.capstone.confhub.dto.request.ResetPasswordRequest;
 import com.capstone.confhub.dto.response.JwtResponse;
@@ -22,7 +23,11 @@ import com.capstone.confhub.security.jwt.JwtTokenProvider;
 import com.capstone.confhub.security.services.UserDetailsImpl;
 import com.capstone.confhub.service.AuthService;
 import com.capstone.confhub.service.EmailService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -31,14 +36,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.LocalDateTime;
 import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
@@ -52,8 +60,12 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
 
+    @Value("${app.google.client-id:}")
+    private String googleClientId;
+
     private static final int OTP_LENGTH = 6;
     private static final long OTP_TTL_MINUTES = 5;
+
 
     @Override
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
@@ -83,7 +95,6 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Email is already in use");
         }
 
-        // Create new user's account
         User user = new User();
         user.setFirstName(signUpRequest.getFirstName());
         user.setLastName(signUpRequest.getLastName());
@@ -94,12 +105,10 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
 
-        // Assign roles from database
         Set<String> strRoles = signUpRequest.getRoles();
         Set<Role> roles = new HashSet<>();
 
         if (strRoles == null || strRoles.isEmpty()) {
-            // Default role is AUTHOR
             Role authorRole = roleRepository.findByName("AUTHOR")
                     .orElseThrow(() -> new BadRequestException("Role AUTHOR is not found"));
             roles.add(authorRole);
@@ -111,7 +120,6 @@ public class AuthServiceImpl implements AuthService {
             });
         }
 
-        // Save UserRole entries
         for (Role role : roles) {
             UserRole userRole = new UserRole();
             userRole.setUser(user);
@@ -119,7 +127,6 @@ public class AuthServiceImpl implements AuthService {
             userRoleRepository.save(userRole);
         }
 
-        // Create empty UserProfile
         UserProfile profile = new UserProfile();
         profile.setUser(user);
         userProfileRepository.save(profile);
@@ -131,7 +138,6 @@ public class AuthServiceImpl implements AuthService {
     public MessageResponse requestOtp() {
         User user = getCurrentAuthenticatedUser();
         sendOtpEmail(user, "Change Password OTP", "Your OTP for changing password is: ");
-
         return new MessageResponse("OTP sent to your email!");
     }
 
@@ -140,12 +146,10 @@ public class AuthServiceImpl implements AuthService {
         User user = getCurrentAuthenticatedUser();
         validateOtp(user, changePasswordRequest.getOtp());
 
-        // Verify current password
         if (!encoder.matches(changePasswordRequest.getCurrentPassword(), user.getPassword())) {
             throw new BadRequestException("Current password is incorrect");
         }
 
-        // Update password
         user.setPassword(encoder.encode(changePasswordRequest.getNewPassword()));
         user.setOtpCode(null);
         user.setOtpExpiration(null);
@@ -160,7 +164,6 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
 
         sendOtpEmail(user, "Password Reset OTP", "Your OTP for password reset is: ");
-
         return new MessageResponse("OTP sent to your email!");
     }
 
@@ -172,7 +175,6 @@ public class AuthServiceImpl implements AuthService {
 
         validateOtp(user, request.getOtp());
 
-        // Update Password
         user.setPassword(encoder.encode(request.getNewPassword()));
         user.setOtpCode(null);
         user.setOtpExpiration(null);
@@ -180,6 +182,159 @@ public class AuthServiceImpl implements AuthService {
 
         return new MessageResponse("Password reset successfully!");
     }
+
+    @Override
+    @Transactional
+    public JwtResponse authenticateWithGoogle(GoogleAuthRequest request) {
+        try {
+            // Decode Google ID token (JWT) directly - no external API call needed
+            // Google ID tokens are JWTs with 3 parts: header.payload.signature
+            String[] parts = request.getIdToken().split("\\.");
+            if (parts.length < 2) {
+                throw new BadRequestException("Invalid Google ID token format");
+            }
+
+            // Decode the payload (2nd part)
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode tokenInfo = mapper.readTree(payload);
+
+            // Verify the token is for our app
+            String aud = tokenInfo.has("aud") ? tokenInfo.get("aud").asText() : "";
+            if (!googleClientId.equals(aud)) {
+                throw new BadRequestException("Invalid Google ID token: audience mismatch");
+            }
+
+            // Verify token is not expired
+            long exp = tokenInfo.has("exp") ? tokenInfo.get("exp").asLong() : 0;
+            if (exp < System.currentTimeMillis() / 1000) {
+                throw new BadRequestException("Google ID token has expired");
+            }
+
+            // Verify issuer
+            String iss = tokenInfo.has("iss") ? tokenInfo.get("iss").asText() : "";
+            if (!iss.equals("accounts.google.com") && !iss.equals("https://accounts.google.com")) {
+                throw new BadRequestException("Invalid Google ID token: invalid issuer");
+            }
+
+            String email = tokenInfo.has("email") ? tokenInfo.get("email").asText() : null;
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Invalid Google ID token: no email");
+            }
+
+            String firstName = tokenInfo.has("given_name") ? tokenInfo.get("given_name").asText() : email.split("@")[0];
+            String lastName = tokenInfo.has("family_name") ? tokenInfo.get("family_name").asText() : "";
+
+            // Check if user already exists
+            User user;
+            var existingUser = userRepository.findByEmail(email);
+
+            if (existingUser.isPresent()) {
+                user = existingUser.get();
+                if (!Boolean.TRUE.equals(user.getIsActive())) {
+                    user.setIsActive(true);
+                    userRepository.save(user);
+                }
+            } else {
+                // Create new user with random password
+                String randomPassword = UUID.randomUUID().toString() + UUID.randomUUID().toString();
+
+                user = new User();
+                user.setFirstName(firstName);
+                user.setLastName(lastName);
+                user.setEmail(email);
+                user.setPassword(encoder.encode(randomPassword));
+                user.setIsActive(true);
+                userRepository.save(user);
+
+                // Assign default AUTHOR role
+                Role authorRole = roleRepository.findByName("AUTHOR")
+                        .orElseThrow(() -> new BadRequestException("Role AUTHOR is not found"));
+                UserRole userRole = new UserRole();
+                userRole.setUser(user);
+                userRole.setRole(authorRole);
+                userRoleRepository.save(userRole);
+
+                // Create empty UserProfile
+                UserProfile profile = new UserProfile();
+                profile.setUser(user);
+                userProfileRepository.save(profile);
+
+                log.info("Created new user from Google login: {}", email);
+            }
+
+            // Generate JWT directly (bypass password authentication)
+            List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
+            UserDetailsImpl userDetails = UserDetailsImpl.build(user, userRoles);
+
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtTokenProvider.generateJwtToken(authentication);
+
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(item -> item.getAuthority())
+                    .collect(Collectors.toList());
+
+            return new JwtResponse(jwt,
+                    userDetails.getId(),
+                    userDetails.getEmail(),
+                    userDetails.getFirstName(),
+                    userDetails.getLastName(),
+                    roles);
+
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Google authentication failed: {}", e.getMessage(), e);
+            throw new BadRequestException("Google authentication failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public JwtResponse activateAccount(ActivateAccountRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
+
+        if (Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BadRequestException("Account is already activated");
+        }
+
+        var cut = conferenceUserTrackRepository.findByInvitationToken(request.getInvitationToken())
+                .orElseThrow(() -> new BadRequestException("Invalid invitation token"));
+
+        if (!cut.getUser().getId().equals(user.getId())) {
+            throw new BadRequestException("Token does not match this email");
+        }
+
+        user.setPassword(encoder.encode(request.getNewPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setIsActive(true);
+        user.setOtpCode(null);
+        user.setOtpExpiration(null);
+        userRepository.save(user);
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getNewPassword()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtTokenProvider.generateJwtToken(authentication);
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        return new JwtResponse(jwt,
+                userDetails.getId(),
+                userDetails.getEmail(),
+                userDetails.getFirstName(),
+                userDetails.getLastName(),
+                roles);
+    }
+
+    // ==================== PRIVATE HELPERS ====================
 
     private User getCurrentAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -221,51 +376,5 @@ public class AuthServiceImpl implements AuthService {
         if (user.getOtpExpiration() == null || user.getOtpExpiration().isBefore(LocalDateTime.now())) {
             throw new BadRequestException("OTP has expired");
         }
-    }
-
-    @Override
-    @Transactional
-    public JwtResponse activateAccount(ActivateAccountRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadRequestException("User not found with email: " + request.getEmail()));
-
-        if (Boolean.TRUE.equals(user.getIsActive())) {
-            throw new BadRequestException("Account is already activated");
-        }
-
-        // Verify invitation token
-        var cut = conferenceUserTrackRepository.findByInvitationToken(request.getInvitationToken())
-                .orElseThrow(() -> new BadRequestException("Invalid invitation token"));
-
-        if (!cut.getUser().getId().equals(user.getId())) {
-            throw new BadRequestException("Token does not match this email");
-        }
-
-        // Update user info
-        user.setPassword(encoder.encode(request.getNewPassword()));
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setIsActive(true);
-        user.setOtpCode(null);
-        user.setOtpExpiration(null);
-        userRepository.save(user);
-
-        // Auto-login: authenticate and return JWT
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getNewPassword()));
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtTokenProvider.generateJwtToken(authentication);
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority())
-                .collect(Collectors.toList());
-
-        return new JwtResponse(jwt,
-                userDetails.getId(),
-                userDetails.getEmail(),
-                userDetails.getFirstName(),
-                userDetails.getLastName(),
-                roles);
     }
 }

@@ -10,6 +10,7 @@ import com.capstone.confhub.repository.TicketRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.FirebaseStorageService;
 import com.capstone.confhub.service.PaperFileService;
+import com.capstone.confhub.service.impl.PlagiarismService;
 import com.capstone.confhub.utils.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +33,7 @@ public class PaperFileController {
 
     private final PaperFileService paperFileService;
     private final FirebaseStorageService firebaseStorageService;
+    private final PlagiarismService plagiarismService;
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
@@ -48,7 +50,29 @@ public class PaperFileController {
                 .url(downloadUrl)
                 .isActive(true)
                 .build();
-        return new ResponseEntity<>(paperFileService.createPaperFile(dto), HttpStatus.CREATED);
+        PaperFileResponseDTO response = paperFileService.createPaperFile(dto);
+        // Trigger async plagiarism check
+        plagiarismService.checkPlagiarismAsync(paperId);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping(value = "/upload-supplementary", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a supplementary file for a paper")
+    public ResponseEntity<PaperFileResponseDTO> uploadSupplementaryFile(
+            @RequestParam("conferenceId") Integer conferenceId,
+            @RequestParam("paperId") Integer paperId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
+        PaperFileDTO dto = PaperFileDTO.builder()
+                .paperId(paperId)
+                .url(downloadUrl)
+                .isActive(true)
+                .isSupplementary(true)
+                .build();
+        PaperFileResponseDTO response = paperFileService.createSupplementaryFile(dto);
+        // Trigger async plagiarism check for supplementary files too
+        plagiarismService.checkPlagiarismAsync(paperId);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PostMapping(value = "/upload-camera-ready", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -183,6 +207,12 @@ public class PaperFileController {
     public ResponseEntity<PaperFileResponseDTO> updatePaperFile(@Valid @PathVariable Integer id,
             @RequestBody PaperFileDTO dto) {
         return ResponseEntity.ok(paperFileService.updatePaperFile(id, dto));
+    }
+
+    @PutMapping("/{id}/set-active")
+    @Operation(summary = "Set a manuscript file as the active version (deactivates all others)")
+    public ResponseEntity<PaperFileResponseDTO> setActiveFile(@PathVariable Integer id) {
+        return ResponseEntity.ok(paperFileService.setActiveFile(id));
     }
 
     @DeleteMapping("/{id}")

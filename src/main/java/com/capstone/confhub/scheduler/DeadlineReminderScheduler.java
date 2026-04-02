@@ -104,7 +104,7 @@ public class DeadlineReminderScheduler {
                             m.getAssignedRole() == ConferenceTrackRole.REVIEWER);
 
             if (isChair) {
-                link = "/conference/" + conferenceId + "/update";
+                link = "/conference/" + conferenceId + "/update?tab=features-activity-timeline";
             } else if (isReviewer) {
                 link = "/conference/" + conferenceId + "/reviewer";
             }

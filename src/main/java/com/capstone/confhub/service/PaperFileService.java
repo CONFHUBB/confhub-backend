@@ -20,7 +20,11 @@ public interface PaperFileService {
 
     PaperFileResponseDTO createCopyrightSubmission(PaperFileDTO dto);
 
+    PaperFileResponseDTO createSupplementaryFile(PaperFileDTO dto);
+
     void approveCameraReady(Integer paperId);
 
+    PaperFileResponseDTO setActiveFile(Integer fileId);
+
     java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);
-}
+}

@@ -247,7 +247,7 @@ public class ReviewMetaReviewServiceImpl implements ReviewMetaReviewService {
                                 .title(title)
                                 .message(message)
                                 .type("PAPER_DECISION")
-                                .link("/paper")
+                                .link("/paper/" + paper.getId())
                                 .isRead(false)
                                 .build());
                     }

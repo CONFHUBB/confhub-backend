@@ -16,4 +16,5 @@ public class PaperFileDTO {
     private Boolean isCameraReady;
     private Boolean isRevision;
     private Boolean isCopyrightSubmission;
+    private Boolean isSupplementary;
 }

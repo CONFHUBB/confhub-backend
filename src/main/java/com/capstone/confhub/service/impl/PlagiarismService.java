@@ -1,21 +1,26 @@
 package com.capstone.confhub.service.impl;
 
 import com.capstone.confhub.entity.Paper;
+import com.capstone.confhub.entity.PaperFile;
 import com.capstone.confhub.exception.ResourceNotFoundException;
-import com.capstone.confhub.integration.GeminiApiClient;
 import com.capstone.confhub.integration.GoogleSearchClient;
+import com.capstone.confhub.repository.PaperFileRepository;
 import com.capstone.confhub.repository.PaperRepository;
 import com.capstone.confhub.utils.enums.PlagiarismStatus;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
+import java.net.URI;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,7 +29,7 @@ import java.util.stream.Collectors;
  * Plagiarism checking service with triple-layer approach:
  * 1. Internal: TF-IDF Cosine Similarity + N-gram snippet matching against all papers in DB
  * 2. Web Search: Google Custom Search API for finding similar content online
- * 3. External AI: Gemini AI analysis for originality assessment with detailed reasoning
+ * 2. Web Search: Google Custom Search API for finding similar content online
  */
 @Service
 @RequiredArgsConstructor
@@ -32,9 +37,11 @@ import java.util.stream.Collectors;
 public class PlagiarismService {
 
     private final PaperRepository paperRepository;
-    private final GeminiApiClient geminiClient;
+    private final PaperFileRepository paperFileRepository;
     private final GoogleSearchClient googleSearchClient;
     private final ObjectMapper objectMapper;
+
+    private static final int MAX_PDF_TEXT_LENGTH = 15000; // chars for plagiarism check
 
     // ═══════════════════════════════════════════════════════
     //  PUBLIC API
@@ -64,15 +71,20 @@ public class PlagiarismService {
         result.put("paperId", paperId);
         result.put("score", paper.getPlagiarismScore());
         result.put("status", paper.getPlagiarismStatus());
+        result.put("detailsJson", paper.getPlagiarismDetailsJson()); // raw JSON string
 
-        if (paper.getPlagiarismDetailsJson() != null) {
-            try {
-                result.put("details", objectMapper.readTree(paper.getPlagiarismDetailsJson()));
-            } catch (Exception e) {
-                result.put("details", null);
-            }
-        }
         return result;
+    }
+
+    @Transactional
+    public void resetPlagiarism(Integer paperId) {
+        Paper paper = paperRepository.findById(paperId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paper not found: " + paperId));
+        paper.setPlagiarismScore(null);
+        paper.setPlagiarismStatus(null);
+        paper.setPlagiarismDetailsJson(null);
+        paperRepository.save(paper);
+        log.info("[Plagiarism] Reset plagiarism data for paper {}", paperId);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -87,11 +99,14 @@ public class PlagiarismService {
         paper.setPlagiarismStatus(PlagiarismStatus.CHECKING);
         paperRepository.save(paper);
 
-        String text = buildPaperText(paper);
-        if (text.isBlank()) {
-            markFailed(paperId, "Paper has no title or abstract");
+        // Extract text from the ACTIVE PDF file
+        String text = extractPdfTextForPaper(paper);
+        if (text == null || text.isBlank()) {
+            markFailed(paperId, "Could not extract text from PDF. Make sure the paper has an active manuscript file uploaded.");
             return;
         }
+
+        log.info("[Plagiarism] Extracted {} chars from PDF for paper {}", text.length(), paperId);
 
         try {
             // Phase 1: Internal check (Cosine Similarity + N-gram snippets)
@@ -100,20 +115,14 @@ public class PlagiarismService {
             // Phase 2: Web Search check (Google Custom Search API)
             WebSearchResult webSearchResult = performWebSearch(text);
 
-            // Phase 3: External AI check (Gemini with detailed analysis)
-            ExternalCheckResult externalResult = performExternalCheck(paper, text, webSearchResult);
-
-            // Calculate final score = weighted combination
-            double finalScore = Math.max(internalResult.score,
-                    Math.max(webSearchResult.score, externalResult.score));
+            // Calculate final score = max of internal and web
+            double finalScore = Math.max(internalResult.score, webSearchResult.score);
 
             // Build details JSON
             ObjectNode details = objectMapper.createObjectNode();
             details.put("internalScore", round(internalResult.score));
-            details.put("externalScore", round(externalResult.score));
             details.put("webSearchScore", round(webSearchResult.score));
             details.put("finalScore", round(finalScore));
-            details.put("checkedAt", java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now()));
 
             // Internal matches with snippets
             ArrayNode matchesArray = objectMapper.createArrayNode();
@@ -140,22 +149,6 @@ public class PlagiarismService {
                 webMatchesArray.add(wmNode);
             }
             details.set("webSearchMatches", webMatchesArray);
-
-            // External AI analysis
-            ObjectNode extNode = objectMapper.createObjectNode();
-            extNode.put("score", round(externalResult.score));
-            extNode.put("summary", externalResult.summary);
-            ArrayNode flaggedArr = objectMapper.createArrayNode();
-            for (FlaggedSection fs : externalResult.flaggedSections) {
-                ObjectNode fsNode = objectMapper.createObjectNode();
-                fsNode.put("text", fs.text);
-                fsNode.put("reason", fs.reason);
-                fsNode.put("source", fs.source);
-                fsNode.put("confidence", fs.confidence);
-                flaggedArr.add(fsNode);
-            }
-            extNode.set("flaggedSections", flaggedArr);
-            details.set("externalAnalysis", extNode);
 
             details.put("checkedAt", Instant.now().toString());
 
@@ -268,19 +261,37 @@ public class PlagiarismService {
         }
 
         try {
-            // Extract key sentences for search queries
+            // Extract key sentences/phrases for search queries
             List<String> queries = extractSearchQueries(text);
+            log.info("[Plagiarism] Web search with {} queries", queries.size());
             List<WebMatch> allMatches = new ArrayList<>();
 
             for (String query : queries) {
-                List<GoogleSearchClient.SearchResult> results = googleSearchClient.search(
-                        "\"" + query + "\"", 5);  // Exact phrase search
-
-                for (GoogleSearchClient.SearchResult sr : results) {
-                    double similarity = calculateSnippetSimilarity(query, sr.snippet());
-                    if (similarity > 30.0) {
-                        allMatches.add(new WebMatch(sr.link(), sr.title(), sr.snippet(), similarity));
+                // Search 1: exact phrase match (wrap in quotes)
+                try {
+                    List<GoogleSearchClient.SearchResult> exactResults = googleSearchClient.search(
+                            "\"" + query + "\"", 3);
+                    for (GoogleSearchClient.SearchResult sr : exactResults) {
+                        double similarity = calculateSnippetSimilarity(query, sr.snippet());
+                        // Exact phrase match gets a boost
+                        allMatches.add(new WebMatch(sr.link(), sr.title(), sr.snippet(), Math.max(similarity, 50.0)));
                     }
+                } catch (Exception e) {
+                    log.debug("[Plagiarism] Exact search failed for query: {}", e.getMessage());
+                }
+
+                // Search 2: keyword search (without quotes — broader match)
+                try {
+                    List<GoogleSearchClient.SearchResult> keywordResults = googleSearchClient.search(
+                            query, 5);
+                    for (GoogleSearchClient.SearchResult sr : keywordResults) {
+                        double similarity = calculateSnippetSimilarity(query, sr.snippet());
+                        if (similarity > 15.0) {
+                            allMatches.add(new WebMatch(sr.link(), sr.title(), sr.snippet(), similarity));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("[Plagiarism] Keyword search failed for query: {}", e.getMessage());
                 }
             }
 
@@ -297,6 +308,7 @@ public class PlagiarismService {
                     .mapToDouble(m -> m.similarity)
                     .max().orElse(0);
 
+            log.info("[Plagiarism] Web search found {} matches, max score: {}%", finalMatches.size(), round(maxScore));
             return new WebSearchResult(maxScore, finalMatches);
 
         } catch (Exception e) {
@@ -307,23 +319,49 @@ public class PlagiarismService {
 
     /**
      * Extract meaningful search queries from text (key sentences / phrases).
+     * Improved: broader sentence filter, more queries, uses key n-word phrases.
      */
     private List<String> extractSearchQueries(String text) {
-        // Split into sentences and pick the most meaningful ones
-        String[] sentences = text.split("[.!?]+");
+        // Clean text: normalize whitespace, remove references/numbers
+        String cleanText = text.replaceAll("\\s+", " ").trim();
+
+        // Split into sentences
+        String[] sentences = cleanText.split("[.!?]+");
         List<String> queries = new ArrayList<>();
+
         for (String s : sentences) {
             String trimmed = s.trim();
-            // Only use sentences that are meaningful (7-15 words)
             long wordCount = trimmed.split("\\s+").length;
-            if (wordCount >= 7 && wordCount <= 20 && trimmed.length() >= 30) {
+            // Accept sentences from 5 to 40 words
+            if (wordCount >= 5 && wordCount <= 40 && trimmed.length() >= 20) {
+                // If sentence is long, take the first 15 words as query
+                if (wordCount > 15) {
+                    String[] words = trimmed.split("\\s+");
+                    trimmed = String.join(" ", Arrays.copyOfRange(words, 0, Math.min(15, words.length)));
+                }
                 queries.add(trimmed);
             }
         }
-        // Limit to 3 queries to avoid rate limiting
-        if (queries.size() > 3) {
-            queries = queries.subList(0, 3);
+
+        // Also extract the paper title as a query (from first line or first sentence)
+        String firstLine = cleanText.split("\n")[0].trim();
+        if (firstLine.length() >= 10 && firstLine.split("\\s+").length <= 20) {
+            queries.add(0, firstLine); // Title as first query
         }
+
+        // Limit to 5 queries to avoid rate limiting
+        if (queries.size() > 5) {
+            // Take first (title), then evenly sample from the rest
+            List<String> sampled = new ArrayList<>();
+            sampled.add(queries.get(0));
+            int step = Math.max(1, (queries.size() - 1) / 4);
+            for (int i = 1; i < queries.size() && sampled.size() < 5; i += step) {
+                sampled.add(queries.get(i));
+            }
+            queries = sampled;
+        }
+
+        log.info("[Plagiarism] Extracted {} search queries from text", queries.size());
         return queries;
     }
 
@@ -350,97 +388,6 @@ public class PlagiarismService {
         return (double) intersection.size() / queryWords.size() * 100;
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  EXTERNAL CHECK: Gemini AI (Enhanced with web context)
-    // ═══════════════════════════════════════════════════════
-
-    private ExternalCheckResult performExternalCheck(Paper paper, String text, WebSearchResult webContext) {
-        try {
-            // Build web context string from search results
-            StringBuilder webContextStr = new StringBuilder();
-            if (!webContext.matches.isEmpty()) {
-                webContextStr.append("\n\nWEB SEARCH RESULTS (similar content found online):\n");
-                for (WebMatch wm : webContext.matches) {
-                    webContextStr.append("- Source: ").append(wm.title).append(" (").append(wm.url).append(")\n");
-                    webContextStr.append("  Snippet: ").append(wm.snippet).append("\n");
-                }
-            }
-
-            String systemPrompt = """
-                    You are an academic plagiarism detection expert. Analyze the following paper title and abstract
-                    for originality. Check if the content appears to be copied or closely paraphrased from known
-                    published academic works, common textbook content, or widely available online sources.
-                    
-                    You will also be provided with web search results that show similar content found online.
-                    Use these to help identify potential sources of plagiarism.
-                    
-                    Rate the plagiarism percentage from 0 to 100:
-                    - 0 = completely original
-                    - 100 = entirely plagiarized
-                    
-                    For each flagged section, provide:
-                    - The exact text that appears plagiarized
-                    - The reason why it is flagged
-                    - The likely source (paper name, URL, or "common knowledge")
-                    - A confidence level from 0 to 100
-                    
-                    Respond with ONLY valid JSON, no markdown, no other text:
-                    {
-                      "plagiarismScore": <number 0-100>,
-                      "summary": "<detailed assessment explaining WHY this score was given, what parts are original vs suspicious>",
-                      "flaggedSections": [
-                        {
-                          "text": "<exact text that appears plagiarized>",
-                          "reason": "<why this is flagged - e.g. 'closely paraphrases known work', 'common phrasing from textbooks'>",
-                          "source": "<likely source - paper title, URL, or 'common academic phrasing'>",
-                          "confidence": <number 0-100>
-                        }
-                      ]
-                    }
-                    """;
-
-            String userMsg = "Title: " + paper.getTitle() + "\n\nAbstract: " + paper.getAbstractField()
-                    + webContextStr;
-            List<Map<String, String>> messages = List.of(Map.of("role", "user", "content", userMsg));
-
-            String aiReply = geminiClient.generateContent(systemPrompt, messages);
-            log.info("[Plagiarism] Gemini raw response: {}", aiReply);
-
-            return parseExternalResult(aiReply);
-
-        } catch (Exception e) {
-            log.warn("[Plagiarism] Gemini analysis failed: {}. Using 0 for external score.", e.getMessage());
-            return new ExternalCheckResult(0, "Gemini analysis unavailable: " + e.getMessage(), List.of());
-        }
-    }
-
-    private ExternalCheckResult parseExternalResult(String aiReply) {
-        try {
-            String json = extractJson(aiReply);
-            JsonNode root = objectMapper.readTree(json);
-
-            double score = root.path("plagiarismScore").asDouble(0);
-            String summary = root.path("summary").asText("No summary available");
-
-            List<FlaggedSection> flagged = new ArrayList<>();
-            JsonNode flaggedNode = root.path("flaggedSections");
-            if (flaggedNode.isArray()) {
-                for (JsonNode fs : flaggedNode) {
-                    flagged.add(new FlaggedSection(
-                            fs.path("text").asText(""),
-                            fs.path("reason").asText(""),
-                            fs.path("source").asText("unknown"),
-                            fs.path("confidence").asInt(50)
-                    ));
-                }
-            }
-
-            return new ExternalCheckResult(score, summary, flagged);
-        } catch (Exception e) {
-            log.error("[Plagiarism] Failed to parse Gemini response: {}", e.getMessage());
-            return new ExternalCheckResult(0, "Failed to parse AI response", List.of());
-        }
-    }
 
     // ═══════════════════════════════════════════════════════
     //  TF-IDF & COSINE SIMILARITY UTILITIES
@@ -490,6 +437,66 @@ public class PlagiarismService {
     //  HELPERS
     // ═══════════════════════════════════════════════════════
 
+    /**
+     * Extract text from the active PDF file of a paper.
+     * Downloads the PDF from Firebase Storage URL and uses PDFBox to extract text.
+     */
+    private String extractPdfTextForPaper(Paper paper) {
+        // Find the active manuscript file
+        List<PaperFile> files = paperFileRepository.findByPaper_Id(paper.getId());
+        PaperFile activeFile = files.stream()
+                .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && !Boolean.TRUE.equals(f.getIsSupplementary()) && !Boolean.TRUE.equals(f.getIsCameraReady()))
+                .findFirst()
+                .orElse(null);
+
+        if (activeFile == null) {
+            log.warn("[Plagiarism] No active manuscript file found for paper {}", paper.getId());
+            return null;
+        }
+
+        String url = activeFile.getUrl();
+        if (url == null || url.isBlank()) {
+            log.warn("[Plagiarism] Active file has no URL for paper {}", paper.getId());
+            return null;
+        }
+
+        return downloadAndExtractPdf(url, paper.getId());
+    }
+
+    /**
+     * Download PDF from URL and extract text using PDFBox.
+     */
+    private String downloadAndExtractPdf(String url, Integer paperId) {
+        try {
+            log.info("[Plagiarism] Downloading PDF from: {}", url);
+            try (InputStream is = URI.create(url).toURL().openStream()) {
+                byte[] pdfBytes = is.readAllBytes();
+                PDDocument doc = Loader.loadPDF(pdfBytes);
+                PDFTextStripper stripper = new PDFTextStripper();
+                String text = stripper.getText(doc);
+                doc.close();
+
+                // Clean up: remove excessive whitespace
+                text = text.replaceAll("\\s{3,}", "\n\n").trim();
+
+                // Truncate if too long
+                if (text.length() > MAX_PDF_TEXT_LENGTH) {
+                    text = text.substring(0, MAX_PDF_TEXT_LENGTH);
+                }
+
+                log.info("[Plagiarism] Extracted {} chars from PDF for paper {}", text.length(), paperId);
+                return text;
+            }
+        } catch (Exception e) {
+            log.error("[Plagiarism] Failed to download/extract PDF for paper {}: {}", paperId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Fallback: get title + abstract text for internal comparison with other papers.
+     * Used when we don't want to download PDFs for ALL papers in the DB.
+     */
     private String buildPaperText(Paper paper) {
         StringBuilder sb = new StringBuilder();
         if (paper.getTitle() != null) sb.append(paper.getTitle()).append(" ");
@@ -513,27 +520,6 @@ public class PlagiarismService {
         }
     }
 
-    private String extractJson(String text) {
-        if (text == null) return "{}";
-        int start = text.indexOf("```json");
-        if (start >= 0) {
-            start = text.indexOf("\n", start) + 1;
-            int end = text.indexOf("```", start);
-            if (end > start) return text.substring(start, end).trim();
-        }
-        start = text.indexOf("```");
-        if (start >= 0) {
-            start = text.indexOf("\n", start) + 1;
-            int end = text.indexOf("```", start);
-            if (end > start) return text.substring(start, end).trim();
-        }
-        start = text.indexOf("{");
-        int end = text.lastIndexOf("}");
-        if (start >= 0 && end > start) {
-            return text.substring(start, end + 1);
-        }
-        return text.trim();
-    }
 
     private double round(double v) {
         return Math.round(v * 10.0) / 10.0;
@@ -544,9 +530,7 @@ public class PlagiarismService {
     // ═══════════════════════════════════════════════════════
 
     private record InternalCheckResult(double score, List<PaperMatch> matches) {}
-    private record ExternalCheckResult(double score, String summary, List<FlaggedSection> flaggedSections) {}
     private record PaperMatch(Integer paperId, String title, double similarity, String matchedSnippet) {}
-    private record FlaggedSection(String text, String reason, String source, int confidence) {}
     private record WebSearchResult(double score, List<WebMatch> matches) {}
     private record WebMatch(String url, String title, String snippet, double similarity) {}
 }

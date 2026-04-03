@@ -49,28 +49,38 @@ public class GeminiApiClient {
      * @return The model's text response
      */
     public String generateContent(String systemPrompt, List<Map<String, String>> messages) {
-        try {
-            ObjectNode requestBody = buildRequestBody(systemPrompt, messages);
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ObjectNode requestBody = buildRequestBody(systemPrompt, messages);
 
-            String responseJson = webClient.post()
-                    .uri("/models/{model}:generateContent?key={key}", model, apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody.toString())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+                String responseJson = webClient.post()
+                        .uri("/models/{model}:generateContent?key={key}", model, apiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody.toString())
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
 
-            return extractTextFromResponse(responseJson);
-        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
-            log.error("[GeminiAPI] Server returned HTTP {}: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
-            if (e.getStatusCode().value() == 429) {
-                throw new RuntimeException("Gemini AI is currently busy (Rate Limit Exceeded). Please wait a few seconds and try again.", e);
+                return extractTextFromResponse(responseJson);
+            } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+                log.error("[GeminiAPI] Server returned HTTP {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+                if (e.getStatusCode().value() == 429 && attempt < maxRetries) {
+                    long waitMs = attempt * 5000L; // 5s, 10s
+                    log.info("[GeminiAPI] Rate limited. Retrying in {}ms (attempt {}/{})", waitMs, attempt, maxRetries);
+                    try { Thread.sleep(waitMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    continue;
+                }
+                if (e.getStatusCode().value() == 429) {
+                    throw new RuntimeException("Gemini AI is currently busy (Rate Limit Exceeded). Please wait a few seconds and try again.", e);
+                }
+                throw new RuntimeException("AI Provider Error: " + e.getStatusCode(), e);
+            } catch (Exception e) {
+                log.error("[GeminiAPI] Error calling Gemini API: {}", e.getMessage(), e);
+                throw new RuntimeException("Internal Error calling Google: " + e.getMessage(), e);
             }
-            throw new RuntimeException("AI Provider Error: " + e.getStatusCode(), e);
-        } catch (Exception e) {
-            log.error("[GeminiAPI] Error calling Gemini API: {}", e.getMessage(), e);
-            throw new RuntimeException("Internal Error calling Google: " + e.getMessage(), e);
         }
+        throw new RuntimeException("Gemini API failed after " + maxRetries + " attempts");
     }
 
     /**

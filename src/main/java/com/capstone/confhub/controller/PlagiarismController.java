@@ -32,4 +32,12 @@ public class PlagiarismController {
         plagiarismService.recheckPlagiarism(paperId);
         return ResponseEntity.ok(plagiarismService.getPlagiarismResult(paperId));
     }
+
+    @DeleteMapping("/paper/{paperId}")
+    @Operation(summary = "Reset plagiarism data for a paper (used when manuscript is deleted)")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> resetPlagiarism(@PathVariable Integer paperId) {
+        plagiarismService.resetPlagiarism(paperId);
+        return ResponseEntity.noContent().build();
+    }
 }

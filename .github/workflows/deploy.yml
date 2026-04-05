@@ -19,7 +19,7 @@ jobs:
       - name: Copy Firebase credentials
         run: |
           mkdir -p src/main/resources
-          cp /state/partition1/devops/secrets/firebase-adminsdk.json \
+          cp /state/partition1/devops/CONFMSA-GSP26SE76/secrets/firebase-adminsdk.json \
              src/main/resources/filestorage-71871-firebase-adminsdk-fbsvc-7ba8487811.json
 
       - name: Detect server IP for environment config

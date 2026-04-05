@@ -54,6 +54,21 @@ jobs:
 
       - name: Health Check
         run: |
-          echo "Waiting 30 seconds for Spring Boot container to initialize..."
-          sleep 30
-          curl -f http://localhost:8080/v3/api-docs || exit 1
+          echo "Waiting for Spring Boot container to become healthy..."
+          MAX_WAIT=120
+          INTERVAL=5
+          ELAPSED=0
+          until curl -sf http://localhost:8080/v3/api-docs > /dev/null 2>&1; do
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+              echo "❌ Health check failed after ${MAX_WAIT}s"
+              echo "--- Container status ---"
+              docker ps -a --filter name=confhub-backend
+              echo "--- Container logs (last 100 lines) ---"
+              docker logs --tail 100 confhub-backend 2>&1 || true
+              exit 1
+            fi
+            echo "  ⏳ Waiting... (${ELAPSED}s / ${MAX_WAIT}s)"
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          echo "✅ Spring Boot is healthy (took ~${ELAPSED}s)"

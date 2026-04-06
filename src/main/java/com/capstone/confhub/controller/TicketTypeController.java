@@ -37,6 +37,14 @@ public class TicketTypeController {
         return ResponseEntity.ok(ticketTypeService.getByConference(conferenceId, activeOnly));
     }
 
+    @GetMapping("/conferences/{conferenceId}/ticket-types/for-user")
+    @Operation(summary = "List ticket types eligible for a specific user based on their role")
+    public ResponseEntity<List<TicketTypeResponse>> getForUser(
+            @PathVariable Integer conferenceId,
+            @RequestParam Integer userId) {
+        return ResponseEntity.ok(ticketTypeService.getForUser(conferenceId, userId));
+    }
+
     @PutMapping("/ticket-types/{id}")
     @Operation(summary = "Update ticket type (Chair)")
     public ResponseEntity<TicketTypeResponse> update(

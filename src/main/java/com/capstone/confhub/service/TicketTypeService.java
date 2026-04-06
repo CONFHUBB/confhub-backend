@@ -10,4 +10,5 @@ public interface TicketTypeService {
     TicketTypeResponse update(Integer id, TicketTypeRequest request);
     void delete(Integer id);
     List<TicketTypeResponse> getByConference(Integer conferenceId, boolean activeOnly);
+    List<TicketTypeResponse> getForUser(Integer conferenceId, Integer userId);
 }

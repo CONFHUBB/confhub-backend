@@ -3,18 +3,26 @@ package com.capstone.confhub.service.impl;
 import com.capstone.confhub.dto.request.TicketTypeRequest;
 import com.capstone.confhub.dto.response.TicketTypeResponse;
 import com.capstone.confhub.entity.Conference;
+import com.capstone.confhub.entity.PaperAuthor;
 import com.capstone.confhub.entity.TicketType;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.ConferenceRepository;
+import com.capstone.confhub.repository.ConferenceUserTrackRepository;
+import com.capstone.confhub.repository.PaperAuthorRepository;
 import com.capstone.confhub.repository.TicketTypeRepository;
 import com.capstone.confhub.service.TicketTypeService;
+import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.PaperStatus;
+import com.capstone.confhub.utils.enums.TicketCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,6 +32,8 @@ public class TicketTypeServiceImpl implements TicketTypeService {
 
     private final TicketTypeRepository ticketTypeRepository;
     private final ConferenceRepository conferenceRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     @Override
     @Transactional
@@ -65,6 +75,50 @@ public class TicketTypeServiceImpl implements TicketTypeService {
                 ? ticketTypeRepository.findByConferenceIdAndIsActiveTrue(conferenceId)
                 : ticketTypeRepository.findByConferenceId(conferenceId);
         return types.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketTypeResponse> getForUser(Integer conferenceId, Integer userId) {
+        // Get all active ticket types
+        List<TicketType> allTypes = ticketTypeRepository.findByConferenceIdAndIsActiveTrue(conferenceId);
+
+        // Determine eligible categories for this user
+        Set<TicketCategory> eligible = EnumSet.of(TicketCategory.STANDARD, TicketCategory.VIP, TicketCategory.STUDENT);
+
+        // Check if user is an author with accepted/published paper in this conference
+        boolean isAuthor = false;
+        List<PaperAuthor> authorships = paperAuthorRepository.findByUserId(userId);
+        for (PaperAuthor pa : authorships) {
+            var paper = pa.getPaper();
+            if (paper.getTrack() != null
+                    && paper.getTrack().getConference() != null
+                    && paper.getTrack().getConference().getId().equals(conferenceId)
+                    && (paper.getStatus() == PaperStatus.ACCEPTED || paper.getStatus() == PaperStatus.PUBLISHED)) {
+                isAuthor = true;
+                break;
+            }
+        }
+        if (isAuthor) {
+            eligible.add(TicketCategory.AUTHOR);
+        }
+
+        // Check if user is staff (REVIEWER, PROGRAM_CHAIR, or CONFERENCE_CHAIR)
+        boolean isStaff = conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                userId, conferenceId, ConferenceTrackRole.REVIEWER)
+                || conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                userId, conferenceId, ConferenceTrackRole.PROGRAM_CHAIR)
+                || conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                userId, conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
+        if (isStaff) {
+            eligible.add(TicketCategory.STAFF);
+        }
+
+        // Filter ticket types by eligible categories
+        return allTypes.stream()
+                .filter(t -> eligible.contains(t.getCategory()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // ========== Helpers ==========

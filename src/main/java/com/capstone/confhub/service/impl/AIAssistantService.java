@@ -158,7 +158,7 @@ public class AIAssistantService {
                 - TONE: for informal or non-academic language
                 - CLARITY: for vague or unclear expressions
                 
-                Return ONLY valid JSON:
+                IMPORTANT: Return ONLY the raw JSON object below. Do NOT wrap it in markdown code fences.
                 {
                   "suggestions": [
                     {"original": "exact text with issue", "suggested": "corrected version", "reason": "brief explanation", "type": "SPELLING|GRAMMAR|TONE|CLARITY"}
@@ -173,29 +173,44 @@ public class AIAssistantService {
                 request.getAbstractText());
 
         List<Map<String, String>> messages = List.of(Map.of("role", "user", "content", userMsg));
-        try {
-            String aiReply = geminiClient.generateContent(systemPrompt, messages);
-            log.info("[AIAssistant] Writing check raw response (first 500 chars): {}",
-                    aiReply.length() > 500 ? aiReply.substring(0, 500) : aiReply);
-            return parseWritingCheckResponse(aiReply);
-        } catch (RuntimeException e) {
-            log.error("[AIAssistant] Gemini API error for writing check: {}", e.getMessage());
-            return WritingCheckResponse.builder()
-                    .suggestions(List.of())
-                    .overallAssessment("AI service error: " + e.getMessage())
-                    .build();
+
+        // Retry up to 3 times — each attempt rotates to the next API key
+        int maxAttempts = 3;
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                String aiReply = geminiClient.generateContent(systemPrompt, messages);
+                log.info("[AIAssistant] Writing check attempt {}/{} raw response (first 500 chars): {}",
+                        attempt, maxAttempts,
+                        aiReply.length() > 500 ? aiReply.substring(0, 500) : aiReply);
+                return parseWritingCheckResponse(aiReply);
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("[AIAssistant] Writing check attempt {}/{} failed: {}", attempt, maxAttempts, e.getMessage());
+                if (attempt < maxAttempts) {
+                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                }
+            }
         }
+        log.error("[AIAssistant] Writing check failed after {} attempts", maxAttempts, lastError);
+        throw new BadRequestException("AI writing check failed after " + maxAttempts + " attempts. Please try again later.");
     }
 
+    /**
+     * Parse the writing check JSON response. Throws on invalid format so the caller can retry.
+     */
     private WritingCheckResponse parseWritingCheckResponse(String aiReply) {
         try {
             String json = extractJson(aiReply);
-            if (json.equals(aiReply.trim()) && !json.startsWith("{")) {
-                // extractJson couldn't find JSON — AI returned plain text
-                log.warn("[AIAssistant] Writing check: AI returned non-JSON: {}", aiReply);
-                throw new RuntimeException("AI did not return valid JSON");
+            if (!json.trim().startsWith("{")) {
+                throw new RuntimeException("No JSON object found in AI response");
             }
             JsonNode root = objectMapper.readTree(json);
+
+            // Validate that the expected fields exist
+            if (!root.has("suggestions")) {
+                throw new RuntimeException("Missing 'suggestions' field in AI response");
+            }
 
             List<WritingCheckResponse.WritingSuggestion> suggestions = new ArrayList<>();
             root.path("suggestions").forEach(n -> suggestions.add(
@@ -213,7 +228,7 @@ public class AIAssistantService {
                     .build();
         } catch (Exception e) {
             log.error("[AIAssistant] Failed to parse writing check response. Raw reply: {}", aiReply, e);
-            throw new BadRequestException("AI analysis failed. The AI returned an unexpected response. Please try again.");
+            throw new RuntimeException("Parse failed: " + e.getMessage(), e);
         }
     }
 
@@ -455,9 +470,22 @@ public class AIAssistantService {
 
     /**
      * Extract JSON object from AI response that may contain markdown fences or extra text.
+     * Handles: ```json {...} ```, ```{...}```, plain {...}, and extra prose around JSON.
      */
     private String extractJson(String aiReply) {
         String text = aiReply.trim();
+
+        // Strip markdown code fences: ```json ... ``` or ``` ... ```
+        if (text.contains("```")) {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("```(?:json)?\\s*\\n?(\\{.*?})\\s*\\n?```", java.util.regex.Pattern.DOTALL)
+                    .matcher(text);
+            if (m.find()) {
+                return m.group(1).trim();
+            }
+        }
+
+        // Find the outermost JSON object by matching braces
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
         if (start != -1 && end != -1 && end > start) {

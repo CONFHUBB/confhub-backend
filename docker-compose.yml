@@ -5,10 +5,21 @@ services:
     container_name: confhub-backend
     restart: unless-stopped
     network_mode: host
+    env_file: .env
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-192.168.88.110}:5433/confhub_db
-      - SPRING_DATASOURCE_USERNAME=confhub_user
-      - SPRING_DATASOURCE_PASSWORD=StrongPass123
+      # These override .env when set by CI/CD
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-192.168.88.110}:${DB_PORT:-5433}/${DB_NAME:-confhub_db}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-confhub_user}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-StrongPass123}
       - APP_FRONTEND_URL=${APP_FRONTEND_URL:-http://192.168.88.110:4000}
       - APP_BASE_URL=${APP_BASE_URL:-http://192.168.88.110:8080}
       - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://192.168.88.110:8080/api/v1/payment/vnpay-callback}
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-ZMNARP7X}
+      - VNPAY_SECRET_KEY=${VNPAY_SECRET_KEY:-3H30ARTPZYUZ4829VVM0P4BUG4GRYMRK}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS:-}
+      - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY:-}
+      - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID:-}

@@ -33,3 +33,6 @@ build/
 .vscode/
 
 src/main/resources/*firebase*.json
+
+# Environment variables (secrets)
+.env

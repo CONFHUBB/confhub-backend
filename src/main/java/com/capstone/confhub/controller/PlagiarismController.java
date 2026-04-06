@@ -29,7 +29,8 @@ public class PlagiarismController {
     @Operation(summary = "Trigger a manual plagiarism re-check for a paper")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> recheckPlagiarism(@PathVariable Integer paperId) {
-        plagiarismService.recheckPlagiarism(paperId);
+        // Start async check and return immediately — frontend polls for result
+        plagiarismService.recheckPlagiarismAsync(paperId);
         return ResponseEntity.ok(plagiarismService.getPlagiarismResult(paperId));
     }
 

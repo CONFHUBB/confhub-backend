@@ -131,12 +131,30 @@ public class AIChatService {
         List<Map<String, Object>> conferenceCtx = buildConferenceListForMatching();
 
         if (conferenceCtx.isEmpty()) {
-            return ManuscriptAnalysisResponse.builder()
-                    .summary("No conferences are currently accepting paper submissions.")
-                    .detectedKeywords(List.of())
-                    .detectedArea("Unknown")
+            // Still analyze the manuscript even if no conferences are accepting
+            String analysisOnlyPrompt = buildManuscriptAnalysisPrompt(pdfText, List.of());
+            List<Map<String, String>> messages = List.of(
+                    Map.of("role", "user", "content", analysisOnlyPrompt));
+            String aiReply = geminiClient.generateContent(buildManuscriptSystemPrompt(), messages);
+            ManuscriptAnalysisResponse response = parseManuscriptResponse(aiReply);
+            // Override recommendations with empty + clear message
+            response = ManuscriptAnalysisResponse.builder()
+                    .summary(response.getSummary())
+                    .detectedKeywords(response.getDetectedKeywords())
+                    .detectedArea(response.getDetectedArea())
                     .recommendations(List.of())
                     .build();
+
+            User user = userRepo.findById(userId).orElse(null);
+            if (user != null && sessionId != null) {
+                saveMessage(user, sessionId, "user",
+                        "[Uploaded manuscript: " + filename + "]", "ANALYZE", null);
+                saveMessage(user, sessionId, "model",
+                        "\uD83D\uDCC4 **Manuscript Analysis Complete**\n\n" + response.getSummary()
+                                + "\n\n⚠️ *No conferences are currently accepting paper submissions. Check back later or create your own conference.*",
+                        "ANALYZE", null);
+            }
+            return response;
         }
 
         // 5. Build analysis prompt
@@ -288,6 +306,42 @@ public class AIChatService {
             } catch (Exception e) {
                 log.warn("Could not load conference context: {}", e.getMessage());
             }
+        }
+
+        // Inject ALL conferences and their current phase
+        try {
+            List<Conference> allConfs = conferenceRepo.findAll();
+            if (!allConfs.isEmpty()) {
+                sb.append("\n## All Conferences on ConfHub:\n");
+                for (Conference conf : allConfs) {
+                    sb.append("- **").append(conf.getName());
+                    if (conf.getAcronym() != null && !conf.getAcronym().isBlank()) {
+                        sb.append(" (").append(conf.getAcronym()).append(")");
+                    }
+                    sb.append("** [ID: ").append(conf.getId()).append("]\n");
+                    sb.append("  Status: ").append(conf.getStatus()).append("\n");
+
+                    var activities = activityRepo.findByConferenceId(conf.getId());
+                    var currentPhase = activities.stream()
+                            .filter(ConferenceActivity::getIsEnabled)
+                            .map(a -> a.getActivityType().name())
+                            .collect(Collectors.joining(", "));
+                    sb.append("  Active Phase(s): ").append(currentPhase.isEmpty() ? "None" : currentPhase).append("\n");
+
+                    var subActivity = activities.stream()
+                            .filter(a -> a.getActivityType() == ActivityType.PAPER_SUBMISSION && a.getIsEnabled())
+                            .findFirst().orElse(null);
+                    if (subActivity != null) {
+                        sb.append("  📌 ACCEPTING SUBMISSIONS");
+                        if (subActivity.getDeadline() != null) {
+                            sb.append(" (Deadline: ").append(subActivity.getDeadline().format(DT_FMT)).append(")");
+                        }
+                        sb.append("\n");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not load conference list: {}", e.getMessage());
         }
 
         return sb.toString();
@@ -553,10 +607,21 @@ public class AIChatService {
                             .anyMatch(a -> a.getActivityType() == ActivityType.PAPER_SUBMISSION && a.getIsEnabled());
                     
                     if (canSubmit) {
-                        actions.add(createAction(addedLabels, "📄 Nộp bài: " + acronym, "NAVIGATE", "/conference/" + c.getId() + "/author"));
+                        actions.add(createAction(addedLabels, "📄 Nộp bài: " + acronym, "NAVIGATE", "/conference/" + c.getId()));
+                    }
+                    // If registration is open, add "Register" button
+                    boolean canRegister = activities.stream()
+                            .anyMatch(a -> a.getActivityType() == ActivityType.REGISTRATION && a.getIsEnabled());
+                    if (canRegister) {
+                        actions.add(createAction(addedLabels, "🎟 Đăng ký: " + acronym, "NAVIGATE", "/conference/" + c.getId()));
                     }
                 }
             }
+        }
+
+        // Always add a browse conferences action
+        if (actions.size() < 4) {
+            actions.add(createAction(addedLabels, "🔍 Xem tất cả hội nghị", "NAVIGATE", "/conference"));
         }
 
         return actions;

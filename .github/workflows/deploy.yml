@@ -22,23 +22,24 @@ jobs:
           cp /state/partition1/devops/CONFMSA-GSP26SE76/secrets/firebase-adminsdk.json \
              src/main/resources/filestorage-71871-firebase-adminsdk-fbsvc-7ba8487811.json
 
+      - name: Copy .env secrets
+        run: |
+          cp /state/partition1/devops/CONFMSA-GSP26SE76/secrets/backend.env .env
+
       - name: Detect server IP for environment config
         run: |
           SERVER_IP=$(hostname -I | awk '{print $1}')
           echo "Detected server IP: ${SERVER_IP}"
-          echo "APP_FRONTEND_URL=http://${SERVER_IP}:4000" >> $GITHUB_ENV
-          echo "APP_BASE_URL=http://${SERVER_IP}:8080" >> $GITHUB_ENV
-          echo "VNPAY_RETURN_URL=http://${SERVER_IP}:8080/api/v1/payment/vnpay-callback" >> $GITHUB_ENV
-          echo "DB_HOST=${SERVER_IP}" >> $GITHUB_ENV
+          # Append dynamic server-specific overrides to .env
+          echo "" >> .env
+          echo "# Auto-detected by CI/CD" >> .env
+          echo "APP_FRONTEND_URL=http://${SERVER_IP}:4000" >> .env
+          echo "APP_BASE_URL=http://${SERVER_IP}:8080" >> .env
+          echo "VNPAY_RETURN_URL=http://${SERVER_IP}:8080/api/v1/payment/vnpay-callback" >> .env
+          echo "DB_HOST=${SERVER_IP}" >> .env
 
       - name: Build and Deploy via Docker Compose
         run: |
-          # Export env vars so docker compose can use them
-          export APP_FRONTEND_URL=${{ env.APP_FRONTEND_URL }}
-          export APP_BASE_URL=${{ env.APP_BASE_URL }}
-          export VNPAY_RETURN_URL=${{ env.VNPAY_RETURN_URL }}
-          export DB_HOST=${{ env.DB_HOST }}
-          
           # Dừng và xoá container cũ nếu có
           docker rm -f confhub-backend || true
           docker compose down || true

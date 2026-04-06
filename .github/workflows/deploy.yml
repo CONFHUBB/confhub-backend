@@ -2,7 +2,7 @@ name: Deploy Backend
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/conference ]
 
 jobs:
   deploy:
@@ -31,12 +31,15 @@ jobs:
           SERVER_IP=$(hostname -I | awk '{print $1}')
           echo "Detected server IP: ${SERVER_IP}"
           # Append dynamic server-specific overrides to .env
+          # NOTE: DB_HOST is NOT overridden — both servers share the DB on 110
           echo "" >> .env
           echo "# Auto-detected by CI/CD" >> .env
           echo "APP_FRONTEND_URL=http://${SERVER_IP}:4000" >> .env
           echo "APP_BASE_URL=http://${SERVER_IP}:8080" >> .env
           echo "VNPAY_RETURN_URL=http://${SERVER_IP}:8080/api/v1/payment/vnpay-callback" >> .env
-          echo "DB_HOST=${SERVER_IP}" >> .env
+
+      - name: Clean Docker build cache
+        run: docker builder prune -af
 
       - name: Build and Deploy via Docker Compose
         run: |

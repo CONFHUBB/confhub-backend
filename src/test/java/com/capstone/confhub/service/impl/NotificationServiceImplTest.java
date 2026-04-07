@@ -8,6 +8,7 @@ import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.NotificationRepository;
 import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.service.FcmPushService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,8 @@ class NotificationServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private ConferenceRepository conferenceRepository;
+    @Mock
+    private FcmPushService fcmPushService;
 
     @InjectMocks
     private NotificationServiceImpl notificationService;

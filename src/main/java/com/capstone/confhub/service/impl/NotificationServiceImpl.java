@@ -10,6 +10,7 @@ import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.NotificationRepository;
 import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.service.FcmPushService;
 import com.capstone.confhub.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final ConferenceRepository conferenceRepository;
+    private final FcmPushService fcmPushService;
 
     @Override
     @Transactional
@@ -46,6 +48,21 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
 
         Notification saved = notificationRepository.save(notification);
+
+        // Send push notification via FCM (async, non-blocking)
+        try {
+            fcmPushService.sendToUser(
+                    dto.getUserId(),
+                    dto.getTitle(),
+                    dto.getMessage(),
+                    dto.getType(),
+                    dto.getLink()
+            );
+        } catch (Exception e) {
+            // Push failure should not block notification creation
+            // Logged inside FcmPushServiceImpl
+        }
+
         return mapToResponseDTO(saved);
     }
 

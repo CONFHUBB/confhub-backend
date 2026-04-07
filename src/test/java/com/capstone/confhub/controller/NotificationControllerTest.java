@@ -3,6 +3,7 @@ package com.capstone.confhub.controller;
 import com.capstone.confhub.dto.NotificationDTO;
 import com.capstone.confhub.dto.response.PagedResponse;
 import com.capstone.confhub.exception.BadRequestException;
+import com.capstone.confhub.service.FcmPushService;
 import com.capstone.confhub.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,11 +27,14 @@ class NotificationControllerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private FcmPushService fcmPushService;
+
     private NotificationController notificationController;
 
     @BeforeEach
     void setUp() {
-        notificationController = new NotificationController(notificationService);
+        notificationController = new NotificationController(notificationService, fcmPushService);
     }
 
     @Test

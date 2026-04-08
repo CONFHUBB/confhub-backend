@@ -28,8 +28,10 @@ import java.util.stream.Collectors;
 
 /**
  * Plagiarism checking service with dual-layer approach:
- * 1. Internal: TF-IDF Cosine Similarity + N-gram snippet matching against all papers in DB
- * 2. Web Search: Gemini AI with Google Search grounding to find similar content online
+ * 1. Internal: TF-IDF Cosine Similarity + N-gram snippet matching against all
+ * papers in DB
+ * 2. Web Search: Gemini AI with Google Search grounding to find similar content
+ * online
  */
 @Service
 @RequiredArgsConstructor
@@ -44,7 +46,7 @@ public class PlagiarismService {
     private static final int MAX_PDF_TEXT_LENGTH = 15000; // chars for plagiarism check
 
     // ═══════════════════════════════════════════════════════
-    //  PUBLIC API
+    // PUBLIC API
     // ═══════════════════════════════════════════════════════
 
     @Async
@@ -63,7 +65,8 @@ public class PlagiarismService {
      * Called by the recheck endpoint so the response returns fast.
      */
     public void recheckPlagiarismAsync(Integer paperId) {
-        // Set status to CHECKING synchronously so the immediate GET returns correct status
+        // Set status to CHECKING synchronously so the immediate GET returns correct
+        // status
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paper not found: " + paperId));
         paper.setPlagiarismStatus(PlagiarismStatus.CHECKING);
@@ -102,7 +105,7 @@ public class PlagiarismService {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  CORE PLAGIARISM CHECK
+    // CORE PLAGIARISM CHECK
     // ═══════════════════════════════════════════════════════
 
     @Transactional
@@ -116,7 +119,8 @@ public class PlagiarismService {
         // Extract text from the ACTIVE PDF file
         String text = extractPdfTextForPaper(paper);
         if (text == null || text.isBlank()) {
-            markFailed(paperId, "Could not extract text from PDF. Make sure the paper has an active manuscript file uploaded.");
+            markFailed(paperId,
+                    "Could not extract text from PDF. Make sure the paper has an active manuscript file uploaded.");
             return;
         }
 
@@ -184,7 +188,7 @@ public class PlagiarismService {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  INTERNAL CHECK: TF-IDF Cosine Similarity + N-gram
+    // INTERNAL CHECK: TF-IDF Cosine Similarity + N-gram
     // ═══════════════════════════════════════════════════════
 
     private InternalCheckResult performInternalCheck(Paper targetPaper, String targetText) {
@@ -196,10 +200,12 @@ public class PlagiarismService {
         double maxSimilarity = 0;
 
         for (Paper other : allPapers) {
-            if (other.getId().equals(targetPaper.getId())) continue;
+            if (other.getId().equals(targetPaper.getId()))
+                continue;
 
             String otherText = buildPaperText(other);
-            if (otherText.isBlank()) continue;
+            if (otherText.isBlank())
+                continue;
 
             Map<String, Double> otherVector = buildTfIdfVector(otherText);
             double rawSimilarity = cosineSimilarity(targetVector, otherVector) * 100;
@@ -211,7 +217,8 @@ public class PlagiarismService {
             // (TF-IDF alone can give false positives due to common academic vocabulary)
             double similarity = rawSimilarity;
             if (matchedSnippet == null && similarity > 15.0) {
-                log.debug("[Plagiarism] Capping score for paper {} (raw={}, no snippet match)", other.getId(), round(rawSimilarity));
+                log.debug("[Plagiarism] Capping score for paper {} (raw={}, no snippet match)", other.getId(),
+                        round(rawSimilarity));
                 similarity = 15.0;
             }
 
@@ -254,11 +261,12 @@ public class PlagiarismService {
         for (int i = 0; i <= words.length - n; i++) {
             StringBuilder sb = new StringBuilder();
             for (int j = 0; j < n; j++) {
-                if (j > 0) sb.append(" ");
+                if (j > 0)
+                    sb.append(" ");
                 sb.append(words[i + j]);
             }
             String ngram = sb.toString().trim();
-            if (ngram.length() >= 15) {  // Only meaningful ngrams
+            if (ngram.length() >= 15) { // Only meaningful ngrams
                 ngrams.add(ngram);
             }
         }
@@ -268,7 +276,8 @@ public class PlagiarismService {
             List<String> sampled = new ArrayList<>();
             for (int i = 0; i < ngrams.size(); i += step) {
                 sampled.add(ngrams.get(i));
-                if (sampled.size() >= 20) break;
+                if (sampled.size() >= 20)
+                    break;
             }
             return sampled;
         }
@@ -279,7 +288,7 @@ public class PlagiarismService {
             You are a plagiarism detection assistant. Given an academic text excerpt,
             use Google Search to find if any similar content exists online.
             Search for key phrases and sentences from the text.
-            
+
             IMPORTANT: Return ONLY the raw JSON object below. Do NOT wrap it in markdown code fences.
             {
               "matches": [
@@ -299,15 +308,26 @@ public class PlagiarismService {
 
     private WebSearchResult performWebSearch(String text) {
         try {
-            // Split text into up to 3 chunks for broader coverage
-            List<String> chunks = splitIntoChunks(text, 3, 1500);
-            log.info("[Plagiarism] Web search: {} chunks to process", chunks.size());
+            // Use single chunk (up to 3000 chars) to stay within free-tier rate limits
+            // Free Gemini search grounding: ~5 req/min shared across all keys from same
+            // project
+            List<String> chunks = splitIntoChunks(text, 1, 3000);
+            log.info("[Plagiarism] Web search: {} chunk(s) to process", chunks.size());
 
             List<WebMatch> allMatches = new ArrayList<>();
             double maxScore = 0;
             List<String> summaries = new ArrayList<>();
 
             for (int ci = 0; ci < chunks.size(); ci++) {
+                if (ci > 0) {
+                    // Wait 15s between chunks to respect rate limits
+                    log.info("[Plagiarism] Waiting 15s before next chunk to respect rate limits...");
+                    try {
+                        Thread.sleep(15000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
                 String chunk = chunks.get(ci);
                 WebSearchResult chunkResult = searchChunkWithRetry(chunk, ci + 1, chunks.size());
                 allMatches.addAll(chunkResult.matches());
@@ -324,11 +344,13 @@ public class PlagiarismService {
             }
             List<WebMatch> finalMatches = new ArrayList<>(deduped.values());
             finalMatches.sort((a, b) -> Double.compare(b.similarity(), a.similarity()));
-            if (finalMatches.size() > 5) finalMatches = finalMatches.subList(0, 5);
+            if (finalMatches.size() > 5)
+                finalMatches = finalMatches.subList(0, 5);
 
             String combinedSummary = summaries.isEmpty() ? "Web search completed." : String.join(" ", summaries);
 
-            log.info("[Plagiarism] Web search total: {} unique matches, max score: {}%", finalMatches.size(), round(maxScore));
+            log.info("[Plagiarism] Web search total: {} unique matches, max score: {}%", finalMatches.size(),
+                    round(maxScore));
             return new WebSearchResult(maxScore, finalMatches, combinedSummary);
 
         } catch (Exception e) {
@@ -338,11 +360,12 @@ public class PlagiarismService {
     }
 
     /**
-     * Search a single chunk with retry (up to 3 attempts).
-     * Each retry rotates to a different API key automatically.
+     * Search a single chunk with aggressive retry.
+     * Free-tier Gemini search grounding quota resets every ~60s.
+     * We retry up to 4 times with 60s delays to guarantee success.
      */
     private WebSearchResult searchChunkWithRetry(String chunk, int chunkNum, int totalChunks) {
-        int maxAttempts = 3;
+        int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 String userMsg = "Check this text excerpt (part " + chunkNum + "/" + totalChunks
@@ -361,7 +384,10 @@ public class PlagiarismService {
                 log.warn("[Plagiarism] Chunk {}/{} attempt {}/{} failed: {}",
                         chunkNum, totalChunks, attempt, maxAttempts, e.getMessage());
                 if (attempt < maxAttempts) {
-                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    long delay = 60000L; // Wait 60s for rate limit to fully reset
+                    log.info("[Plagiarism] Rate limited. Waiting {}s before retry (attempt {}/{})...",
+                            delay / 1000, attempt + 1, maxAttempts);
+                    try { Thread.sleep(delay); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 }
             }
         }
@@ -388,10 +414,12 @@ public class PlagiarismService {
             // Try to break at a sentence boundary
             if (end < totalLen) {
                 int dot = text.lastIndexOf('.', end);
-                if (dot > start + chunkSize / 2) end = dot + 1;
+                if (dot > start + chunkSize / 2)
+                    end = dot + 1;
             }
             String chunk = text.substring(start, end).trim();
-            if (!chunk.isEmpty()) chunks.add(chunk);
+            if (!chunk.isEmpty())
+                chunks.add(chunk);
         }
         return chunks;
     }
@@ -404,7 +432,8 @@ public class PlagiarismService {
             // Detect non-JSON responses (e.g. "I'm sorry, I couldn't generate a response")
             String trimmed = aiReply.trim();
             if (!trimmed.contains("{")) {
-                throw new RuntimeException("AI returned non-JSON: " + trimmed.substring(0, Math.min(100, trimmed.length())));
+                throw new RuntimeException(
+                        "AI returned non-JSON: " + trimmed.substring(0, Math.min(100, trimmed.length())));
             }
 
             String json = extractJsonFromReply(aiReply);
@@ -438,14 +467,16 @@ public class PlagiarismService {
             }
 
             matches.sort((a, b) -> Double.compare(b.similarity, a.similarity));
-            if (matches.size() > 5) matches = matches.subList(0, 5);
+            if (matches.size() > 5)
+                matches = matches.subList(0, 5);
 
             double maxScore = matches.stream()
                     .mapToDouble(m -> m.similarity)
                     .max().orElse(overallScore);
             maxScore = Math.max(maxScore, overallScore);
 
-            log.info("[Plagiarism] Web search found {} matches, score: {}%, summary: {}", matches.size(), round(maxScore), summary);
+            log.info("[Plagiarism] Web search found {} matches, score: {}%, summary: {}", matches.size(),
+                    round(maxScore), summary);
             return new WebSearchResult(maxScore, matches, summary);
 
         } catch (Exception e) {
@@ -464,16 +495,19 @@ public class PlagiarismService {
             java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("```(?:json)?\\s*\\n?(\\{.*?})\\s*\\n?```", java.util.regex.Pattern.DOTALL)
                     .matcher(text);
-            if (m.find()) return m.group(1).trim();
+            if (m.find())
+                return m.group(1).trim();
         }
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
-        if (start != -1 && end > start) return text.substring(start, end + 1);
+        if (start != -1 && end > start)
+            return text.substring(start, end + 1);
         return text;
     }
 
     /**
-     * Replace literal newline characters inside JSON string values with escaped \\n.
+     * Replace literal newline characters inside JSON string values with escaped
+     * \\n.
      * Gemini sometimes returns multi-line strings in JSON without proper escaping.
      */
     private String sanitizeJsonNewlines(String json) {
@@ -506,9 +540,8 @@ public class PlagiarismService {
         return sb.toString();
     }
 
-
     // ═══════════════════════════════════════════════════════
-    //  TF-IDF & COSINE SIMILARITY UTILITIES
+    // TF-IDF & COSINE SIMILARITY UTILITIES
     // ═══════════════════════════════════════════════════════
 
     private static final Set<String> STOP_WORDS = Set.of(
@@ -529,8 +562,7 @@ public class PlagiarismService {
             "any", "much", "many", "well", "back", "even", "still",
             "however", "therefore", "thus", "hence", "paper", "using",
             "used", "based", "approach", "proposed", "results", "method",
-            "show", "data", "model", "system", "work", "study"
-    );
+            "show", "data", "model", "system", "work", "study");
 
     private Map<String, Double> buildTfIdfVector(String text) {
         String[] tokens = text.toLowerCase().replaceAll("[^a-z0-9\\s]", " ").split("\\s+");
@@ -569,12 +601,13 @@ public class PlagiarismService {
             norm2 += b * b;
         }
 
-        if (norm1 == 0 || norm2 == 0) return 0;
+        if (norm1 == 0 || norm2 == 0)
+            return 0;
         return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
     }
 
     // ═══════════════════════════════════════════════════════
-    //  HELPERS
+    // HELPERS
     // ═══════════════════════════════════════════════════════
 
     /**
@@ -585,7 +618,8 @@ public class PlagiarismService {
         // Find the active manuscript file
         List<PaperFile> files = paperFileRepository.findByPaper_Id(paper.getId());
         PaperFile activeFile = files.stream()
-                .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && !Boolean.TRUE.equals(f.getIsSupplementary()) && !Boolean.TRUE.equals(f.getIsCameraReady()))
+                .filter(f -> Boolean.TRUE.equals(f.getIsActive()) && !Boolean.TRUE.equals(f.getIsSupplementary())
+                        && !Boolean.TRUE.equals(f.getIsCameraReady()))
                 .findFirst()
                 .orElse(null);
 
@@ -634,13 +668,16 @@ public class PlagiarismService {
     }
 
     /**
-     * Fallback: get title + abstract text for internal comparison with other papers.
+     * Fallback: get title + abstract text for internal comparison with other
+     * papers.
      * Used when we don't want to download PDFs for ALL papers in the DB.
      */
     private String buildPaperText(Paper paper) {
         StringBuilder sb = new StringBuilder();
-        if (paper.getTitle() != null) sb.append(paper.getTitle()).append(" ");
-        if (paper.getAbstractField() != null) sb.append(paper.getAbstractField());
+        if (paper.getTitle() != null)
+            sb.append(paper.getTitle()).append(" ");
+        if (paper.getAbstractField() != null)
+            sb.append(paper.getAbstractField());
         return sb.toString().trim();
     }
 
@@ -660,17 +697,23 @@ public class PlagiarismService {
         }
     }
 
-
     private double round(double v) {
         return Math.round(v * 10.0) / 10.0;
     }
 
     // ═══════════════════════════════════════════════════════
-    //  INNER CLASSES
+    // INNER CLASSES
     // ═══════════════════════════════════════════════════════
 
-    private record InternalCheckResult(double score, List<PaperMatch> matches) {}
-    private record PaperMatch(Integer paperId, String title, double similarity, String matchedSnippet) {}
-    private record WebSearchResult(double score, List<WebMatch> matches, String summary) {}
-    private record WebMatch(String url, String title, String snippet, double similarity) {}
+    private record InternalCheckResult(double score, List<PaperMatch> matches) {
+    }
+
+    private record PaperMatch(Integer paperId, String title, double similarity, String matchedSnippet) {
+    }
+
+    private record WebSearchResult(double score, List<WebMatch> matches, String summary) {
+    }
+
+    private record WebMatch(String url, String title, String snippet, double similarity) {
+    }
 }

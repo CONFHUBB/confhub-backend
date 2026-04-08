@@ -181,9 +181,35 @@ public class GeminiApiClient {
      * Send a request to Gemini WITH Google Search grounding enabled.
      * This allows the model to search the web for similar content.
      * Used for plagiarism web search.
+     *
+     * Strategy:
+     * 1. Try all keys with gemini-2.0-flash first
+     * 2. If all keys quota-exhausted, retry all keys with gemini-2.0-flash-lite (separate quota pool)
+     * 3. Parse Google's retryDelay from error response for smart waiting
+     * 4. Detect daily quota exhaustion (limit:0) and skip that key immediately
      */
     public String generateContentWithSearch(String systemPrompt, List<Map<String, String>> messages) {
-        int totalAttempts = apiKeys.size() + 1;
+        // Try with primary model first, then fallback model
+        String[] searchModels = {"gemini-2.0-flash", "gemini-2.0-flash-lite"};
+
+        for (String searchModel : searchModels) {
+            try {
+                String result = trySearchWithModel(searchModel, systemPrompt, messages);
+                if (result != null) return result;
+            } catch (RuntimeException e) {
+                log.warn("[GeminiAPI] All keys exhausted for model [{}]: {}", searchModel, e.getMessage());
+                // Continue to next fallback model
+            }
+        }
+        throw new RuntimeException("Gemini Search failed: all API keys exhausted across all models (gemini-2.0-flash & gemini-2.0-flash-lite). Daily quota may be fully consumed. Please wait until tomorrow or enable billing.");
+    }
+
+    /**
+     * Try search grounding with a specific model across all API keys.
+     * Returns the response text, or throws RuntimeException if all keys fail.
+     */
+    private String trySearchWithModel(String searchModel, String systemPrompt, List<Map<String, String>> messages) {
+        int totalAttempts = apiKeys.size();
 
         for (int attempt = 1; attempt <= totalAttempts; attempt++) {
             String currentKey = getNextKey();
@@ -200,11 +226,11 @@ public class GeminiApiClient {
                 // Lower temperature for factual search results
                 ((ObjectNode) requestBody.get("generationConfig")).put("temperature", 0.1);
 
-                log.info("[GeminiAPI] Search-grounded request using key [{}] (attempt {}/{})",
-                        maskKey(currentKey), attempt, totalAttempts);
+                log.info("[GeminiAPI] Search request: key [{}], model [{}] (attempt {}/{})",
+                        maskKey(currentKey), searchModel, attempt, totalAttempts);
 
                 String responseJson = webClient.post()
-                        .uri("/models/{model}:generateContent?key={key}", model, currentKey)
+                        .uri("/models/{model}:generateContent?key={key}", searchModel, currentKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(requestBody.toString())
                         .retrieve()
@@ -215,22 +241,69 @@ public class GeminiApiClient {
 
             } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
                 int statusCode = e.getStatusCode().value();
-                log.error("[GeminiAPI] Search key [{}] returned HTTP {}", maskKey(currentKey), statusCode);
+                String errorBody = e.getResponseBodyAsString();
+
+                // Check if this is a DAILY quota exhaustion (no point retrying this key)
+                boolean isDailyExhausted = errorBody.contains("PerDay") && errorBody.contains("\"limit\": 0");
+                // Parse Google's suggested retry delay
+                long suggestedDelay = parseRetryDelay(errorBody);
+
+                log.error("[GeminiAPI] Search key [{}] model [{}] → HTTP {}{}",
+                        maskKey(currentKey), searchModel, statusCode,
+                        isDailyExhausted ? " [DAILY QUOTA EXHAUSTED — skipping key]" : "");
+
+                if (isDailyExhausted) {
+                    log.warn("[GeminiAPI] Key [{}] daily quota used up for model [{}]. Moving to next key immediately.",
+                            maskKey(currentKey), searchModel);
+                    // No delay — this key is dead for today, skip to next
+                    if (attempt < totalAttempts) continue;
+                    throw new RuntimeException("All keys daily-exhausted for model " + searchModel);
+                }
+
                 if ((statusCode == 429 || statusCode >= 500) && attempt < totalAttempts) {
-                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    // Per-minute rate limit — wait Google's suggested delay then try next key
+                    long delay = Math.max(suggestedDelay, 10000); // At least 10s
+                    log.warn("[GeminiAPI] Key [{}] per-minute rate limited. Waiting {}s before next key (attempt {}/{})...",
+                            maskKey(currentKey), delay / 1000, attempt, totalAttempts);
+                    try { Thread.sleep(delay); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                     continue;
                 }
-                throw new RuntimeException("AI Search Error: HTTP " + statusCode, e);
+                throw new RuntimeException("AI Search Error: HTTP " + statusCode + " — " + errorBody, e);
             } catch (Exception e) {
-                log.error("[GeminiAPI] Search key [{}] error: {}", maskKey(currentKey), e.getMessage());
+                log.error("[GeminiAPI] Search key [{}] model [{}] error: {}",
+                        maskKey(currentKey), searchModel, e.getMessage(), e);
                 if (attempt < totalAttempts) {
-                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    try { Thread.sleep(5000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                     continue;
                 }
                 throw new RuntimeException("AI Search Error: " + e.getMessage(), e);
             }
         }
-        throw new RuntimeException("Gemini Search failed after trying all keys");
+        throw new RuntimeException("All keys exhausted for model " + searchModel);
+    }
+
+    /**
+     * Parse Google's suggested retry delay from error response body.
+     * Looks for: "retryDelay": "26s" or "retryDelay": "26.555s"
+     * Returns delay in milliseconds, or 30000 (30s default) if not found.
+     */
+    private long parseRetryDelay(String errorBody) {
+        try {
+            JsonNode root = mapper.readTree(errorBody);
+            JsonNode details = root.path("error").path("details");
+            if (details.isArray()) {
+                for (JsonNode detail : details) {
+                    if (detail.has("retryDelay")) {
+                        String delayStr = detail.get("retryDelay").asText("30s");
+                        // Parse "26s" or "26.555240824s"
+                        delayStr = delayStr.replaceAll("[^0-9.]", "");
+                        double seconds = Double.parseDouble(delayStr);
+                        return (long) (seconds * 1000) + 2000; // Add 2s buffer
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return 30000; // Default 30s
     }
 
     /**

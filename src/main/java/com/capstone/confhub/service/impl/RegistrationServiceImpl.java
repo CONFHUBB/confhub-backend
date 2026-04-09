@@ -13,6 +13,7 @@ import com.capstone.confhub.repository.*;
 import com.capstone.confhub.repository.PaperAuthorRepository;
 import com.capstone.confhub.service.RegistrationService;
 import com.capstone.confhub.utils.enums.PaymentStatus;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,8 +43,20 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final PaperAuthorRepository paperAuthorRepository;
     private final VnPayIntegrationService vnPayIntegrationService;
 
-    // Simple counter for registration number suffix (reset on restart; use sequence in production)
-    private static final AtomicInteger counter = new AtomicInteger(100);
+    // Counter for registration number suffix — seeded from DB on startup to prevent duplicates after restarts
+    private final AtomicInteger counter = new AtomicInteger(100);
+
+    @PostConstruct
+    public void initCounter() {
+        String currentYear = String.valueOf(Year.now().getValue());
+        Integer maxSuffix = ticketRepository.findMaxRegistrationSuffix(currentYear);
+        if (maxSuffix != null) {
+            counter.set(maxSuffix + 1);
+            log.info("Registration counter initialized from DB: next value = {}", maxSuffix + 1);
+        } else {
+            log.info("No existing registrations found for year {}. Counter starts at 100.", currentYear);
+        }
+    }
 
     @Override
     @Transactional

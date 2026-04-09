@@ -50,4 +50,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Integer> {
 
     @Query("SELECT COUNT(t) FROM Ticket t WHERE t.conference.id = :conferenceId AND t.paymentStatus = 'COMPLETED'")
     long countPaidByConferenceId(@Param("conferenceId") Integer conferenceId);
+
+    /**
+     * Returns the maximum numeric suffix from registration numbers matching the current year pattern (e.g. CONF2026-NNNNN).
+     * Used to seed the AtomicInteger counter on startup to avoid duplicate key collisions after restarts.
+     */
+    @Query("SELECT MAX(CAST(SUBSTRING(t.registrationNumber, 10) AS int)) FROM Ticket t " +
+           "WHERE t.registrationNumber LIKE CONCAT('CONF', :year, '-%')")
+    Integer findMaxRegistrationSuffix(@Param("year") String year);
 }

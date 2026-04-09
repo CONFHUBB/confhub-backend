@@ -598,22 +598,32 @@ public class AIChatService {
                     
                     String acronym = c.getAcronym() != null && !c.getAcronym().isBlank() ? c.getAcronym() : "Hội nghị";
 
-                    // Add "View" button
-                    actions.add(createAction(addedLabels, "🔍 Xem: " + acronym, "NAVIGATE", "/conference/" + c.getId()));
+                    // Gather conference metadata for enriched cards
+                    var activities = activityRepo.findByConferenceId(c.getId());
+                    var subActivity = activities.stream()
+                            .filter(a -> a.getActivityType() == ActivityType.PAPER_SUBMISSION && a.getIsEnabled())
+                            .findFirst().orElse(null);
+                    String deadline = subActivity != null && subActivity.getDeadline() != null
+                            ? subActivity.getDeadline().format(DT_FMT) : null;
+                    String dates = c.getStartDate().format(DT_FMT) + " → " + c.getEndDate().format(DT_FMT);
+
+                    // Add "View" button with metadata
+                    actions.add(createActionWithMeta(addedLabels, "🔍 Xem: " + acronym, "NAVIGATE",
+                            "/conference/" + c.getId(), c, deadline, dates));
 
                     // If submission is open, add "Submit" button
-                    var activities = activityRepo.findByConferenceId(c.getId());
-                    boolean canSubmit = activities.stream()
-                            .anyMatch(a -> a.getActivityType() == ActivityType.PAPER_SUBMISSION && a.getIsEnabled());
+                    boolean canSubmit = subActivity != null;
                     
                     if (canSubmit) {
-                        actions.add(createAction(addedLabels, "📄 Nộp bài: " + acronym, "NAVIGATE", "/conference/" + c.getId()));
+                        actions.add(createActionWithMeta(addedLabels, "📄 Nộp bài: " + acronym, "NAVIGATE",
+                                "/conference/" + c.getId(), c, deadline, dates));
                     }
                     // If registration is open, add "Register" button
                     boolean canRegister = activities.stream()
                             .anyMatch(a -> a.getActivityType() == ActivityType.REGISTRATION && a.getIsEnabled());
                     if (canRegister) {
-                        actions.add(createAction(addedLabels, "🎟 Đăng ký: " + acronym, "NAVIGATE", "/conference/" + c.getId()));
+                        actions.add(createActionWithMeta(addedLabels, "🎟 Đăng ký: " + acronym, "NAVIGATE",
+                                "/conference/" + c.getId(), c, deadline, dates));
                     }
                 }
             }
@@ -630,6 +640,25 @@ public class AIChatService {
     private AIChatResponse.ActionSuggestion createAction(Set<String> set, String label, String action, String val) {
         if (!set.contains(label)) set.add(label);
         return AIChatResponse.ActionSuggestion.builder().label(label).action(action).value(val).build();
+    }
+
+    /**
+     * Create an action enriched with conference metadata for rich card display.
+     */
+    private AIChatResponse.ActionSuggestion createActionWithMeta(
+            Set<String> set, String label, String action, String val,
+            Conference conf, String deadline, String dates) {
+        if (!set.contains(label)) set.add(label);
+        return AIChatResponse.ActionSuggestion.builder()
+                .label(label)
+                .action(action)
+                .value(val)
+                .conferenceId(conf.getId())
+                .location(conf.getLocation())
+                .area(conf.getArea())
+                .deadline(deadline)
+                .dates(dates)
+                .build();
     }
 
     /**

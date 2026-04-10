@@ -575,7 +575,6 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                     {"Regular Standard", "Standard admission ticket for researchers and industry professionals.", "5000000", "VND", "STANDARD", "500", "2026-08-10T23:59:00Z", "true"},
                     {"Student Full Access", "Heavily discounted ticket for verified university students. Requires valid Student ID at check-in.", "1200000", "VND", "STUDENT", "200", "2026-08-10T23:59:00Z", "true"},
                     {"VIP & Gala Dinner", "Includes standard access plus invitation to the exclusive networking Gala Dinner with keynote speakers.", "8500000", "VND", "VIP", "50", "2026-07-30T23:59:00Z", "true"},
-                    {"Online Only (Virtual)", "Access to live streams of all main tracks. No physical attendance.", "1000000", "VND", "STANDARD", "-1", "2026-08-14T23:59:00Z", "true"}
             };
 
             for (int r = 0; r < samples.length; r++) {
@@ -667,10 +666,17 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 }
             }
 
-            String maxQuantity = d.get("maxQuantity");
-            if (notBlank(maxQuantity) && parseInteger(maxQuantity) == null) {
-                errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("maxQuantity")
-                        .message("Invalid maxQuantity value: " + maxQuantity).build());
+            String maxQuantityStr = d.get("maxQuantity");
+            if (notBlank(maxQuantityStr)) {
+                Integer maxQuantity = parseInteger(maxQuantityStr);
+                if (maxQuantity == null || maxQuantity < 0) {
+                    errors.add(ImportError.builder()
+                            .sheet("TicketTypes")
+                            .row(rowNum)
+                            .column("maxQuantity")
+                            .message("Invalid maxQuantity value: " + maxQuantityStr)
+                            .build());
+                }
             }
 
             String deadline = d.get("deadline");

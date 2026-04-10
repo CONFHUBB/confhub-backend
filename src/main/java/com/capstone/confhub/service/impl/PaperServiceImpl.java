@@ -179,9 +179,11 @@ public class PaperServiceImpl implements PaperService {
     @Override
     @Transactional
     public void deletePaper(Integer id) {
-        if (!paperRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Cannot delete. Paper not found with id " + id);
-        }
+        Paper paper = paperRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cannot delete. Paper not found with id " + id));
+
+        // BR-2.13: Check activity enabled + deadline before delete
+        validatePaperSubmissionActivity(paper.getTrack().getConference().getId());
 
         // BR-2.14: Không xóa nếu đã có reviews
         long reviewCount = reviewRepository.countByPaper_Id(id);

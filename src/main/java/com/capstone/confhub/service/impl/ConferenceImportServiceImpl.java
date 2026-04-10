@@ -644,10 +644,13 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 }
             }
 
-            String price = d.get("price");
-            if (notBlank(price) && parseBigDecimal(price) == null) {
-                errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("price")
-                        .message("Invalid price value: " + price).build());
+            String priceStr = d.get("price");
+            if (notBlank(priceStr)) {
+                BigDecimal priceVal = parseBigDecimal(priceStr);
+                if (priceVal == null || priceVal.compareTo(BigDecimal.ZERO) < 0) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("price")
+                            .message("Invalid price value: " + priceStr).build());
+                }
             }
 
             String currency = d.get("currency");
@@ -683,6 +686,14 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             if (notBlank(deadline) && parseTicketDeadline(deadline) == null) {
                 errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("deadline")
                         .message("Invalid deadline format. Use ISO-8601, e.g. 2026-06-15T23:59:00Z").build());
+            }
+
+            if (notBlank(deadline)) {
+                LocalDateTime deadlineTime = parseTicketDeadline(deadline);
+                if (deadlineTime != null && conference.getEndDate() != null && deadlineTime.isAfter(conference.getEndDate())) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("deadline")
+                            .message("Deadline cannot be after conference end date").build());
+                }
             }
 
             String active = d.get("active");

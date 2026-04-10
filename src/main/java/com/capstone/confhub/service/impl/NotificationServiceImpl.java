@@ -12,6 +12,7 @@ import com.capstone.confhub.repository.NotificationRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.FcmPushService;
 import com.capstone.confhub.service.NotificationService;
+import com.capstone.confhub.service.WebSocketNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final UserRepository userRepository;
     private final ConferenceRepository conferenceRepository;
     private final FcmPushService fcmPushService;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     @Override
     @Transactional
@@ -48,6 +50,14 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
 
         Notification saved = notificationRepository.save(notification);
+        NotificationResponseDTO responseDTO = mapToResponseDTO(saved);
+
+        // Push real-time notification via WebSocket
+        try {
+            webSocketNotificationService.sendToUser(dto.getUserId(), responseDTO);
+        } catch (Exception e) {
+            // WS failure should not block notification creation
+        }
 
         // Send push notification via FCM (async, non-blocking)
         try {
@@ -63,7 +73,7 @@ public class NotificationServiceImpl implements NotificationService {
             // Logged inside FcmPushServiceImpl
         }
 
-        return mapToResponseDTO(saved);
+        return responseDTO;
     }
 
     @Override

@@ -69,7 +69,8 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/google",
                                 "/api/v1/email/accept/**",
                                 "/api/v1/email/decline/**",
-                                "/api/v1/payment/vnpay-callback")
+                                "/api/v1/payment/vnpay-callback",
+                                "/ws/**")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,

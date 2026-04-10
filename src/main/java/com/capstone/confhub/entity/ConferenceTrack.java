@@ -31,7 +31,7 @@ public class ConferenceTrack extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "description", nullable = false)
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

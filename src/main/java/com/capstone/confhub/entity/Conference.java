@@ -28,7 +28,7 @@ public class Conference extends BaseEntity {
     @Column(name = "acronym", nullable = false)
     private String acronym;
 
-    @Column(name = "description", nullable = false)
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
     @Column(name = "website_url")

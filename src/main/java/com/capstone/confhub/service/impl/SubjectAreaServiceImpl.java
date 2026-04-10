@@ -5,7 +5,9 @@ import com.capstone.confhub.dto.response.SubjectAreaResponseDTO;
 import com.capstone.confhub.dto.response.PagedResponse;
 import com.capstone.confhub.entity.ConferenceTrack;
 import com.capstone.confhub.entity.SubjectArea;
+import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
+import com.capstone.confhub.repository.PaperRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
 import com.capstone.confhub.service.SubjectAreaService;
 import com.capstone.confhub.utils.PaginationUtils;
@@ -24,6 +26,7 @@ public class SubjectAreaServiceImpl implements SubjectAreaService {
 
     private final SubjectAreaRepository subjectAreaRepository;
     private final ConferenceTrackRepository trackRepository;
+    private final PaperRepository paperRepository;
 
     @Override
     @Transactional
@@ -110,6 +113,14 @@ public class SubjectAreaServiceImpl implements SubjectAreaService {
         if (!subjectAreaRepository.existsById(id)) {
             throw new EntityNotFoundException("Subject Area not found with ID: " + id);
         }
+
+        // Safety check: block deletion if papers reference this subject area
+        long paperCount = paperRepository.countByPrimarySubjectArea_Id(id);
+        if (paperCount > 0) {
+            throw new BadRequestException(
+                    "Cannot delete subject area: it is used by " + paperCount + " paper(s) as primary subject area.");
+        }
+
         subjectAreaRepository.deleteById(id);
     }
 

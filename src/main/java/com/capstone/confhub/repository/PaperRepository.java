@@ -19,4 +19,9 @@ public interface PaperRepository extends JpaRepository<Paper, Integer> {
     Page<Paper> findByStatus(PaperStatus status, Pageable pageable);
 
     Page<Paper> findByStatusAndTitleContainingIgnoreCase(PaperStatus status, String title, Pageable pageable);
+
+    // Safety checks for track/subject area deletion
+    long countByTrack_Id(Integer trackId);
+
+    long countByPrimarySubjectArea_Id(Integer subjectAreaId);
 }

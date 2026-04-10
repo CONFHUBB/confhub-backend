@@ -9,6 +9,8 @@ import com.capstone.confhub.entity.ConferenceTrack;
 import com.capstone.confhub.entity.TrackReviewSetting;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
+import com.capstone.confhub.repository.PaperRepository;
+import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.service.ConferenceTrackService;
 import com.capstone.confhub.utils.PaginationUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,6 +28,7 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
 
     private final ConferenceTrackRepository trackRepository;
     private final ConferenceRepository conferenceRepository;
+    private final PaperRepository paperRepository;
 
     @Override
     @Transactional
@@ -33,6 +36,13 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         Conference conference = conferenceRepository.findById(dto.getConferenceId())
                 .orElseThrow(
                         () -> new EntityNotFoundException("Conference not found with ID: " + dto.getConferenceId()));
+
+        // Check for duplicate track name within the same conference
+        boolean exists = trackRepository.findByConferenceId(dto.getConferenceId()).stream()
+                .anyMatch(t -> t.getName().trim().equalsIgnoreCase(dto.getName().trim()));
+        if (exists) {
+            throw new BadRequestException("A track named '" + dto.getName() + "' already exists in this conference.");
+        }
 
         ConferenceTrack track = new ConferenceTrack();
         track.setConference(conference);
@@ -105,6 +115,14 @@ public class ConferenceTrackServiceImpl implements ConferenceTrackService {
         if (!trackRepository.existsById(id)) {
             throw new EntityNotFoundException("Track not found with ID: " + id);
         }
+
+        // Safety check: block deletion if papers exist in this track
+        long paperCount = paperRepository.countByTrack_Id(id);
+        if (paperCount > 0) {
+            throw new BadRequestException(
+                    "Cannot delete track: it has " + paperCount + " paper(s). Remove or reassign papers first.");
+        }
+
         trackRepository.deleteById(id);
     }
 

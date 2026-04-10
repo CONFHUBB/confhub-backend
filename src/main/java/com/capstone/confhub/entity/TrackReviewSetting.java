@@ -50,13 +50,13 @@ public class TrackReviewSetting extends BaseEntity {
     private Boolean showReviewerIdentityToOtherReviewer = false;
 
     @Column(name = "show_aggregate_columns", nullable = false)
-    private Boolean showAggregateColumns = false;
+    private Boolean showAggregateColumns = true;  // Always enabled
 
     @Column(name = "allow_reviewer_see_status_before_notification", nullable = false)
-    private Boolean allowReviewerSeeStatusBeforeNotification = false;
+    private Boolean allowReviewerSeeStatusBeforeNotification = true;  // Always enabled
 
     @Column(name = "enable_all_papers_for_discussion", nullable = false)
-    private Boolean enableAllPapersForDiscussion = false;
+    private Boolean enableAllPapersForDiscussion = true;  // Always enabled
 
     @Column(name = "allow_discuss_non_assigned_papers", nullable = false)
     private Boolean allowDiscussNonAssignedPapers = false;

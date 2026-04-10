@@ -12,9 +12,9 @@ public class TrackReviewSettingDTO {
     private Boolean allowOthersReviewAccessAfterSubmit = false;
     private Boolean allowReviewUpdateDuringDiscussion = false;
     private Boolean showReviewerIdentityToOtherReviewer = false;
-    private Boolean showAggregateColumns = false;
-    private Boolean allowReviewerSeeStatusBeforeNotification = false;
-    private Boolean enableAllPapersForDiscussion = false;
+    private Boolean showAggregateColumns = true;  // Always enabled
+    private Boolean allowReviewerSeeStatusBeforeNotification = true;  // Always enabled
+    private Boolean enableAllPapersForDiscussion = true;  // Always enabled
     private Boolean allowDiscussNonAssignedPapers = false;
     private Boolean allowAuthorDiscuss = false;
 

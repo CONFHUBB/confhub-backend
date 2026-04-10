@@ -548,7 +548,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         User user = new User();
         user.setEmail(email);
         user.setFirstName(email.split("@")[0]);  // Use email prefix as temporary name
-        user.setLastName("(Invited)");
+        user.setLastName("");
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));  // Random password
         user.setIsActive(false);
         userRepository.save(user);

@@ -48,16 +48,17 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         if (dto.getIsDoubleBlind() != null) setting.setIsDoubleBlind(dto.getIsDoubleBlind());
         if (dto.getReviewerInstructions() != null) setting.setReviewerInstructions(dto.getReviewerInstructions());
         if (dto.getAllowReviewerQuota() != null) setting.setAllowReviewerQuota(dto.getAllowReviewerQuota());
-        if (dto.getReviewerInviteExpirationDays() != null) setting.setReviewerInviteExpirationDays(dto.getReviewerInviteExpirationDays());
+        setting.setReviewerInviteExpirationDays(7); // Fixed
         if (dto.getAllowOthersReviewAccessAfterSubmit() != null) setting.setAllowOthersReviewAccessAfterSubmit(dto.getAllowOthersReviewAccessAfterSubmit());
         if (dto.getAllowReviewUpdateDuringDiscussion() != null) setting.setAllowReviewUpdateDuringDiscussion(dto.getAllowReviewUpdateDuringDiscussion());
         if (dto.getShowReviewerIdentityToOtherReviewer() != null) setting.setShowReviewerIdentityToOtherReviewer(dto.getShowReviewerIdentityToOtherReviewer());
-        if (dto.getShowAggregateColumns() != null) setting.setShowAggregateColumns(dto.getShowAggregateColumns());
-        if (dto.getAllowReviewerSeeStatusBeforeNotification() != null) setting.setAllowReviewerSeeStatusBeforeNotification(dto.getAllowReviewerSeeStatusBeforeNotification());
-        if (dto.getEnableAllPapersForDiscussion() != null) setting.setEnableAllPapersForDiscussion(dto.getEnableAllPapersForDiscussion());
+        // Hardcoded settings — not configurable from UI
+        setting.setShowAggregateColumns(true);
+        setting.setAllowReviewerSeeStatusBeforeNotification(true);
+        setting.setEnableAllPapersForDiscussion(true);
         if (dto.getAllowDiscussNonAssignedPapers() != null) setting.setAllowDiscussNonAssignedPapers(dto.getAllowDiscussNonAssignedPapers());
-        if (dto.getAllowAuthorDiscuss() != null) setting.setAllowAuthorDiscuss(dto.getAllowAuthorDiscuss());
-        if (dto.getDoNotShowWithdrawnPapers() != null) setting.setDoNotShowWithdrawnPapers(dto.getDoNotShowWithdrawnPapers());
+        setting.setAllowAuthorDiscuss(false);
+        setting.setDoNotShowWithdrawnPapers(false);
         if (dto.getEnableDomainConflict() != null) setting.setEnableDomainConflict(dto.getEnableDomainConflict());
         if (dto.getEnableAuthorSelfConflict() != null) setting.setEnableAuthorSelfConflict(dto.getEnableAuthorSelfConflict());
         if (dto.getAllowAuthorConfigureConflict() != null) setting.setAllowAuthorConfigureConflict(dto.getAllowAuthorConfigureConflict());
@@ -99,13 +100,13 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setIsDoubleBlind(false);
             targetSetting.setReviewerInstructions(null);
             targetSetting.setAllowReviewerQuota(false);
-            targetSetting.setReviewerInviteExpirationDays(null);
+            targetSetting.setReviewerInviteExpirationDays(7);
             targetSetting.setAllowOthersReviewAccessAfterSubmit(false);
             targetSetting.setAllowReviewUpdateDuringDiscussion(false);
             targetSetting.setShowReviewerIdentityToOtherReviewer(false);
-            targetSetting.setShowAggregateColumns(false);
-            targetSetting.setAllowReviewerSeeStatusBeforeNotification(false);
-            targetSetting.setEnableAllPapersForDiscussion(false);
+            targetSetting.setShowAggregateColumns(true);
+            targetSetting.setAllowReviewerSeeStatusBeforeNotification(true);
+            targetSetting.setEnableAllPapersForDiscussion(true);
             targetSetting.setAllowDiscussNonAssignedPapers(false);
             targetSetting.setAllowAuthorDiscuss(false);
             targetSetting.setDoNotShowWithdrawnPapers(false);
@@ -121,12 +122,12 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setAllowOthersReviewAccessAfterSubmit(sourceSetting.getAllowOthersReviewAccessAfterSubmit());
             targetSetting.setAllowReviewUpdateDuringDiscussion(sourceSetting.getAllowReviewUpdateDuringDiscussion());
             targetSetting.setShowReviewerIdentityToOtherReviewer(sourceSetting.getShowReviewerIdentityToOtherReviewer());
-            targetSetting.setShowAggregateColumns(sourceSetting.getShowAggregateColumns());
-            targetSetting.setAllowReviewerSeeStatusBeforeNotification(sourceSetting.getAllowReviewerSeeStatusBeforeNotification());
-            targetSetting.setEnableAllPapersForDiscussion(sourceSetting.getEnableAllPapersForDiscussion());
+            targetSetting.setShowAggregateColumns(true);  // Always enabled
+            targetSetting.setAllowReviewerSeeStatusBeforeNotification(true);  // Always enabled
+            targetSetting.setEnableAllPapersForDiscussion(true);  // Always enabled
             targetSetting.setAllowDiscussNonAssignedPapers(sourceSetting.getAllowDiscussNonAssignedPapers());
-            targetSetting.setAllowAuthorDiscuss(sourceSetting.getAllowAuthorDiscuss());
-            targetSetting.setDoNotShowWithdrawnPapers(sourceSetting.getDoNotShowWithdrawnPapers());
+            targetSetting.setAllowAuthorDiscuss(false);  // Never allowed
+            targetSetting.setDoNotShowWithdrawnPapers(false);  // Always show
             targetSetting.setEnableDomainConflict(sourceSetting.getEnableDomainConflict());
             targetSetting.setEnableAuthorSelfConflict(sourceSetting.getEnableAuthorSelfConflict());
             targetSetting.setAllowAuthorConfigureConflict(sourceSetting.getAllowAuthorConfigureConflict());

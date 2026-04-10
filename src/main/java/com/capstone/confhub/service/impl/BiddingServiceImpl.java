@@ -259,7 +259,7 @@ public class BiddingServiceImpl implements BiddingService {
             PaperForBiddingDTO dto = PaperForBiddingDTO.builder()
                     .paperId(paper.getId())
                     .title(paper.getTitle())
-                    .abstractText(isDoubleBlind ? null : paper.getAbstractField())
+                    .abstractText(paper.getAbstractField())  // Always show abstract — reviewers need it for bidding
                     .primarySubjectArea(primarySA)
                     .secondarySubjectAreas(secondarySAs)
                     .keywords(keywords)

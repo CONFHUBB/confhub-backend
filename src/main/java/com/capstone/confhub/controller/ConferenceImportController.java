@@ -138,4 +138,34 @@ public class ConferenceImportController {
                 ? ResponseEntity.status(HttpStatus.CREATED).body(result)
                 : ResponseEntity.badRequest().body(result);
     }
+
+    // ── Ticket Types ──
+
+    @GetMapping("/conferences/{conferenceId}/ticket-types/import/template")
+    @Operation(summary = "Download ticket type Excel template")
+    public ResponseEntity<byte[]> ticketTypeTemplate(@PathVariable Integer conferenceId) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ticket_type_template.xlsx")
+                .contentType(XLSX_TYPE)
+                .body(importService.generateTicketTypeTemplate());
+    }
+
+    @PostMapping("/conferences/{conferenceId}/ticket-types/import/preview")
+    @Operation(summary = "Preview ticket types from Excel (no DB write)")
+    public ResponseEntity<ImportResultDTO> previewTicketTypes(
+            @PathVariable Integer conferenceId,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(importService.previewTicketTypesFromExcel(conferenceId, file));
+    }
+
+    @PostMapping("/conferences/{conferenceId}/ticket-types/import")
+    @Operation(summary = "Import ticket types for a conference from Excel file")
+    public ResponseEntity<ImportResultDTO> importTicketTypes(
+            @PathVariable Integer conferenceId,
+            @RequestParam("file") MultipartFile file) {
+        ImportResultDTO result = importService.importTicketTypesFromExcel(conferenceId, file);
+        return result.isSuccess()
+                ? ResponseEntity.status(HttpStatus.CREATED).body(result)
+                : ResponseEntity.badRequest().body(result);
+    }
 }

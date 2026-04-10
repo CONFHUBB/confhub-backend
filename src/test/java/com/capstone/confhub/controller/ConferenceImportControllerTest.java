@@ -307,6 +307,101 @@ class ConferenceImportControllerTest {
         assertTrue(result.getHeaders().getContentDisposition().getFilename().contains("subject_area_template.xlsx"));
     }
 
+    // ── Ticket Type Template Tests ──
+
+    @Test
+    void ticketTypeTemplateShouldReturnOkWithXlsxContentType() {
+        byte[] templateData = new byte[]{1, 2, 3, 4, 5};
+        when(conferenceImportService.generateTicketTypeTemplate()).thenReturn(templateData);
+
+        var result = conferenceImportController.ticketTypeTemplate(1);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(templateData, result.getBody());
+        assertTrue(result.getHeaders().getContentDisposition().getFilename().contains("ticket_type_template.xlsx"));
+    }
+
+    // ── Ticket Type Preview Tests ──
+
+    @Test
+    void previewTicketTypesShouldReturnOkWithResult() {
+        ImportResultDTO expectedResult = ImportResultDTO.builder()
+                .success(true)
+                .ticketTypePreviews(java.util.List.of(
+                        java.util.Map.of("name", "Early-Bird Standard"),
+                        java.util.Map.of("name", "Regular Standard")))
+                .build();
+
+        when(conferenceImportService.previewTicketTypesFromExcel(eq(1), any(MultipartFile.class)))
+                .thenReturn(expectedResult);
+
+        var result = conferenceImportController.previewTicketTypes(1, mockFile);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(2, result.getBody().getTicketTypePreviews().size());
+    }
+
+    @Test
+    void previewTicketTypesShouldPassConferenceIdAndFileToService() {
+        ImportResultDTO result = ImportResultDTO.builder().success(true).build();
+        when(conferenceImportService.previewTicketTypesFromExcel(eq(42), any(MultipartFile.class)))
+                .thenReturn(result);
+
+        conferenceImportController.previewTicketTypes(42, mockFile);
+
+        verify(conferenceImportService, times(1)).previewTicketTypesFromExcel(42, mockFile);
+    }
+
+    // ── Ticket Type Import Tests ──
+
+    @Test
+    void importTicketTypesShouldReturnCreatedOnSuccess() {
+        ImportResultDTO successResult = ImportResultDTO.builder()
+                .success(true)
+                .ticketTypesCreated(5)
+                .build();
+
+        when(conferenceImportService.importTicketTypesFromExcel(eq(1), any(MultipartFile.class)))
+                .thenReturn(successResult);
+
+        var result = conferenceImportController.importTicketTypes(1, mockFile);
+
+        assertEquals(HttpStatus.CREATED, result.getStatusCode());
+        assertEquals(5, result.getBody().getTicketTypesCreated());
+    }
+
+    @Test
+    void importTicketTypesShouldReturnBadRequestOnFailure() {
+        ImportResultDTO failResult = ImportResultDTO.builder()
+                .success(false)
+                .errors(java.util.List.of(ImportResultDTO.ImportError.builder()
+                        .sheet("TicketTypes")
+                        .row(3)
+                        .column("name")
+                        .message("Duplicate ticket type")
+                        .build()))
+                .build();
+
+        when(conferenceImportService.importTicketTypesFromExcel(eq(1), any(MultipartFile.class)))
+                .thenReturn(failResult);
+
+        var result = conferenceImportController.importTicketTypes(1, mockFile);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+        assertFalse(result.getBody().isSuccess());
+    }
+
+    @Test
+    void importTicketTypesShouldPassConferenceIdAndFileToService() {
+        ImportResultDTO result = ImportResultDTO.builder().success(true).build();
+        when(conferenceImportService.importTicketTypesFromExcel(eq(50), any(MultipartFile.class)))
+                .thenReturn(result);
+
+        conferenceImportController.importTicketTypes(50, mockFile);
+
+        verify(conferenceImportService, times(1)).importTicketTypesFromExcel(50, mockFile);
+    }
+
     // ── Subject Area Preview Tests ──
 
     @Test
@@ -470,11 +565,13 @@ class ConferenceImportControllerTest {
         when(conferenceImportService.generateTrackTemplate()).thenReturn(data);
         when(conferenceImportService.generateSubjectAreaTemplate()).thenReturn(data);
         when(conferenceImportService.generateMemberTemplate()).thenReturn(data);
+        when(conferenceImportService.generateTicketTypeTemplate()).thenReturn(data);
 
         assertNotNull(conferenceImportController.conferenceTemplate().getBody());
         assertNotNull(conferenceImportController.trackTemplate(1).getBody());
         assertNotNull(conferenceImportController.subjectAreaTemplate(1).getBody());
         assertNotNull(conferenceImportController.memberTemplate(1).getBody());
+        assertNotNull(conferenceImportController.ticketTypeTemplate(1).getBody());
     }
 
     @Test

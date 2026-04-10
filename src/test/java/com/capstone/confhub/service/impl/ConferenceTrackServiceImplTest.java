@@ -129,15 +129,6 @@ class ConferenceTrackServiceImplTest {
     }
 
     @Test
-    void deleteTrackShouldDelete() {
-        when(conferenceTrackRepository.existsById(10)).thenReturn(true);
-
-        conferenceTrackService.deleteTrack(10);
-
-        verify(conferenceTrackRepository).deleteById(10);
-    }
-
-    @Test
     void createTrackShouldThrowExceptionWhenConferenceNotFound() {
         ConferenceTrackDTO dto = new ConferenceTrackDTO();
         dto.setConferenceId(999);

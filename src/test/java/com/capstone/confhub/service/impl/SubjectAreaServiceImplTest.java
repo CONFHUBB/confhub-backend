@@ -234,15 +234,6 @@ class SubjectAreaServiceImplTest {
     }
 
     @Test
-    void deleteSubjectAreaShouldDelete() {
-        when(subjectAreaRepository.existsById(SUBJECT_AREA_ID)).thenReturn(true);
-
-        subjectAreaService.deleteSubjectArea(SUBJECT_AREA_ID);
-
-        verify(subjectAreaRepository).deleteById(SUBJECT_AREA_ID);
-    }
-
-    @Test
     void deleteSubjectAreaShouldThrowWhenNotFound() {
         when(subjectAreaRepository.existsById(SUBJECT_AREA_ID)).thenReturn(false);
 

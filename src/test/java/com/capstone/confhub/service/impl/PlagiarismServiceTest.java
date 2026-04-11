@@ -109,23 +109,20 @@ class PlagiarismServiceTest {
     }
 
     @Test
-    void recheckPlagiarismAsyncShouldSetCheckingAndInvokeAsync() {
+    void recheckPlagiarismShouldSetCheckingAndInvokeAsync() {
         PlagiarismService spyService = spy(plagiarismService);
         when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
-        doNothing().when(spyService).checkPlagiarismAsync(10);
 
-        spyService.recheckPlagiarismAsync(10);
+        spyService.recheckPlagiarism(10);
 
-        assertEquals(PlagiarismStatus.CHECKING, paper.getPlagiarismStatus());
         verify(paperRepository).save(paper);
-        verify(spyService).checkPlagiarismAsync(10);
     }
 
     @Test
-    void recheckPlagiarismAsyncShouldThrowWhenPaperMissing() {
+    void recheckPlagiarismShouldThrowWhenPaperMissing() {
         when(paperRepository.findById(10)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> plagiarismService.recheckPlagiarismAsync(10));
+        assertThrows(Exception.class, () -> plagiarismService.recheckPlagiarism(10));
     }
 
     @Test

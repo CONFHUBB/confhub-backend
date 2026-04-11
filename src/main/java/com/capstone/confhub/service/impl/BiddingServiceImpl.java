@@ -160,17 +160,28 @@ public class BiddingServiceImpl implements BiddingService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + reviewerId));
 
         // 1. Kiểm tra bắt buộc chọn subject areas trước khi bid
-        List<ReviewerInterest> interests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
+        List<ReviewerInterest> allInterests = reviewerInterestRepository.findByReviewer_Id(reviewerId);
 
-        // Check if any track in this conference has papers — subject areas are always required
+        // 2. Lấy tất cả papers trong conference (also used for track IDs)
+        List<Paper> allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
+
+        // Get all track IDs for this conference to filter interests
+        Set<Integer> trackIds = allPapers.stream()
+                .map(p -> p.getTrack().getId())
+                .collect(Collectors.toSet());
+
+        // Filter to only interests whose subject area belongs to this conference's tracks
+        List<ReviewerInterest> interests = allInterests.stream()
+                .filter(ri -> ri.getSubjectArea().getTrack() != null
+                        && trackIds.contains(ri.getSubjectArea().getTrack().getId()))
+                .collect(Collectors.toList());
+
+        // Subject areas are always required for bidding
         if (interests.isEmpty()) {
             throw new BadRequestException(
-                    "You must select your Subject Areas before viewing papers for bidding. " +
+                    "You must select your Subject Areas for this conference before viewing papers for bidding. " +
                     "Please go to the Subject Areas page first.");
         }
-
-        // 2. Lấy tất cả papers trong conference
-        List<Paper> allPapers = paperRepository.findByTrack_Conference_Id(conferenceId);
 
         // 3. Lấy paper IDs mà reviewer có conflict (manual)
         Set<Integer> conflictPaperIds = paperConflictRepository.findByUser_Id(reviewerId)

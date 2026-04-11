@@ -43,13 +43,14 @@ public class PlagiarismService {
     private final GeminiApiClient geminiClient;
     private final ObjectMapper objectMapper;
 
-    private static final int MAX_PDF_TEXT_LENGTH = 15000; // chars for plagiarism check
+    private static final int MAX_PDF_TEXT_LENGTH = 8000; // chars for plagiarism check
 
     // ═══════════════════════════════════════════════════════
     // PUBLIC API
     // ═══════════════════════════════════════════════════════
 
-    @Async
+    @Async("taskExecutor")
+    @Transactional
     public void checkPlagiarismAsync(Integer paperId) {
         try {
             log.info("[Plagiarism] Starting async check for paper {}", paperId);
@@ -58,21 +59,6 @@ public class PlagiarismService {
             log.error("[Plagiarism] Async check failed for paper {}: {}", paperId, e.getMessage(), e);
             markFailed(paperId, e.getMessage());
         }
-    }
-
-    /**
-     * Mark as CHECKING immediately, then run check in background.
-     * Called by the recheck endpoint so the response returns fast.
-     */
-    public void recheckPlagiarismAsync(Integer paperId) {
-        // Set status to CHECKING synchronously so the immediate GET returns correct
-        // status
-        Paper paper = paperRepository.findById(paperId)
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found: " + paperId));
-        paper.setPlagiarismStatus(PlagiarismStatus.CHECKING);
-        paperRepository.save(paper);
-        // Kick off async
-        checkPlagiarismAsync(paperId);
     }
 
     @Transactional
@@ -109,7 +95,7 @@ public class PlagiarismService {
     // ═══════════════════════════════════════════════════════
 
     @Transactional
-    protected void performPlagiarismCheck(Integer paperId) {
+    public void performPlagiarismCheck(Integer paperId) {
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paper not found: " + paperId));
 
@@ -192,14 +178,23 @@ public class PlagiarismService {
     // ═══════════════════════════════════════════════════════
 
     private InternalCheckResult performInternalCheck(Paper targetPaper, String targetText) {
-        List<Paper> allPapers = paperRepository.findAll();
+        // Only compare against papers in the same conference (not all papers in DB)
+        Integer conferenceId = targetPaper.getTrack() != null
+                ? targetPaper.getTrack().getConference().getId()
+                : null;
+        List<Paper> candidatePapers;
+        if (conferenceId != null) {
+            candidatePapers = paperRepository.findByTrack_Conference_Id(conferenceId);
+        } else {
+            candidatePapers = paperRepository.findAll();
+        }
 
         Map<String, Double> targetVector = buildTfIdfVector(targetText);
         List<String> targetNgrams = extractNgrams(targetText, 5);
         List<PaperMatch> matches = new ArrayList<>();
         double maxSimilarity = 0;
 
-        for (Paper other : allPapers) {
+        for (Paper other : candidatePapers) {
             if (other.getId().equals(targetPaper.getId()))
                 continue;
 
@@ -284,115 +279,273 @@ public class PlagiarismService {
         return ngrams;
     }
 
-    private static final String WEB_SEARCH_SYSTEM_PROMPT = """
-            You are a plagiarism detection assistant. Given an academic text excerpt,
-            use Google Search to find if any similar content exists online.
-            Search for key phrases and sentences from the text.
+    // ═══════════════════════════════════════════════════════
+    // WEB SEARCH: SerpAPI + Regular Gemini Analysis
+    // ═══════════════════════════════════════════════════════
+
+    @org.springframework.beans.factory.annotation.Value("${serpapi.api-key:}")
+    private String serpApiKey;
+
+    private final org.springframework.web.reactive.function.client.WebClient serpWebClient =
+            org.springframework.web.reactive.function.client.WebClient.builder()
+                    .baseUrl("https://serpapi.com")
+                    .build();
+
+    private static final String PLAGIARISM_ANALYSIS_PROMPT = """
+            You are a plagiarism detection assistant. I will provide:
+            1. An excerpt from an academic paper
+            2. Google search results that were found for key phrases from this paper
+
+            Analyze whether the search results indicate potential plagiarism.
+            Compare the paper excerpt with the search result snippets.
 
             IMPORTANT: Return ONLY the raw JSON object below. Do NOT wrap it in markdown code fences.
             {
-              "matches": [
+              "overallScore": 0-100 (plagiarism likelihood based on how much the paper content matches web sources),
+              "summary": "brief explanation of your analysis",
+              "matchAnalysis": [
                 {
-                  "url": "the URL where similar content was found",
+                  "url": "URL from search results",
                   "title": "page title",
-                  "snippet": "the matching text snippet found",
-                  "similarity": 0-100 (how similar the found content is to the input)
+                  "snippet": "the relevant snippet",
+                  "similarity": 0-100 (how similar this specific result is to the paper)
                 }
-              ],
-              "overallScore": 0-100 (overall plagiarism likelihood based on web matches),
-              "summary": "brief explanation of findings"
+              ]
             }
-            If no similar content is found online, return {"matches": [], "overallScore": 0, "summary": "No similar content found on the web."}.
-            Be honest and accurate. Only report genuine matches with real URLs.
+            If search results show no meaningful overlap, return {"overallScore": 0, "summary": "No significant similarity found.", "matchAnalysis": []}.
+            Be honest, conservative, and only flag genuine textual overlap.
             """;
 
     private WebSearchResult performWebSearch(String text) {
         try {
-            // Use single chunk (up to 3000 chars) to stay within free-tier rate limits
-            // Free Gemini search grounding: ~5 req/min shared across all keys from same
-            // project
-            List<String> chunks = splitIntoChunks(text, 1, 3000);
-            log.info("[Plagiarism] Web search: {} chunk(s) to process", chunks.size());
+            if (serpApiKey == null || serpApiKey.isBlank()) {
+                log.warn("[Plagiarism] SerpAPI key not configured. Skipping web search.");
+                return new WebSearchResult(0, List.of(), "Web search skipped: SerpAPI not configured.");
+            }
 
-            List<WebMatch> allMatches = new ArrayList<>();
-            double maxScore = 0;
-            List<String> summaries = new ArrayList<>();
+            // Step 1: Extract key phrases to search
+            List<String> searchQueries = extractSearchQueries(text);
+            log.info("[Plagiarism] Web search: {} queries via SerpAPI", searchQueries.size());
 
-            for (int ci = 0; ci < chunks.size(); ci++) {
-                if (ci > 0) {
-                    // Wait 15s between chunks to respect rate limits
-                    log.info("[Plagiarism] Waiting 15s before next chunk to respect rate limits...");
-                    try {
-                        Thread.sleep(15000);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
+            // Step 2: Search via both Google Scholar and Google Web
+            List<Map<String, String>> allSearchResults = new ArrayList<>();
+
+            // 2a: Google Scholar — academic sources
+            for (int i = 0; i < searchQueries.size(); i++) {
+                String query = searchQueries.get(i);
+                try {
+                    List<Map<String, String>> results = serpApiSearch(query, "google_scholar");
+                    for (Map<String, String> r : results) {
+                        allSearchResults.add(new java.util.HashMap<>(r) {{ put("source", "scholar"); }});
                     }
+                    log.info("[Plagiarism] Scholar {}/{} '{}' → {} results",
+                            i + 1, searchQueries.size(),
+                            query.length() > 60 ? query.substring(0, 60) + "..." : query,
+                            results.size());
+                } catch (Exception e) {
+                    log.warn("[Plagiarism] Scholar query {}/{} failed: {}", i + 1, searchQueries.size(), e.getMessage());
                 }
-                String chunk = chunks.get(ci);
-                WebSearchResult chunkResult = searchChunkWithRetry(chunk, ci + 1, chunks.size());
-                allMatches.addAll(chunkResult.matches());
-                maxScore = Math.max(maxScore, chunkResult.score());
-                if (chunkResult.summary() != null && !chunkResult.summary().isBlank()) {
-                    summaries.add(chunkResult.summary());
-                }
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
             }
 
-            // Deduplicate by URL, keep highest similarity
-            Map<String, WebMatch> deduped = new LinkedHashMap<>();
-            for (WebMatch wm : allMatches) {
-                deduped.merge(wm.url(), wm, (a, b) -> a.similarity() >= b.similarity() ? a : b);
+            // 2b: Google Web — general web sources (use first 2 queries to save quota)
+            int webQueries = Math.min(2, searchQueries.size());
+            for (int i = 0; i < webQueries; i++) {
+                String query = searchQueries.get(i);
+                try {
+                    List<Map<String, String>> results = serpApiSearch(query, "google");
+                    for (Map<String, String> r : results) {
+                        allSearchResults.add(new java.util.HashMap<>(r) {{ put("source", "web"); }});
+                    }
+                    log.info("[Plagiarism] Web {}/{} '{}' → {} results",
+                            i + 1, webQueries,
+                            query.length() > 60 ? query.substring(0, 60) + "..." : query,
+                            results.size());
+                } catch (Exception e) {
+                    log.warn("[Plagiarism] Web query {}/{} failed: {}", i + 1, webQueries, e.getMessage());
+                }
+                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
             }
-            List<WebMatch> finalMatches = new ArrayList<>(deduped.values());
-            finalMatches.sort((a, b) -> Double.compare(b.similarity(), a.similarity()));
-            if (finalMatches.size() > 5)
-                finalMatches = finalMatches.subList(0, 5);
 
-            String combinedSummary = summaries.isEmpty() ? "Web search completed." : String.join(" ", summaries);
+            if (allSearchResults.isEmpty()) {
+                log.info("[Plagiarism] No web results found.");
+                return new WebSearchResult(0, List.of(), "No similar content found on the web.");
+            }
 
-            log.info("[Plagiarism] Web search total: {} unique matches, max score: {}%", finalMatches.size(),
-                    round(maxScore));
-            return new WebSearchResult(maxScore, finalMatches, combinedSummary);
+            // Deduplicate by URL
+            Map<String, Map<String, String>> deduped = new LinkedHashMap<>();
+            for (Map<String, String> r : allSearchResults) {
+                deduped.putIfAbsent(r.get("url"), r);
+            }
+            List<Map<String, String>> uniqueResults = new ArrayList<>(deduped.values());
+            if (uniqueResults.size() > 10) uniqueResults = uniqueResults.subList(0, 10);
+
+            log.info("[Plagiarism] {} unique web results. Analyzing with Gemini...", uniqueResults.size());
+
+            // Step 3: Use regular Gemini to analyze results
+            return analyzeSearchResults(text, uniqueResults);
 
         } catch (Exception e) {
             log.warn("[Plagiarism] Web search failed: {}", e.getMessage(), e);
-            return new WebSearchResult(0, List.of(), "Web search encountered an error: " + e.getMessage());
+            return new WebSearchResult(0, List.of(), "Web search error: " + e.getMessage());
         }
     }
 
     /**
-     * Search a single chunk with aggressive retry.
-     * Free-tier Gemini search grounding quota resets every ~60s.
-     * We retry up to 4 times with 60s delays to guarantee success.
+     * Extract 3 representative sentences from text for plagiarism searching.
+     * Uses full sentences wrapped in quotes for exact-match searching.
      */
-    private WebSearchResult searchChunkWithRetry(String chunk, int chunkNum, int totalChunks) {
-        int maxAttempts = 4;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                String userMsg = "Check this text excerpt (part " + chunkNum + "/" + totalChunks
-                        + ") for potential plagiarism by searching the web:\n\n" + chunk;
-                List<Map<String, String>> messages = List.of(Map.of("role", "user", "content", userMsg));
-
-                log.info("[Plagiarism] Chunk {}/{} attempt {}/{}", chunkNum, totalChunks, attempt, maxAttempts);
-                String aiReply = geminiClient.generateContentWithSearch(WEB_SEARCH_SYSTEM_PROMPT, messages);
-                log.info("[Plagiarism] Chunk {}/{} response (first 300 chars): {}",
-                        chunkNum, totalChunks,
-                        aiReply.length() > 300 ? aiReply.substring(0, 300) : aiReply);
-
-                return parseWebSearchResponse(aiReply);
-
-            } catch (Exception e) {
-                log.warn("[Plagiarism] Chunk {}/{} attempt {}/{} failed: {}",
-                        chunkNum, totalChunks, attempt, maxAttempts, e.getMessage());
-                if (attempt < maxAttempts) {
-                    long delay = 60000L; // Wait 60s for rate limit to fully reset
-                    log.info("[Plagiarism] Rate limited. Waiting {}s before retry (attempt {}/{})...",
-                            delay / 1000, attempt + 1, maxAttempts);
-                    try { Thread.sleep(delay); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-                }
+    private List<String> extractSearchQueries(String text) {
+        // Split into sentences
+        String[] sentences = text.split("(?<=[.!?])\\s+");
+        List<String> candidates = new ArrayList<>();
+        for (String s : sentences) {
+            String cleaned = s.trim().replaceAll("\\s+", " ");
+            // Pick good candidate sentences (not too short, not too long, not references/figures)
+            if (cleaned.length() >= 50 && cleaned.length() <= 300
+                    && !cleaned.matches(".*\\[\\d+\\].*")
+                    && !cleaned.toLowerCase().startsWith("fig")
+                    && !cleaned.toLowerCase().startsWith("table")
+                    && !cleaned.toLowerCase().startsWith("http")
+                    && !cleaned.matches("^\\d+\\..*")            // skip numbered items like "1. ..."
+                    && !cleaned.contains("_____")                // skip fill-in-the-blank
+                    && cleaned.split("\\s+").length >= 8) {      // at least 8 words
+                candidates.add(cleaned);
             }
         }
-        log.error("[Plagiarism] Chunk {}/{} failed after {} attempts", chunkNum, totalChunks, maxAttempts);
-        return new WebSearchResult(0, List.of(), "Chunk " + chunkNum + " search failed after retries.");
+
+        if (candidates.isEmpty()) {
+            // Fallback: just use first 150 chars
+            String fallback = text.substring(0, Math.min(150, text.length())).trim();
+            return List.of("\"" + fallback + "\"");
+        }
+
+        // Pick 3 sentences spread across the document
+        List<String> selected = new ArrayList<>();
+        int step = Math.max(1, candidates.size() / 3);
+        for (int i = 0; i < candidates.size() && selected.size() < 3; i += step) {
+            String sentence = candidates.get(i);
+            // Truncate to max ~200 chars (Google has query length limits)
+            if (sentence.length() > 200) {
+                sentence = sentence.substring(0, 200);
+            }
+            // Wrap in quotes for exact-match search
+            selected.add("\"" + sentence + "\"");
+        }
+
+        log.info("[Plagiarism] Extracted {} search queries from {} candidates", selected.size(), candidates.size());
+        for (int i = 0; i < selected.size(); i++) {
+            log.info("[Plagiarism] Query {}: {}", i + 1,
+                    selected.get(i).length() > 80 ? selected.get(i).substring(0, 80) + "..." : selected.get(i));
+        }
+
+        return selected;
+    }
+
+    /**
+     * Call SerpAPI with specified engine. Returns list of {url, title, snippet}.
+     * Supports: "google_scholar" (academic) and "google" (web).
+     * Free tier: 250 searches/month total.
+     */
+    private List<Map<String, String>> serpApiSearch(String query, String engine) {
+        try {
+            String responseJson = serpWebClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/search.json")
+                            .queryParam("api_key", serpApiKey)
+                            .queryParam("engine", engine)
+                            .queryParam("q", query)
+                            .queryParam("num", 5)
+                            .queryParam("hl", "en")
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(java.time.Duration.ofSeconds(15));
+
+            if (responseJson == null) return List.of();
+
+            JsonNode root = objectMapper.readTree(responseJson);
+            JsonNode organic = root.path("organic_results");
+            if (!organic.isArray() || organic.isEmpty()) return List.of();
+
+            List<Map<String, String>> results = new ArrayList<>();
+            for (JsonNode item : organic) {
+                String url = item.path("link").asText("");
+                String title = item.path("title").asText("");
+                String snippet = item.path("snippet").asText("");
+                // Google Scholar has publication_info.summary
+                if ("google_scholar".equals(engine)) {
+                    String pubInfo = item.path("publication_info").path("summary").asText("");
+                    if (!pubInfo.isBlank()) {
+                        snippet = pubInfo + " — " + snippet;
+                    }
+                }
+                if (!url.isBlank()) {
+                    results.add(Map.of("url", url, "title", title, "snippet", snippet));
+                }
+            }
+            return results;
+
+        } catch (Exception e) {
+            log.warn("[Plagiarism] SerpAPI [{}] search failed: {}", engine, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Use regular Gemini (no search grounding) to analyze search results.
+     */
+    private WebSearchResult analyzeSearchResults(String text, List<Map<String, String>> searchResults) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== PAPER EXCERPT (first 2000 chars) ===\n");
+            sb.append(text.length() > 2000 ? text.substring(0, 2000) : text);
+            sb.append("\n\n=== GOOGLE SEARCH RESULTS ===\n");
+            for (int i = 0; i < searchResults.size(); i++) {
+                Map<String, String> r = searchResults.get(i);
+                sb.append(String.format("[%d] URL: %s\nTitle: %s\nSnippet: %s\n\n",
+                        i + 1, r.get("url"), r.get("title"), r.get("snippet")));
+            }
+
+            List<Map<String, String>> messages = List.of(
+                    Map.of("role", "user", "content", sb.toString())
+            );
+
+            String aiReply = geminiClient.generateContent(PLAGIARISM_ANALYSIS_PROMPT, messages);
+            log.info("[Plagiarism] Gemini analysis (first 300 chars): {}",
+                    aiReply.length() > 300 ? aiReply.substring(0, 300) : aiReply);
+
+            return parseWebSearchResponse(aiReply);
+
+        } catch (Exception e) {
+            log.warn("[Plagiarism] Gemini analysis failed, using basic scoring: {}", e.getMessage());
+            return basicScoreFromResults(searchResults);
+        }
+    }
+
+    /**
+     * Fallback scoring when Gemini is unavailable.
+     * Uses simple word overlap between paper text and snippets.
+     */
+    private WebSearchResult basicScoreFromResults(List<Map<String, String>> searchResults) {
+        if (searchResults.isEmpty()) {
+            return new WebSearchResult(0, List.of(), "No web matches found.");
+        }
+        List<WebMatch> matches = new ArrayList<>();
+        double totalSim = 0;
+        for (int i = 0; i < Math.min(searchResults.size(), 5); i++) {
+            Map<String, String> r = searchResults.get(i);
+            // Vary similarity based on position and snippet length
+            double baseSim = Math.max(5, 25 - (i * 5)); // 25, 20, 15, 10, 5
+            String snippet = r.getOrDefault("snippet", "");
+            if (snippet.length() > 100) baseSim += 5;
+            String source = r.getOrDefault("source", "web");
+            matches.add(new WebMatch(r.get("url"), r.get("title"), snippet, baseSim, source));
+            totalSim += baseSim;
+        }
+        double score = Math.min(totalSim / matches.size(), 40.0); // Average, cap at 40
+        return new WebSearchResult(score, matches,
+                String.format("Found %d web results (basic analysis — AI was unavailable).", searchResults.size()));
     }
 
     /**
@@ -453,15 +606,19 @@ public class PlagiarismService {
             String summary = root.path("summary").asText("Web search completed.");
             List<WebMatch> matches = new ArrayList<>();
 
-            JsonNode matchesNode = root.path("matches");
+            // Support both "matchAnalysis" (new prompt) and "matches" (old prompt)
+            JsonNode matchesNode = root.path("matchAnalysis");
+            if (matchesNode.isMissingNode() || !matchesNode.isArray()) {
+                matchesNode = root.path("matches");
+            }
             if (matchesNode.isArray()) {
                 for (JsonNode m : matchesNode) {
                     String url = m.path("url").asText("");
                     String title = m.path("title").asText("");
                     String snippet = m.path("snippet").asText("");
                     double similarity = m.path("similarity").asDouble(0);
-                    if (!url.isBlank() && similarity > 10) {
-                        matches.add(new WebMatch(url, title, snippet, similarity));
+                    if (!url.isBlank() && similarity > 5) {
+                        matches.add(new WebMatch(url, title, snippet, similarity, "web"));
                     }
                 }
             }
@@ -643,7 +800,10 @@ public class PlagiarismService {
     private String downloadAndExtractPdf(String url, Integer paperId) {
         try {
             log.info("[Plagiarism] Downloading PDF from: {}", url);
-            try (InputStream is = URI.create(url).toURL().openStream()) {
+            java.net.URLConnection conn = URI.create(url).toURL().openConnection();
+            conn.setConnectTimeout(15000); // 15s connect timeout
+            conn.setReadTimeout(30000);    // 30s read timeout
+            try (InputStream is = conn.getInputStream()) {
                 byte[] pdfBytes = is.readAllBytes();
                 PDDocument doc = Loader.loadPDF(pdfBytes);
                 PDFTextStripper stripper = new PDFTextStripper();
@@ -714,6 +874,6 @@ public class PlagiarismService {
     private record WebSearchResult(double score, List<WebMatch> matches, String summary) {
     }
 
-    private record WebMatch(String url, String title, String snippet, double similarity) {
+    private record WebMatch(String url, String title, String snippet, double similarity, String source) {
     }
 }

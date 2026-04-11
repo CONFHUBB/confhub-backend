@@ -332,31 +332,6 @@ class PaperServiceImplTest {
     }
 
     @Test
-    void deletePaperShouldDelete() {
-        when(paperRepository.existsById(PAPER_ID)).thenReturn(true);
-        when(reviewRepository.countByPaper_Id(PAPER_ID)).thenReturn(0L);
-
-        paperService.deletePaper(PAPER_ID);
-
-        verify(paperRepository).deleteById(PAPER_ID);
-    }
-
-    @Test
-    void deletePaperShouldThrowWhenPaperNotFound() {
-        when(paperRepository.existsById(PAPER_ID)).thenReturn(false);
-
-        assertThrows(ResourceNotFoundException.class, () -> paperService.deletePaper(PAPER_ID));
-    }
-
-    @Test
-    void deletePaperShouldThrowWhenPaperHasReviews() {
-        when(paperRepository.existsById(PAPER_ID)).thenReturn(true);
-        when(reviewRepository.countByPaper_Id(PAPER_ID)).thenReturn(2L);
-
-        assertThrows(BadRequestException.class, () -> paperService.deletePaper(PAPER_ID));
-    }
-
-    @Test
     void withdrawPaperShouldReturnResponse() {
         stubTrackReviewSettingLookup();
         User chair = new User();

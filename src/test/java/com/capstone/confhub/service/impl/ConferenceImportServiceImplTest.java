@@ -6,6 +6,7 @@ import com.capstone.confhub.entity.ConferenceTrack;
 import com.capstone.confhub.entity.ConferenceUserTrack;
 import com.capstone.confhub.entity.Notification;
 import com.capstone.confhub.entity.Role;
+import com.capstone.confhub.entity.TicketType;
 import com.capstone.confhub.entity.SubjectArea;
 import com.capstone.confhub.entity.TrackReviewSetting;
 import com.capstone.confhub.entity.User;
@@ -17,6 +18,7 @@ import com.capstone.confhub.repository.ConferenceTrackRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.repository.NotificationRepository;
 import com.capstone.confhub.repository.RoleRepository;
+import com.capstone.confhub.repository.TicketTypeRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
 import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.repository.UserProfileRepository;
@@ -27,6 +29,7 @@ import com.capstone.confhub.service.ConferenceActivityService;
 import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.TicketCategory;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -82,6 +85,8 @@ class ConferenceImportServiceImplTest {
     private ConferenceUserTrackRepository conferenceUserTrackRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private TicketTypeRepository ticketTypeRepository;
     @Mock
     private ConferenceActivityService conferenceActivityService;
     @Mock
@@ -671,6 +676,93 @@ class ConferenceImportServiceImplTest {
     }
 
     @Test
+    void previewTicketTypesFromExcelShouldParseRows() {
+        MultipartFile file = ticketTypesFile(List.of(
+                row("name", "Early-Bird Standard", "description", "Discounted rate", "price", "3500000", "currency", "VND", "category", "STANDARD", "maxQuantity", "150", "deadline", "2026-06-15T23:59:00Z", "active", "true"),
+                row("name", "Regular Standard", "description", "Standard admission", "price", "5000000", "currency", "VND", "category", "STANDARD", "maxQuantity", "500", "deadline", "2026-08-10T23:59:00Z", "active", "true")
+        ));
+
+        when(conferenceRepository.findById(11)).thenReturn(Optional.of(conference));
+        when(ticketTypeRepository.findByConferenceIdAndNameIgnoreCase(eq(11), any())).thenReturn(Optional.empty());
+
+        ImportResultDTO result = conferenceImportService.previewTicketTypesFromExcel(11, file);
+
+        assertTrue(result.isSuccess());
+        assertEquals(2, result.getTicketTypePreviews().size());
+        assertEquals("Early-Bird Standard", result.getTicketTypePreviews().get(0).get("name"));
+    }
+
+    @Test
+    void previewTicketTypesFromExcelShouldFailOnDuplicateNameAndInvalidFields() {
+        MultipartFile file = ticketTypesFile(List.of(
+                row("name", "VIP & Gala Dinner", "description", "x", "price", "-1", "currency", "VNDVND", "category", "BAD", "maxQuantity", "abc", "deadline", "bad-date", "active", "maybe"),
+                row("name", "VIP & Gala Dinner", "description", "y", "price", "5000000", "currency", "VND", "category", "VIP", "maxQuantity", "50", "deadline", "2026-07-30T23:59:00Z", "active", "true")
+        ));
+
+        when(conferenceRepository.findById(11)).thenReturn(Optional.of(conference));
+        when(ticketTypeRepository.findByConferenceIdAndNameIgnoreCase(eq(11), any())).thenReturn(Optional.empty());
+
+        ImportResultDTO result = conferenceImportService.previewTicketTypesFromExcel(11, file);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getErrors().stream().anyMatch(e -> "name".equals(e.getColumn()) && e.getMessage().contains("Duplicate row")));
+        assertTrue(result.getErrors().stream().anyMatch(e -> "price".equals(e.getColumn())));
+        assertTrue(result.getErrors().stream().anyMatch(e -> "category".equals(e.getColumn())));
+        assertTrue(result.getErrors().stream().anyMatch(e -> "deadline".equals(e.getColumn())));
+        assertTrue(result.getErrors().stream().anyMatch(e -> "active".equals(e.getColumn())));
+    }
+
+    @Test
+    void previewTicketTypesFromExcelShouldFailWhenTicketTypeAlreadyExists() {
+        MultipartFile file = ticketTypesFile(List.of(
+                row("name", "Regular Standard", "description", "x", "price", "5000000", "currency", "VND", "category", "STANDARD", "maxQuantity", "500", "deadline", "2026-08-10T23:59:00Z", "active", "true")
+        ));
+
+        TicketType existing = new TicketType();
+        existing.setId(900);
+
+        when(conferenceRepository.findById(11)).thenReturn(Optional.of(conference));
+        when(ticketTypeRepository.findByConferenceIdAndNameIgnoreCase(11, "Regular Standard")).thenReturn(Optional.of(existing));
+
+        ImportResultDTO result = conferenceImportService.previewTicketTypesFromExcel(11, file);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getErrors().stream().anyMatch(e -> e.getMessage().contains("already exists")));
+    }
+
+    @Test
+    void importTicketTypesFromExcelShouldCreateTicketTypes() {
+        MultipartFile file = ticketTypesFile(List.of(
+                row("name", "Early-Bird Standard", "description", "Discounted rate", "price", "3500000", "currency", "VND", "category", "STANDARD", "maxQuantity", "150", "deadline", "2026-06-15T23:59:00Z", "active", "true"),
+                row("name", "VIP & Gala Dinner", "description", "Exclusive event", "price", "8500000", "currency", "VND", "category", "VIP", "maxQuantity", "50", "deadline", "2026-07-30T23:59:00Z", "active", "true")
+        ));
+
+        when(conferenceRepository.findById(11)).thenReturn(Optional.of(conference));
+        when(ticketTypeRepository.findByConferenceIdAndNameIgnoreCase(eq(11), any())).thenReturn(Optional.empty());
+        when(ticketTypeRepository.save(any(TicketType.class))).thenAnswer(invocation -> {
+            TicketType type = invocation.getArgument(0);
+            if (type.getId() == null) {
+                type.setId(type.getName().equals("Early-Bird Standard") ? 501 : 502);
+            }
+            return type;
+        });
+
+        ImportResultDTO result = conferenceImportService.importTicketTypesFromExcel(11, file);
+
+        assertTrue(result.isSuccess());
+        assertEquals(2, result.getTicketTypesCreated());
+        verify(ticketTypeRepository, times(2)).save(any(TicketType.class));
+    }
+
+    @Test
+    void generateTicketTypeTemplateShouldReturnBytes() {
+        byte[] bytes = conferenceImportService.generateTicketTypeTemplate();
+
+        assertNotNull(bytes);
+        assertTrue(bytes.length > 0);
+    }
+
+    @Test
     void previewMembersFromExcelShouldThrowOnUnsupportedFileType() {
         MockMultipartFile file = new MockMultipartFile("file", "members.csv", "text/plain", "a,b,c".getBytes());
 
@@ -767,6 +859,14 @@ class ConferenceImportServiceImplTest {
         return xlsxFile("Members", headers, rows, "members.xlsx");
     }
 
+    private MultipartFile ticketTypesFile(List<Map<String, String>> rowsMap) {
+        List<String> headers = List.of("name", "description", "price", "currency", "category", "maxQuantity", "deadline", "active");
+        List<List<String>> rows = rowsMap.stream().map(m -> List.of(
+                m.get("name"), m.get("description"), m.get("price"), m.get("currency"),
+                m.get("category"), m.get("maxQuantity"), m.get("deadline"), m.get("active"))).toList();
+        return xlsxFile("TicketTypes", headers, rows, "ticket-types.xlsx");
+    }
+
     private Map<String, String> row(String k1, String v1, String k2, String v2) {
         Map<String, String> map = new LinkedHashMap<>();
         map.put(k1, v1);
@@ -788,6 +888,20 @@ class ConferenceImportServiceImplTest {
         map.put(k2, v2);
         map.put(k3, v3);
         map.put(k4, v4);
+        return map;
+    }
+
+    private Map<String, String> row(String k1, String v1, String k2, String v2, String k3, String v3, String k4, String v4,
+                                    String k5, String v5, String k6, String v6, String k7, String v7, String k8, String v8) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        map.put(k3, v3);
+        map.put(k4, v4);
+        map.put(k5, v5);
+        map.put(k6, v6);
+        map.put(k7, v7);
+        map.put(k8, v8);
         return map;
     }
 

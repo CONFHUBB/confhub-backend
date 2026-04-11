@@ -7,4 +7,5 @@ import java.util.List;
 public interface TicketTypeRepository extends JpaRepository<TicketType, Integer> {
     List<TicketType> findByConferenceIdAndIsActiveTrue(Integer conferenceId);
     List<TicketType> findByConferenceId(Integer conferenceId);
+    java.util.Optional<TicketType> findByConferenceIdAndNameIgnoreCase(Integer conferenceId, String name);
 }

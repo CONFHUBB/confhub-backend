@@ -11,6 +11,7 @@ import com.capstone.confhub.service.ConferenceImportService;
 import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.TicketCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -25,11 +26,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 @Service
@@ -43,6 +46,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private final SubjectAreaRepository subjectAreaRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final UserRepository userRepository;
+    private final TicketTypeRepository ticketTypeRepository;
     private final ConferenceActivityService conferenceActivityService;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
@@ -63,6 +67,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             "name", "acronym", "description", "location", "startDate", "endDate",
             "websiteUrl", "country", "province", "area", "contactInformation", "chairEmails",
             "bannerImageUrl", "societySponsor"
+    };
+    private static final String[] TICKET_TYPE_HEADERS = {
+            "name", "description", "price", "currency", "category", "maxQuantity", "deadline", "active"
     };
     private static final String[] TRACK_HEADERS = {"name", "description"};
     private static final String[] SA_HEADERS = {"trackName", "name", "description", "parentName"};
@@ -506,6 +513,80 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         }
     }
 
+    // ===================== TICKET TYPES =====================
+
+    @Override
+    public ImportResultDTO previewTicketTypesFromExcel(Integer conferenceId, MultipartFile file) {
+        validateFile(file);
+        Conference conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
+
+        List<ImportError> errors = new ArrayList<>();
+
+        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            if (sheet == null) return errorResult("No sheet found in file");
+
+            List<Map<String, String>> rows = parseAllRows(sheet, TICKET_TYPE_HEADERS, "TicketTypes", errors);
+            validateTicketTypeData(conference, rows, errors);
+
+            return ImportResultDTO.builder()
+                    .success(errors.isEmpty())
+                    .ticketTypePreviews(rows)
+                    .errors(errors)
+                    .build();
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to read Excel file: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public ImportResultDTO importTicketTypesFromExcel(Integer conferenceId, MultipartFile file) {
+        ImportResultDTO preview = previewTicketTypesFromExcel(conferenceId, file);
+        if (!preview.isSuccess()) return preview;
+
+        Conference conference = conferenceRepository.findById(conferenceId)
+                .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
+
+        int count = 0;
+        for (Map<String, String> data : preview.getTicketTypePreviews()) {
+            createTicketType(data, conference);
+            count++;
+        }
+
+        log.info("Imported {} ticket types for conference {}", count, conferenceId);
+        return ImportResultDTO.builder()
+                .success(true)
+                .conferenceId(conferenceId)
+                .ticketTypesCreated(count)
+                .build();
+    }
+
+    @Override
+    public byte[] generateTicketTypeTemplate() {
+        try (Workbook wb = new XSSFWorkbook()) {
+            CellStyle headerStyle = createHeaderStyle(wb);
+            Sheet sheet = wb.createSheet("TicketTypes");
+            writeHeaders(sheet, TICKET_TYPE_HEADERS, headerStyle);
+
+            String[][] samples = {
+                    {"Early-Bird Standard", "Discounted rate for early registrants. Includes full access to all main tracks and keynotes.", "3500000", "VND", "STANDARD", "150", "2026-06-15T23:59:00Z", "true"},
+                    {"Regular Standard", "Standard admission ticket for researchers and industry professionals.", "5000000", "VND", "STANDARD", "500", "2026-08-10T23:59:00Z", "true"},
+                    {"Student Full Access", "Heavily discounted ticket for verified university students. Requires valid Student ID at check-in.", "1200000", "VND", "STUDENT", "200", "2026-08-10T23:59:00Z", "true"},
+                    {"VIP & Gala Dinner", "Includes standard access plus invitation to the exclusive networking Gala Dinner with keynote speakers.", "8500000", "VND", "VIP", "50", "2026-07-30T23:59:00Z", "true"},
+            };
+
+            for (int r = 0; r < samples.length; r++) {
+                Row row = sheet.createRow(r + 1);
+                for (int c = 0; c < samples[r].length; c++) row.createCell(c).setCellValue(samples[r][c]);
+            }
+            return toBytes(wb);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate template", e);
+        }
+    }
+
     private void validateMemberData(List<Map<String, String>> rows, List<ImportError> errors) {
         Set<String> seen = new HashSet<>();
         for (int i = 0; i < rows.size(); i++) {
@@ -538,6 +619,104 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 }
             }
         }
+    }
+
+    private void validateTicketTypeData(Conference conference, List<Map<String, String>> rows, List<ImportError> errors) {
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < rows.size(); i++) {
+            int rowNum = i + 2;
+            Map<String, String> d = rows.get(i);
+
+            requireField(d, "name", "TicketTypes", rowNum, errors);
+            requireField(d, "price", "TicketTypes", rowNum, errors);
+            requireField(d, "category", "TicketTypes", rowNum, errors);
+
+            String name = d.get("name");
+            if (notBlank(name)) {
+                String key = name.trim().toLowerCase(Locale.ROOT);
+                if (!seen.add(key)) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("name")
+                            .message("Duplicate row: " + name).build());
+                }
+                if (ticketTypeRepository.findByConferenceIdAndNameIgnoreCase(conference.getId(), name.trim()).isPresent()) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("name")
+                            .message("Ticket type already exists in this conference: " + name).build());
+                }
+            }
+
+            String priceStr = d.get("price");
+            if (notBlank(priceStr)) {
+                BigDecimal priceVal = parseBigDecimal(priceStr);
+                if (priceVal == null || priceVal.compareTo(BigDecimal.ZERO) < 0) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("price")
+                            .message("Invalid price value: " + priceStr).build());
+                }
+            }
+
+            String currency = d.get("currency");
+            if (notBlank(currency) && currency.trim().length() > 3) {
+                errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("currency")
+                        .message("Currency must be a 3-letter code").build());
+            }
+
+            String category = d.get("category");
+            if (notBlank(category)) {
+                try {
+                    TicketCategory.valueOf(category.trim().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException e) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("category")
+                            .message("Invalid category: " + category + ". Valid: " + Arrays.toString(TicketCategory.values())).build());
+                }
+            }
+
+            String maxQuantityStr = d.get("maxQuantity");
+            if (notBlank(maxQuantityStr)) {
+                Integer maxQuantity = parseInteger(maxQuantityStr);
+                if (maxQuantity == null || maxQuantity < 0) {
+                    errors.add(ImportError.builder()
+                            .sheet("TicketTypes")
+                            .row(rowNum)
+                            .column("maxQuantity")
+                            .message("Invalid maxQuantity value: " + maxQuantityStr)
+                            .build());
+                }
+            }
+
+            String deadline = d.get("deadline");
+            if (notBlank(deadline) && parseTicketDeadline(deadline) == null) {
+                errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("deadline")
+                        .message("Invalid deadline format. Use ISO-8601, e.g. 2026-06-15T23:59:00Z").build());
+            }
+
+            if (notBlank(deadline)) {
+                LocalDateTime deadlineTime = parseTicketDeadline(deadline);
+                if (deadlineTime != null && conference.getEndDate() != null && deadlineTime.isAfter(conference.getEndDate())) {
+                    errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("deadline")
+                            .message("Deadline cannot be after conference end date").build());
+                }
+            }
+
+            String active = d.get("active");
+            if (notBlank(active) && parseBooleanValue(active) == null) {
+                errors.add(ImportError.builder().sheet("TicketTypes").row(rowNum).column("active")
+                        .message("Invalid active value: " + active + ". Use true or false").build());
+            }
+        }
+    }
+
+    private void createTicketType(Map<String, String> data, Conference conference) {
+        TicketType ticketType = new TicketType();
+        ticketType.setConference(conference);
+        ticketType.setName(data.get("name") != null ? data.get("name").trim() : null);
+        ticketType.setDescription(data.getOrDefault("description", ""));
+        ticketType.setPrice(parseBigDecimal(data.get("price")));
+        ticketType.setCurrency(notBlank(data.get("currency")) ? data.get("currency").trim().toUpperCase(Locale.ROOT) : "VND");
+        ticketType.setCategory(TicketCategory.valueOf(data.get("category").trim().toUpperCase(Locale.ROOT)));
+        ticketType.setDeadline(parseTicketDeadline(data.get("deadline")));
+        ticketType.setMaxQuantity(parseInteger(data.get("maxQuantity")));
+        ticketType.setQuantitySold(0);
+        ticketType.setIsActive(parseBooleanValue(data.get("active")) != null ? parseBooleanValue(data.get("active")) : true);
+        ticketTypeRepository.save(ticketType);
     }
     // ===================== MEMBER CREATION HELPERS =====================
 
@@ -777,6 +956,50 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     }
 
     private boolean notBlank(String s) { return s != null && !s.isBlank(); }
+
+    private BigDecimal parseBigDecimal(String s) {
+        if (s == null || s.isBlank()) return null;
+        try {
+            BigDecimal value = new BigDecimal(s.trim());
+            return value.compareTo(BigDecimal.ZERO) < 0 ? null : value;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer parseInteger(String s) {
+        if (s == null || s.isBlank()) return null;
+        try {
+            return Integer.valueOf(s.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Boolean parseBooleanValue(String s) {
+        if (s == null || s.isBlank()) return null;
+        if ("true".equalsIgnoreCase(s.trim())) return true;
+        if ("false".equalsIgnoreCase(s.trim())) return false;
+        return null;
+    }
+
+    private LocalDateTime parseTicketDeadline(String s) {
+        if (s == null || s.isBlank()) return null;
+        String value = s.trim();
+        try {
+            return OffsetDateTime.parse(value).toLocalDateTime();
+        } catch (DateTimeParseException ignored) {
+            try {
+                return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            } catch (DateTimeParseException ignored2) {
+                try {
+                    return LocalDate.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd")).atStartOfDay();
+                } catch (DateTimeParseException ignored3) {
+                    return null;
+                }
+            }
+        }
+    }
 
     private LocalDateTime parseDate(String s) {
         if (s == null || s.isBlank()) return null;

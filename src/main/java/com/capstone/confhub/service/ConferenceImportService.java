@@ -24,4 +24,9 @@ public interface ConferenceImportService {
     ImportResultDTO previewMembersFromExcel(MultipartFile file);
     ImportResultDTO importMembersFromExcel(Integer conferenceId, MultipartFile file);
     byte[] generateMemberTemplate();
+
+    // Ticket Types
+    ImportResultDTO previewTicketTypesFromExcel(Integer conferenceId, MultipartFile file);
+    ImportResultDTO importTicketTypesFromExcel(Integer conferenceId, MultipartFile file);
+    byte[] generateTicketTypeTemplate();
 }

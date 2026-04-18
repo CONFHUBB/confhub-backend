@@ -7,7 +7,6 @@ import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.ConferenceActivity;
 import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.utils.enums.ActivityType;
-import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.repository.ActivityAuditLogRepository;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceActivityRepository;
@@ -149,15 +148,6 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                 if (a.getActivityType() != enablingType) {
                     a.setIsEnabled(false);
                 }
-            }
-
-            // ── Auto-transition conference status when PAPER_SUBMISSION is enabled ──
-            if (enablingType == ActivityType.PAPER_SUBMISSION
-                    && conference.getStatus() == ConferenceStatus.SCHEDULED) {
-                log.info("Auto-transitioning conference {} from SCHEDULED to ONGOING (PAPER_SUBMISSION enabled)",
-                        conferenceId);
-                conference.setStatus(ConferenceStatus.ONGOING);
-                conferenceRepository.save(conference);
             }
         }
 

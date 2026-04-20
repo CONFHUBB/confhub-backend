@@ -128,9 +128,16 @@ public class PaperFileController {
     }
 
     @PostMapping("/approve-camera-ready/{paperId}")
-    @Operation(summary = "Approve camera-ready submission — transitions paper status from ACCEPTED to PUBLISHED")
+    @Operation(summary = "Approve camera-ready submission — transitions paper status to PUBLISHED")
     public ResponseEntity<Void> approveCameraReady(@PathVariable Integer paperId) {
         paperFileService.approveCameraReady(paperId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reject-camera-ready/{paperId}")
+    @Operation(summary = "Reject camera-ready submission — transitions paper status to CAMERA_READY_REJECTED")
+    public ResponseEntity<Void> rejectCameraReady(@PathVariable Integer paperId) {
+        paperFileService.rejectCameraReady(paperId);
         return ResponseEntity.ok().build();
     }
 

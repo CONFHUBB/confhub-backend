@@ -24,6 +24,8 @@ public interface PaperFileService {
 
     void approveCameraReady(Integer paperId);
 
+    void rejectCameraReady(Integer paperId);
+
     PaperFileResponseDTO setActiveFile(Integer fileId);
 
     java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);

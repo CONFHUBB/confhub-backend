@@ -23,9 +23,8 @@ public interface PaperService {
      */
     PagedResponse<PaperResponseDTO> getPapersByAuthor(Integer authorId, int page, int size);
 
-    // BR-2.15: Withdraw + Restore
+    // BR-2.15: Withdraw (WITHDRAWN is terminal — no restore)
     PaperResponseDTO withdrawPaper(Integer id);
-    PaperResponseDTO restorePaper(Integer id);
 
     /**
      * Get all papers in a conference (for Chair/PC paper management).

@@ -86,7 +86,7 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         Paper paper = paperRepository.findById(paperId).orElseThrow(() -> new RuntimeException("Paper not found"));
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (paper.getStatus() != PaperStatus.ACCEPTED && paper.getStatus() != PaperStatus.PUBLISHED) {
+        if (paper.getStatus() != PaperStatus.ACCEPTED && paper.getStatus() != PaperStatus.AWAITING_REGISTRATION && paper.getStatus() != PaperStatus.REGISTERED && paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY && paper.getStatus() != PaperStatus.CAMERA_READY_SUBMITTED && paper.getStatus() != PaperStatus.PUBLISHED) {
             throw new RuntimeException("Acceptance letter is only available for accepted papers");
         }
         if (!paperAuthorRepository.existsByPaperIdAndUserId(paperId, userId)) {

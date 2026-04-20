@@ -49,14 +49,19 @@ public class PaperServiceImpl implements PaperService {
     private final ObjectMapper objectMapper;
 
     // ==================== VALID STATUS TRANSITIONS (BR-2.16) ====================
-    private static final Map<PaperStatus, Set<PaperStatus>> VALID_TRANSITIONS = Map.of(
-            PaperStatus.DRAFT, Set.of(PaperStatus.SUBMITTED, PaperStatus.WITHDRAWN),
-            PaperStatus.SUBMITTED, Set.of(PaperStatus.UNDER_REVIEW, PaperStatus.WITHDRAWN),
-            PaperStatus.UNDER_REVIEW, Set.of(PaperStatus.ACCEPTED, PaperStatus.REJECTED, PaperStatus.WITHDRAWN),
-            PaperStatus.ACCEPTED, Set.of(PaperStatus.PUBLISHED),
-            PaperStatus.REJECTED, Set.of(),
-            PaperStatus.WITHDRAWN, Set.of(PaperStatus.SUBMITTED),
-            PaperStatus.PUBLISHED, Set.of()
+    private static final Map<PaperStatus, Set<PaperStatus>> VALID_TRANSITIONS = Map.ofEntries(
+            Map.entry(PaperStatus.SUBMITTED, Set.of(PaperStatus.UNDER_REVIEW, PaperStatus.WITHDRAWN)),
+            Map.entry(PaperStatus.UNDER_REVIEW, Set.of(PaperStatus.AWAITING_DECISION, PaperStatus.WITHDRAWN)),
+            Map.entry(PaperStatus.AWAITING_DECISION, Set.of(PaperStatus.ACCEPTED, PaperStatus.REJECTED)),
+            Map.entry(PaperStatus.ACCEPTED, Set.of(PaperStatus.AWAITING_REGISTRATION, PaperStatus.WITHDRAWN)),
+            Map.entry(PaperStatus.REJECTED, Set.of()),
+            Map.entry(PaperStatus.AWAITING_REGISTRATION, Set.of(PaperStatus.REGISTERED)),
+            Map.entry(PaperStatus.REGISTERED, Set.of(PaperStatus.AWAITING_CAMERA_READY)),
+            Map.entry(PaperStatus.AWAITING_CAMERA_READY, Set.of(PaperStatus.CAMERA_READY_SUBMITTED)),
+            Map.entry(PaperStatus.CAMERA_READY_SUBMITTED, Set.of(PaperStatus.PUBLISHED, PaperStatus.CAMERA_READY_REJECTED)),
+            Map.entry(PaperStatus.CAMERA_READY_REJECTED, Set.of(PaperStatus.CAMERA_READY_SUBMITTED)),
+            Map.entry(PaperStatus.PUBLISHED, Set.of()),
+            Map.entry(PaperStatus.WITHDRAWN, Set.of())
     );
 
     // ==================== CREATE ====================
@@ -75,7 +80,7 @@ public class PaperServiceImpl implements PaperService {
         Paper paper = new Paper();
         mapDtoToEntity(dto, paper, track);
 
-        // BR-2.4: DRAFT if no status specified or explicitly DRAFT
+        // BR-2.4: Default to SUBMITTED
         if (dto.getStatus() == null) {
             paper.setStatus(PaperStatus.SUBMITTED);
         }
@@ -202,12 +207,12 @@ public class PaperServiceImpl implements PaperService {
         Paper paper = paperRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
 
-        // Chỉ withdraw từ SUBMITTED hoặc UNDER_REVIEW
+        // Chỉ withdraw từ SUBMITTED, UNDER_REVIEW, hoặc ACCEPTED
         if (paper.getStatus() != PaperStatus.SUBMITTED
                 && paper.getStatus() != PaperStatus.UNDER_REVIEW
-                && paper.getStatus() != PaperStatus.DRAFT) {
+                && paper.getStatus() != PaperStatus.ACCEPTED) {
             throw new BadRequestException(
-                    "Can only withdraw papers with status DRAFT, SUBMITTED, or UNDER_REVIEW. Current: "
+                    "Can only withdraw papers with status SUBMITTED, UNDER_REVIEW, or ACCEPTED. Current: "
                             + paper.getStatus());
         }
 
@@ -239,21 +244,7 @@ public class PaperServiceImpl implements PaperService {
         return mapToResponseDTO(saved);
     }
 
-    // ==================== RESTORE (BR-2.15) ====================
-    @Override
-    @Transactional
-    public PaperResponseDTO restorePaper(Integer id) {
-        Paper paper = paperRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Paper not found with id " + id));
-
-        if (paper.getStatus() != PaperStatus.WITHDRAWN) {
-            throw new BadRequestException("Can only restore WITHDRAWN papers. Current: " + paper.getStatus());
-        }
-
-        paper.setStatus(PaperStatus.SUBMITTED);
-        paper.setUpdatedAt(LocalDateTime.now());
-        return mapToResponseDTO(paperRepository.save(paper));
-    }
+    // WITHDRAWN is terminal — no restore allowed
     // ==================== GET BY CONFERENCE (Chair/PC) ====================
     @Override
     @Transactional(readOnly = true)

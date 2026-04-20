@@ -94,7 +94,7 @@ public class TicketTypeServiceImpl implements TicketTypeService {
             if (paper.getTrack() != null
                     && paper.getTrack().getConference() != null
                     && paper.getTrack().getConference().getId().equals(conferenceId)
-                    && (paper.getStatus() == PaperStatus.ACCEPTED || paper.getStatus() == PaperStatus.PUBLISHED)) {
+                    && (paper.getStatus() == PaperStatus.ACCEPTED || paper.getStatus() == PaperStatus.AWAITING_REGISTRATION || paper.getStatus() == PaperStatus.REGISTERED || paper.getStatus() == PaperStatus.AWAITING_CAMERA_READY || paper.getStatus() == PaperStatus.CAMERA_READY_SUBMITTED || paper.getStatus() == PaperStatus.PUBLISHED)) {
                 isAuthor = true;
                 break;
             }

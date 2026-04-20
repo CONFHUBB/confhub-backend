@@ -151,10 +151,11 @@ public class PaperFileServiceImpl implements PaperFileService {
         Paper paper = paperRepository.findById(dto.getPaperId())
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
 
-        // Validate: only ACCEPTED papers can upload camera-ready
-        if (paper.getStatus() != PaperStatus.ACCEPTED) {
+        // Validate: only AWAITING_CAMERA_READY or CAMERA_READY_REJECTED papers can upload camera-ready
+        if (paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
+                && paper.getStatus() != PaperStatus.CAMERA_READY_REJECTED) {
             throw new BadRequestException(
-                    "Camera-ready upload is only allowed for papers with status ACCEPTED. Current status: "
+                    "Camera-ready upload is only allowed for papers with status AWAITING_CAMERA_READY or CAMERA_READY_REJECTED. Current status: "
                             + paper.getStatus());
         }
 
@@ -184,7 +185,14 @@ public class PaperFileServiceImpl implements PaperFileService {
         entity.setUpdatedAt(LocalDateTime.now());
 
         log.info("Camera-ready file uploaded for paper {} in conference {}", paper.getId(), conferenceId);
-        return mapToPaperFileResponseDTO(paperFileRepository.save(entity));
+        PaperFile savedFile = paperFileRepository.save(entity);
+
+        // Transition paper status to CAMERA_READY_SUBMITTED
+        paper.setStatus(PaperStatus.CAMERA_READY_SUBMITTED);
+        paper.setUpdatedAt(LocalDateTime.now());
+        paperRepository.save(paper);
+
+        return mapToPaperFileResponseDTO(savedFile);
     }
 
     @Override
@@ -193,10 +201,12 @@ public class PaperFileServiceImpl implements PaperFileService {
         Paper paper = paperRepository.findById(dto.getPaperId())
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
 
-        // Validate: only ACCEPTED papers can upload copyright
-        if (paper.getStatus() != PaperStatus.ACCEPTED) {
+        // Validate: only papers in camera-ready phase can upload copyright
+        if (paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
+                && paper.getStatus() != PaperStatus.CAMERA_READY_SUBMITTED
+                && paper.getStatus() != PaperStatus.CAMERA_READY_REJECTED) {
             throw new BadRequestException(
-                    "Copyright submission is only allowed for papers with status ACCEPTED. Current status: "
+                    "Copyright submission is only allowed for papers in camera-ready phase. Current status: "
                             + paper.getStatus());
         }
 
@@ -236,9 +246,9 @@ public class PaperFileServiceImpl implements PaperFileService {
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + paperId));
 
-        if (paper.getStatus() != PaperStatus.ACCEPTED) {
+        if (paper.getStatus() != PaperStatus.CAMERA_READY_SUBMITTED) {
             throw new BadRequestException(
-                    "Only ACCEPTED papers can be approved for camera-ready. Current status: " + paper.getStatus());
+                    "Only CAMERA_READY_SUBMITTED papers can be approved. Current status: " + paper.getStatus());
         }
 
         // Verify camera-ready file exists
@@ -256,6 +266,24 @@ public class PaperFileServiceImpl implements PaperFileService {
         paperRepository.save(paper);
 
         log.info("Paper {} approved as camera-ready → status PUBLISHED", paperId);
+    }
+
+    @Override
+    @Transactional
+    public void rejectCameraReady(Integer paperId) {
+        Paper paper = paperRepository.findById(paperId)
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + paperId));
+
+        if (paper.getStatus() != PaperStatus.CAMERA_READY_SUBMITTED) {
+            throw new BadRequestException(
+                    "Only CAMERA_READY_SUBMITTED papers can be rejected. Current status: " + paper.getStatus());
+        }
+
+        paper.setStatus(PaperStatus.CAMERA_READY_REJECTED);
+        paper.setUpdatedAt(LocalDateTime.now());
+        paperRepository.save(paper);
+
+        log.info("Paper {} camera-ready rejected → status CAMERA_READY_REJECTED", paperId);
     }
 
     @Override

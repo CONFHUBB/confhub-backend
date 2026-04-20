@@ -63,7 +63,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         log.info("Creating conference: {}", dto.getName());
         Conference conference = new Conference();
         mapDtoToEntity(dto, conference);
-        conference.setStatus(ConferenceStatus.PENDING);
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
         Conference savedConference = repository.save(conference);
 
         User currentUser = getCurrentAuthenticatedUser();
@@ -147,13 +147,13 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        // BR-1.3: Chỉ SCHEDULED mới chuyển sang ONGOING
-        if (conference.getStatus() != ConferenceStatus.SCHEDULED) {
+        // BR-1.3: Chỉ SETUP mới chuyển sang OPEN
+        if (conference.getStatus() != ConferenceStatus.SETUP) {
             throw new BadRequestException(
-                    "Can only open submissions for SCHEDULED conferences. Current status: " + conference.getStatus());
+                    "Can only open submissions for SETUP conferences. Current status: " + conference.getStatus());
         }
 
-        conference.setStatus(ConferenceStatus.ONGOING);
+        conference.setStatus(ConferenceStatus.OPEN);
         Conference saved = repository.save(conference);
         notifyAllMembers(saved, "Conference is now live",
                 "\"" + saved.getName() + "\" is now open for submissions.", "CONFERENCE_STATUS");
@@ -167,11 +167,11 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        // BR-1.3: Chỉ PENDING mới approve
-        if (conference.getStatus() != ConferenceStatus.PENDING) {
-            throw new BadRequestException("Only conferences with PENDING status can be approved.");
+        // BR-1.3: Chỉ PENDING_APPROVAL mới approve
+        if (conference.getStatus() != ConferenceStatus.PENDING_APPROVAL) {
+            throw new BadRequestException("Only conferences with PENDING_APPROVAL status can be approved.");
         }
-        conference.setStatus(ConferenceStatus.SCHEDULED);
+        conference.setStatus(ConferenceStatus.SETUP);
         Conference saved = repository.save(conference);
         notifyAllMembers(saved, "Conference has been scheduled",
                 "\"" + saved.getName() + "\" has been approved and scheduled.", "CONFERENCE_STATUS");
@@ -186,10 +186,10 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        // BR-1.3: Chỉ ONGOING mới complete
-        if (conference.getStatus() != ConferenceStatus.ONGOING) {
+        // BR-1.3: Chỉ OPEN mới complete
+        if (conference.getStatus() != ConferenceStatus.OPEN) {
             throw new BadRequestException(
-                    "Can only complete ONGOING conferences. Current status: " + conference.getStatus());
+                    "Can only complete OPEN conferences. Current status: " + conference.getStatus());
         }
         conference.setStatus(ConferenceStatus.COMPLETED);
         Conference saved = repository.save(conference);
@@ -311,10 +311,10 @@ public class ConferenceServiceImpl implements ConferenceService {
         requireChairOrProgramChairOf(conferenceId);
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
         int total = papers.size();
-        int submitted = (int) papers.stream().filter(p -> !"DRAFT".equals(p.getStatus() != null ? p.getStatus().name() : "")).count();
-        int underReview = (int) papers.stream().filter(p -> p.getStatus() != null && "UNDER_REVIEW".equals(p.getStatus().name())).count();
-        int accepted = (int) papers.stream().filter(p -> p.getStatus() != null && ("ACCEPTED".equals(p.getStatus().name()) || "PUBLISHED".equals(p.getStatus().name()))).count();
-        int rejected = (int) papers.stream().filter(p -> p.getStatus() != null && "REJECTED".equals(p.getStatus().name())).count();
+        int submitted = (int) papers.stream().filter(p -> p.getStatus() == PaperStatus.SUBMITTED).count();
+        int underReview = (int) papers.stream().filter(p -> p.getStatus() == PaperStatus.UNDER_REVIEW || p.getStatus() == PaperStatus.AWAITING_DECISION).count();
+        int accepted = (int) papers.stream().filter(p -> p.getStatus() != null && (p.getStatus() == PaperStatus.ACCEPTED || p.getStatus() == PaperStatus.AWAITING_REGISTRATION || p.getStatus() == PaperStatus.REGISTERED || p.getStatus() == PaperStatus.CAMERA_READY_SUBMITTED || p.getStatus() == PaperStatus.PUBLISHED)).count();
+        int rejected = (int) papers.stream().filter(p -> p.getStatus() == PaperStatus.REJECTED).count();
 
         long totalReviews = reviewRepository.countByConferenceId(conferenceId);
         long completedReviews = reviewRepository.countCompletedByConferenceId(conferenceId);

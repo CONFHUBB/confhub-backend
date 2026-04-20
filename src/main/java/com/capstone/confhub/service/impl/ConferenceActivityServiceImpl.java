@@ -5,9 +5,11 @@ import com.capstone.confhub.dto.ConferenceActivityDTO;
 import com.capstone.confhub.entity.ActivityAuditLog;
 import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.ConferenceActivity;
+import com.capstone.confhub.entity.Paper;
 import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.utils.enums.ActivityType;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
+import com.capstone.confhub.utils.enums.PaperStatus;
 import com.capstone.confhub.repository.ActivityAuditLogRepository;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceActivityRepository;
@@ -153,11 +155,50 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
 
             // ── Auto-transition conference status when PAPER_SUBMISSION is enabled ──
             if (enablingType == ActivityType.PAPER_SUBMISSION
-                    && conference.getStatus() == ConferenceStatus.SCHEDULED) {
-                log.info("Auto-transitioning conference {} from SCHEDULED to ONGOING (PAPER_SUBMISSION enabled)",
+                    && conference.getStatus() == ConferenceStatus.SETUP) {
+                log.info("Auto-transitioning conference {} from SETUP to OPEN (PAPER_SUBMISSION enabled)",
                         conferenceId);
-                conference.setStatus(ConferenceStatus.ONGOING);
+                conference.setStatus(ConferenceStatus.OPEN);
                 conferenceRepository.save(conference);
+            }
+
+            // ── Bulk paper status transitions driven by timeline phase changes ──
+            List<Paper> conferencePapers = paperRepository.findByTrack_Conference_Id(conferenceId);
+
+            if (enablingType == ActivityType.REVIEWER_BIDDING) {
+                // All SUBMITTED papers → UNDER_REVIEW
+                for (Paper p : conferencePapers) {
+                    if (p.getStatus() == PaperStatus.SUBMITTED) {
+                        log.info("Bulk transition: Paper {} SUBMITTED → UNDER_REVIEW (REVIEWER_BIDDING enabled)", p.getId());
+                        p.setStatus(PaperStatus.UNDER_REVIEW);
+                        p.setUpdatedAt(LocalDateTime.now());
+                    }
+                }
+                paperRepository.saveAll(conferencePapers);
+            }
+
+            if (enablingType == ActivityType.AUTHOR_NOTIFICATION) {
+                // All UNDER_REVIEW papers → AWAITING_DECISION
+                for (Paper p : conferencePapers) {
+                    if (p.getStatus() == PaperStatus.UNDER_REVIEW) {
+                        log.info("Bulk transition: Paper {} UNDER_REVIEW → AWAITING_DECISION (AUTHOR_NOTIFICATION enabled)", p.getId());
+                        p.setStatus(PaperStatus.AWAITING_DECISION);
+                        p.setUpdatedAt(LocalDateTime.now());
+                    }
+                }
+                paperRepository.saveAll(conferencePapers);
+            }
+
+            if (enablingType == ActivityType.CAMERA_READY_SUBMISSION) {
+                // All ACCEPTED papers → AWAITING_REGISTRATION
+                for (Paper p : conferencePapers) {
+                    if (p.getStatus() == PaperStatus.ACCEPTED) {
+                        log.info("Bulk transition: Paper {} ACCEPTED → AWAITING_REGISTRATION (CAMERA_READY_SUBMISSION enabled)", p.getId());
+                        p.setStatus(PaperStatus.AWAITING_REGISTRATION);
+                        p.setUpdatedAt(LocalDateTime.now());
+                    }
+                }
+                paperRepository.saveAll(conferencePapers);
             }
         }
 

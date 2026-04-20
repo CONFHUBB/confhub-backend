@@ -3,7 +3,10 @@ package com.capstone.confhub.controller;
 
 import com.capstone.confhub.dto.EmailDTO;
 import com.capstone.confhub.dto.request.BulkEmailRequestDTO;
+import com.capstone.confhub.dto.request.ExternalInvitationRequest;
+import com.capstone.confhub.dto.response.ExternalInvitationResponseDTO;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
+import com.capstone.confhub.service.ExternalInvitationService;
 import com.capstone.confhub.service.ConferenceUserTrackService;
 import com.capstone.confhub.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +34,7 @@ public class EmailController {
 
 
     private final EmailService emailService;
+    private final ExternalInvitationService externalInvitationService;
     private final ConferenceUserTrackService conferenceUserTrackService;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
 
@@ -51,6 +55,18 @@ public class EmailController {
             return ResponseEntity.internalServerError().body("Send email unsuccessfully. Internal mail server error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Unexpected error occurred while sending email: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/external-invite")
+    @Operation(summary = "Invite an external user (not in system)",
+            description = "Creates a pending User + ConferenceUserTrack record with a real invitation token, then sends an invitation email with Accept/Decline links.")
+    public ResponseEntity<?> sendExternalInvitationEmail(@Valid @RequestBody ExternalInvitationRequest request) {
+        try {
+            ExternalInvitationResponseDTO result = externalInvitationService.createExternalInvitation(request);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to send external invitation: " + e.getMessage());
         }
     }
 
@@ -96,7 +112,7 @@ public class EmailController {
             @PathVariable String token,
             @RequestParam(required = false) Integer reviewerQuota) {
         try {
-            conferenceUserTrackService.acceptByToken(token, reviewerQuota);
+            externalInvitationService.acceptExternalInvitation(token, null, reviewerQuota);
 
             // Check if the user account is inactive (external/new user) — redirect to activate page
             var cut = conferenceUserTrackRepository.findByInvitationToken(token).orElse(null);
@@ -122,7 +138,7 @@ public class EmailController {
             description = "Handle the logic when a user clicks the Decline link in the invitation email. Validates token, updates DB, and redirects to frontend.")
     public ResponseEntity<Void> declineEmail(@PathVariable String token) {
         try {
-            conferenceUserTrackService.declineByToken(token);
+            externalInvitationService.declineExternalInvitation(token);
             return ResponseEntity.status(302)
                     .location(URI.create(frontendUrl + "/invitation/declined?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)))
                     .build();

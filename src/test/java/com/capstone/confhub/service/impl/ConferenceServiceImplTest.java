@@ -96,7 +96,7 @@ public class ConferenceServiceImplTest {
         conference.setName(CONFERENCE_NAME);
         conference.setAcronym("CMS");
         conference.setLocation("HCM");
-        conference.setStatus(ConferenceStatus.PENDING);
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
         conference.setStartDate(LocalDateTime.now().plusDays(10));
         conference.setEndDate(LocalDateTime.now().plusDays(12));
 
@@ -227,7 +227,7 @@ public class ConferenceServiceImplTest {
     @Test
     void updateConferenceShouldReturnResponse() {
         ConferenceDTO dto = buildConferenceDto("Updated Conf");
-        conference.setStatus(ConferenceStatus.PENDING);
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
 
         stubChairAuthorization(true);
         when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
@@ -281,7 +281,7 @@ public class ConferenceServiceImplTest {
 
     @Test
     void openSubmissionsShouldReturnResponse() {
-        conference.setStatus(ConferenceStatus.SCHEDULED);
+        conference.setStatus(ConferenceStatus.SETUP);
         ConferenceUserTrack member = new ConferenceUserTrack();
         member.setUser(user);
         member.setConference(conference);
@@ -296,12 +296,12 @@ public class ConferenceServiceImplTest {
         var result = conferenceService.openSubmissions(CONFERENCE_ID);
 
         assertNotNull(result);
-        assertEquals(ConferenceStatus.ONGOING, result.getStatus());
+        assertEquals(ConferenceStatus.OPEN, result.getStatus());
     }
 
     @Test
     void openSubmissionsShouldThrowWhenStatusIsNotScheduled() {
-        conference.setStatus(ConferenceStatus.PENDING);
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
         stubChairAuthorization(true);
         when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
 
@@ -325,12 +325,12 @@ public class ConferenceServiceImplTest {
         var result = conferenceService.approveConference(CONFERENCE_ID);
 
         assertNotNull(result);
-        assertEquals(ConferenceStatus.SCHEDULED, result.getStatus());
+        assertEquals(ConferenceStatus.SETUP, result.getStatus());
     }
 
     @Test
     void approveConferenceShouldThrowWhenStatusNotPending() {
-        conference.setStatus(ConferenceStatus.SCHEDULED);
+        conference.setStatus(ConferenceStatus.SETUP);
         when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
 
         assertThrows(BadRequestException.class,
@@ -339,7 +339,7 @@ public class ConferenceServiceImplTest {
 
     @Test
     void completeConferenceShouldReturnResponse() {
-        conference.setStatus(ConferenceStatus.ONGOING);
+        conference.setStatus(ConferenceStatus.OPEN);
         ConferenceUserTrack member = new ConferenceUserTrack();
         member.setUser(user);
         member.setConference(conference);
@@ -359,7 +359,7 @@ public class ConferenceServiceImplTest {
 
     @Test
     void completeConferenceShouldThrowWhenStatusNotOngoing() {
-        conference.setStatus(ConferenceStatus.SCHEDULED);
+        conference.setStatus(ConferenceStatus.SETUP);
         stubChairAuthorization(true);
         when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
 
@@ -369,7 +369,7 @@ public class ConferenceServiceImplTest {
 
     @Test
     void cancelConferenceShouldReturnResponse() {
-        conference.setStatus(ConferenceStatus.SCHEDULED);
+        conference.setStatus(ConferenceStatus.SETUP);
         ConferenceUserTrack member = new ConferenceUserTrack();
         member.setUser(user);
         member.setConference(conference);
@@ -485,7 +485,7 @@ public class ConferenceServiceImplTest {
         when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
                 USER_ID, CONFERENCE_ID, ConferenceTrackRole.PROGRAM_CHAIR)).thenReturn(true);
         when(paperRepository.findByTrack_Conference_Id(CONFERENCE_ID)).thenReturn(List.of(
-                buildPaper(PaperStatus.DRAFT),
+                buildPaper(PaperStatus.SUBMITTED),
                 buildPaper(PaperStatus.SUBMITTED),
                 buildPaper(PaperStatus.UNDER_REVIEW),
                 buildPaper(PaperStatus.ACCEPTED),

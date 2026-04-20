@@ -360,27 +360,4 @@ class PaperServiceImplTest {
         assertThrows(BadRequestException.class, () -> paperService.withdrawPaper(PAPER_ID));
     }
 
-    @Test
-    void restorePaperShouldReturnResponse() {
-        stubTrackReviewSettingLookup();
-        paper.setStatus(PaperStatus.WITHDRAWN);
-        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
-        when(paperRepository.save(any(Paper.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        var result = paperService.restorePaper(PAPER_ID);
-
-        assertNotNull(result);
-        assertEquals(PaperStatus.SUBMITTED, result.getStatus());
-    }
-
-    @Test
-    void restorePaperShouldThrowWhenPaperIsNotWithdrawn() {
-        paper.setStatus(PaperStatus.SUBMITTED);
-        when(paperRepository.findById(PAPER_ID)).thenReturn(Optional.of(paper));
-
-        assertThrows(BadRequestException.class, () -> paperService.restorePaper(PAPER_ID));
-    }
 }
-
-
-

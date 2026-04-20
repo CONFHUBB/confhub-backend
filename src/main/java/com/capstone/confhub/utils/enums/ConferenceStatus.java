@@ -1,10 +1,9 @@
 package com.capstone.confhub.utils.enums;
 
 public enum ConferenceStatus {
-    PENDING,
-    SCHEDULED,
-    ONGOING,
-    BIDDING,
+    PENDING_APPROVAL,
+    SETUP,
+    OPEN,
     COMPLETED,
     CANCELLED
 }

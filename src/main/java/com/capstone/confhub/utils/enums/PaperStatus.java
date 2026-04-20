@@ -1,11 +1,16 @@
 package com.capstone.confhub.utils.enums;
 
 public enum PaperStatus {
-    DRAFT,
     SUBMITTED,
     UNDER_REVIEW,
+    AWAITING_DECISION,
     ACCEPTED,
     REJECTED,
-    WITHDRAWN,
-    PUBLISHED
+    AWAITING_REGISTRATION,
+    REGISTERED,
+    AWAITING_CAMERA_READY,
+    CAMERA_READY_SUBMITTED,
+    CAMERA_READY_REJECTED,
+    PUBLISHED,
+    WITHDRAWN
 }

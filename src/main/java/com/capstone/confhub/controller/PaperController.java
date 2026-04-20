@@ -92,12 +92,8 @@ public class PaperController {
         return ResponseEntity.ok(paperService.withdrawPaper(id));
     }
 
-    @PutMapping("/{id}/restore")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Restore a withdrawn paper (BR-2.15, Chair only)")
-    public ResponseEntity<PaperResponseDTO> restorePaper(@PathVariable Integer id) {
-        return ResponseEntity.ok(paperService.restorePaper(id));
-    }
+
+    // WITHDRAWN is terminal — restore endpoint removed
 
     /**
      * Task 5: Track Chair Filtered View

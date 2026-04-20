@@ -131,7 +131,7 @@ public class BiddingServiceImpl implements BiddingService {
         }
 
         long totalPapers = paperRepository.findByTrack_Conference_Id(conferenceId).stream()
-                .filter(p -> p.getStatus() != PaperStatus.WITHDRAWN && p.getStatus() != PaperStatus.DRAFT)
+                .filter(p -> p.getStatus() != PaperStatus.WITHDRAWN)
                 .count();
 
         return BidsSummaryDTO.builder()
@@ -210,7 +210,7 @@ public class BiddingServiceImpl implements BiddingService {
         List<PaperForBiddingDTO> result = new ArrayList<>();
         for (Paper paper : allPapers) {
             // BR-3.4: Lọc WITHDRAWN + DRAFT papers
-            if (paper.getStatus() == PaperStatus.WITHDRAWN || paper.getStatus() == PaperStatus.DRAFT) {
+            if (paper.getStatus() == PaperStatus.WITHDRAWN) {
                 continue;
             }
 

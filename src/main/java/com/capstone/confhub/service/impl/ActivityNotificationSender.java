@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
@@ -53,6 +54,7 @@ public class ActivityNotificationSender {
      * Auto-disabled activities do NOT generate separate emails to reduce noise.
      */
     @Async
+    @Transactional(readOnly = true)
     public void sendNotifications(Conference conference, List<ActivityAuditLog> auditLogs) {
         try {
             List<ConferenceUserTrack> members = conferenceUserTrackRepository.findByConference_Id(conference.getId());

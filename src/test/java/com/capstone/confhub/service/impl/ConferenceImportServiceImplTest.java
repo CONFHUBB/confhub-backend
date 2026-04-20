@@ -217,7 +217,7 @@ class ConferenceImportServiceImplTest {
 
         ArgumentCaptor<Conference> conferenceCaptor = ArgumentCaptor.forClass(Conference.class);
         verify(conferenceRepository).save(conferenceCaptor.capture());
-        assertEquals(ConferenceStatus.PENDING, conferenceCaptor.getValue().getStatus());
+        assertEquals(ConferenceStatus.PENDING_APPROVAL, conferenceCaptor.getValue().getStatus());
         assertEquals("ConfHub Summit", conferenceCaptor.getValue().getName());
     }
 

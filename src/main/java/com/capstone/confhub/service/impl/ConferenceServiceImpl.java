@@ -24,6 +24,7 @@ import com.capstone.confhub.service.ConferenceActivityService;
 import com.capstone.confhub.utils.PaginationUtils;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.PaperStatus;
 import com.capstone.confhub.entity.Notification;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

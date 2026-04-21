@@ -12,6 +12,7 @@ import com.capstone.confhub.integration.payment.VnPayIntegrationService;
 import com.capstone.confhub.repository.*;
 import com.capstone.confhub.repository.PaperAuthorRepository;
 import com.capstone.confhub.service.RegistrationService;
+import com.capstone.confhub.utils.enums.PaperStatus;
 import com.capstone.confhub.utils.enums.PaymentStatus;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -133,6 +134,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             Ticket saved = ticketRepository.save(ticket);
             ticketType.setQuantitySold(ticketType.getQuantitySold() + 1);
             ticketTypeRepository.save(ticketType);
+            // Transition paper to AWAITING_CAMERA_READY after free registration
+            transitionPaperToAwaitingCameraReady(saved);
             log.info("Free ticket registered: {} for conference {}", regNumber, conferenceId);
             return RegistrationResponse.builder()
                     .ticket(mapToTicketResponse(saved))
@@ -253,6 +256,9 @@ public class RegistrationServiceImpl implements RegistrationService {
             tt.setQuantitySold(tt.getQuantitySold() + 1);
             ticketTypeRepository.save(tt);
         }
+
+        // Transition paper to AWAITING_CAMERA_READY after paid registration
+        transitionPaperToAwaitingCameraReady(ticket);
 
         log.info("Payment completed for ticket {}, txnRef={}", ticketId, vnpTxnRef);
     }
@@ -426,6 +432,28 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     // ========== Helpers ==========
+
+    /**
+     * Transition paper status to AWAITING_CAMERA_READY
+     * when the author completes registration (ticket purchase).
+     * Handles papers in either ACCEPTED or AWAITING_REGISTRATION status.
+     */
+    private void transitionPaperToAwaitingCameraReady(Ticket ticket) {
+        if (ticket.getPaperId() == null) return;
+        try {
+            Paper paper = paperRepository.findById(ticket.getPaperId()).orElse(null);
+            if (paper != null && (paper.getStatus() == PaperStatus.ACCEPTED
+                    || paper.getStatus() == PaperStatus.AWAITING_REGISTRATION)) {
+                paper.setStatus(PaperStatus.AWAITING_CAMERA_READY);
+                paperRepository.save(paper);
+                log.info("Paper {} transitioned to AWAITING_CAMERA_READY after registration (ticket {})",
+                        paper.getId(), ticket.getRegistrationNumber());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to transition paper status for ticket {}: {}",
+                    ticket.getRegistrationNumber(), e.getMessage());
+        }
+    }
 
     private TicketResponse mapToTicketResponse(Ticket t) {
         return TicketResponse.builder()

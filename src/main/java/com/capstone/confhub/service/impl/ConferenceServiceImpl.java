@@ -448,6 +448,9 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     private void requireChairOf(Integer conferenceId) {
         UserDetailsImpl u = getCurrentUserDetails();
+        boolean isAdmin = u.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) return; // ADMIN bypasses conference-level checks
         boolean isChair = conferenceUserTrackRepository
                 .existsByUser_IdAndConference_IdAndAssignedRole(
                         u.getId(), conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR);
@@ -457,6 +460,9 @@ public class ConferenceServiceImpl implements ConferenceService {
 
     private void requireChairOrProgramChairOf(Integer conferenceId) {
         UserDetailsImpl u = getCurrentUserDetails();
+        boolean isAdmin = u.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) return; // ADMIN bypasses conference-level checks
         boolean ok = conferenceUserTrackRepository
                 .existsByUser_IdAndConference_IdAndAssignedRole(
                         u.getId(), conferenceId, ConferenceTrackRole.CONFERENCE_CHAIR)

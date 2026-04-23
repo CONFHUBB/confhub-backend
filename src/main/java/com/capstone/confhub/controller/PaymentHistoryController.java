@@ -14,13 +14,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
-@Tag(name = "Payment History", description = "Retrieve payment audit history for tickets")
+@Tag(name = "Payment History", description = "Retrieve payment audit history for tickets and subscriptions")
 public class PaymentHistoryController {
 
     private final PaymentHistoryRepository paymentHistoryRepository;
@@ -48,24 +49,34 @@ public class PaymentHistoryController {
 
     /**
      * GET /api/v1/conferences/{conferenceId}/payment-history
-     * Returns all VNPay callbacks recorded for all tickets in this conference.
+     * Returns all VNPay callbacks recorded for all tickets + subscription in this conference.
      */
     @GetMapping("/conferences/{conferenceId}/payment-history")
-    @Operation(summary = "Get full payment history for all tickets in a conference (Chair view)")
+    @Operation(summary = "Get full payment history for a conference (tickets + subscription)")
     public ResponseEntity<List<PaymentHistoryResponse>> getConferencePaymentHistory(
             @PathVariable Integer conferenceId) {
+        // Ticket payments
         List<Ticket> tickets = ticketRepository.findByConferenceId(conferenceId);
-        List<PaymentHistoryResponse> history = tickets.stream()
+        List<PaymentHistory> ticketHistory = tickets.stream()
                 .flatMap(t -> paymentHistoryRepository.findByTicketOrderByRecordedAtDesc(t).stream())
-                .sorted((a, b) -> b.getRecordedAt().compareTo(a.getRecordedAt()))
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(history);
+                .toList();
+
+        // Subscription payments
+        List<PaymentHistory> subHistory = paymentHistoryRepository
+                .findByConference_IdOrderByRecordedAtDesc(conferenceId);
+
+        // Merge and sort
+        List<PaymentHistory> all = new ArrayList<>();
+        all.addAll(ticketHistory);
+        all.addAll(subHistory);
+        all.sort((a, b) -> b.getRecordedAt().compareTo(a.getRecordedAt()));
+
+        return ResponseEntity.ok(all.stream().map(this::mapToResponse).collect(Collectors.toList()));
     }
 
     /**
      * GET /api/v1/my-payment-history
-     * Returns all VNPay callbacks recorded for all tickets belonging to a specific user.
+     * Returns all VNPay callbacks for the user: ticket payments + subscription payments (if user is chair).
      */
     @GetMapping("/my-payment-history")
     @Operation(summary = "Get full payment history for the current user across all conferences")
@@ -74,27 +85,45 @@ public class PaymentHistoryController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        List<Ticket> tickets = ticketRepository.findByUser(user);
+        List<PaymentHistory> all = new ArrayList<>();
 
-        // If user has no tickets, return empty list immediately to avoid querying with empty list
-        if (tickets.isEmpty()) {
-            return ResponseEntity.ok(List.of());
+        // 1. Ticket payments
+        List<Ticket> tickets = ticketRepository.findByUser(user);
+        if (!tickets.isEmpty()) {
+            all.addAll(paymentHistoryRepository.findByTicketInOrderByRecordedAtDesc(tickets));
         }
 
-        List<PaymentHistoryResponse> history = paymentHistoryRepository
-                .findByTicketInOrderByRecordedAtDesc(tickets)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        // 2. Subscription payments (where user is conference chair)
+        all.addAll(paymentHistoryRepository.findSubscriptionPaymentsByChairUserId(userId));
 
-        return ResponseEntity.ok(history);
+        // Sort by recordedAt desc
+        all.sort((a, b) -> b.getRecordedAt().compareTo(a.getRecordedAt()));
+
+        return ResponseEntity.ok(all.stream().map(this::mapToResponse).collect(Collectors.toList()));
     }
 
     private PaymentHistoryResponse mapToResponse(PaymentHistory h) {
+        // Determine payment type and conference info
+        boolean isSubscription = h.getTicket() == null && h.getConference() != null;
+        String paymentType = isSubscription ? "SUBSCRIPTION" : "TICKET";
+
+        Integer conferenceId = null;
+        String conferenceName = null;
+        if (h.getConference() != null) {
+            conferenceId = h.getConference().getId();
+            conferenceName = h.getConference().getName();
+        } else if (h.getTicket() != null && h.getTicket().getConference() != null) {
+            conferenceId = h.getTicket().getConference().getId();
+            conferenceName = h.getTicket().getConference().getName();
+        }
+
         return PaymentHistoryResponse.builder()
                 .id(h.getId())
                 .ticketId(h.getTicket() != null ? h.getTicket().getId() : null)
                 .registrationNumber(h.getTicket() != null ? h.getTicket().getRegistrationNumber() : null)
+                .conferenceId(conferenceId)
+                .conferenceName(conferenceName)
+                .paymentType(paymentType)
                 .vnpTxnRef(h.getVnpTxnRef())
                 .vnpTransactionNo(h.getVnpTransactionNo())
                 .vnpTransactionStatus(h.getVnpTransactionStatus())

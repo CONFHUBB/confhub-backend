@@ -43,4 +43,7 @@ public class PaperFile extends BaseEntity {
     @Column(name = "is_supplementary", nullable = false)
     private Boolean isSupplementary = false;
 
+    @Column(name = "file_hash", length = 64)
+    private String fileHash;
+
 }

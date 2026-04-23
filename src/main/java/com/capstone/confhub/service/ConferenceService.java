@@ -13,6 +13,9 @@ public interface ConferenceService {
     void deleteConference(Integer id);
     ConferenceResponseDTO openSubmissions(Integer id);
     ConferenceResponseDTO approveConference(Integer id);
+    ConferenceResponseDTO rejectConference(Integer id, String reason);
+    ConferenceResponseDTO submitForApproval(Integer id);
+    java.util.Map<String, Object> selectPlan(Integer id, String plan, String ipAddr);
     ConferenceResponseDTO completeConference(Integer id);
     ConferenceResponseDTO cancelConference(Integer id);
 

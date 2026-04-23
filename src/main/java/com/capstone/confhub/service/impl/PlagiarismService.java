@@ -173,21 +173,71 @@ public class PlagiarismService {
         }
     }
 
+    public String checkPlagiarismSyncAndGetDetails(Paper paper, String text) throws Exception {
+        log.info("[Plagiarism] Sync check started. Extracted {} chars from PDF for paper {}", text.length(), paper.getId());
+        
+        if (text.length() > MAX_PDF_TEXT_LENGTH) {
+            text = text.substring(0, MAX_PDF_TEXT_LENGTH);
+        }
+
+        InternalCheckResult internalResult = performInternalCheck(paper, text);
+        WebSearchResult webSearchResult = performWebSearch(text);
+
+        double finalScore = Math.max(internalResult.score, webSearchResult.score);
+
+        ObjectNode details = objectMapper.createObjectNode();
+        details.put("internalScore", round(internalResult.score));
+        details.put("webSearchScore", round(webSearchResult.score));
+        details.put("finalScore", round(finalScore));
+
+        ArrayNode matchesArray = objectMapper.createArrayNode();
+        for (PaperMatch match : internalResult.matches) {
+            ObjectNode matchNode = objectMapper.createObjectNode();
+            matchNode.put("paperId", match.paperId);
+            matchNode.put("title", match.title);
+            matchNode.put("similarity", round(match.similarity));
+            if (match.matchedSnippet != null && !match.matchedSnippet.isBlank()) {
+                matchNode.put("matchedSnippet", match.matchedSnippet);
+            }
+            matchesArray.add(matchNode);
+        }
+        details.set("internalMatches", matchesArray);
+
+        ArrayNode webMatchesArray = objectMapper.createArrayNode();
+        for (WebMatch wm : webSearchResult.matches) {
+            ObjectNode wmNode = objectMapper.createObjectNode();
+            wmNode.put("url", wm.url);
+            wmNode.put("title", wm.title);
+            wmNode.put("snippet", wm.snippet);
+            wmNode.put("similarity", round(wm.similarity));
+            webMatchesArray.add(wmNode);
+        }
+        details.set("webSearchMatches", webMatchesArray);
+        if (webSearchResult.summary != null && !webSearchResult.summary.isBlank()) {
+            details.put("webSearchSummary", webSearchResult.summary);
+        }
+
+        details.put("checkedAt", Instant.now().toString());
+
+        if (finalScore > 50.0) {
+            throw new com.capstone.confhub.exception.BadRequestException(
+                "Đạo văn vượt quá mức cho phép. Phát hiện tương đồng: " + round(finalScore) + "%. Vui lòng chỉnh sửa trước khi nộp."
+            );
+        }
+        
+        paper.setPlagiarismScore(round(finalScore));
+        paper.setPlagiarismStatus(PlagiarismStatus.COMPLETED);
+        
+        return objectMapper.writeValueAsString(details);
+    }
+
     // ═══════════════════════════════════════════════════════
     // INTERNAL CHECK: TF-IDF Cosine Similarity + N-gram
     // ═══════════════════════════════════════════════════════
 
     private InternalCheckResult performInternalCheck(Paper targetPaper, String targetText) {
-        // Only compare against papers in the same conference (not all papers in DB)
-        Integer conferenceId = targetPaper.getTrack() != null
-                ? targetPaper.getTrack().getConference().getId()
-                : null;
-        List<Paper> candidatePapers;
-        if (conferenceId != null) {
-            candidatePapers = paperRepository.findByTrack_Conference_Id(conferenceId);
-        } else {
-            candidatePapers = paperRepository.findAll();
-        }
+        // Compare against ALL papers in the system (cross-conference duplicate detection)
+        List<Paper> candidatePapers = paperRepository.findAll();
 
         Map<String, Double> targetVector = buildTfIdfVector(targetText);
         List<String> targetNgrams = extractNgrams(targetText, 5);
@@ -198,11 +248,13 @@ public class PlagiarismService {
             if (other.getId().equals(targetPaper.getId()))
                 continue;
 
-            String otherText = buildPaperText(other);
-            if (otherText.isBlank())
+            String otherText = extractPdfTextForPaper(other);
+            if (otherText == null || otherText.isBlank())
                 continue;
 
             Map<String, Double> otherVector = buildTfIdfVector(otherText);
+            
+            // Full Text vs Full Text TF-IDF Cosine Similarity
             double rawSimilarity = cosineSimilarity(targetVector, otherVector) * 100;
 
             // Find matching n-gram snippets (actual text overlap proof)
@@ -772,6 +824,11 @@ public class PlagiarismService {
      * Downloads the PDF from Firebase Storage URL and uses PDFBox to extract text.
      */
     private String extractPdfTextForPaper(Paper paper) {
+        // Return cached text if available
+        if (paper.getPlagiarismExtractedText() != null && !paper.getPlagiarismExtractedText().isBlank()) {
+            return paper.getPlagiarismExtractedText();
+        }
+
         // Find the active manuscript file
         List<PaperFile> files = paperFileRepository.findByPaper_Id(paper.getId());
         PaperFile activeFile = files.stream()
@@ -791,7 +848,15 @@ public class PlagiarismService {
             return null;
         }
 
-        return downloadAndExtractPdf(url, paper.getId());
+        String text = downloadAndExtractPdf(url, paper.getId());
+        
+        // Cache the extracted text for future checks
+        if (text != null && !text.isBlank()) {
+            paper.setPlagiarismExtractedText(text);
+            paperRepository.save(paper);
+        }
+        
+        return text;
     }
 
     /**

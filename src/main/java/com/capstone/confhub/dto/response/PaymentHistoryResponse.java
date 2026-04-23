@@ -11,6 +11,9 @@ public class PaymentHistoryResponse {
     private Long id;
     private Integer ticketId;
     private String registrationNumber;
+    private Integer conferenceId;
+    private String conferenceName;
+    private String paymentType; // TICKET | SUBSCRIPTION
     private String vnpTxnRef;
     private String vnpTransactionNo;
     private String vnpTransactionStatus;

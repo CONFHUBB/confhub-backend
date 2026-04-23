@@ -86,4 +86,7 @@ public class Paper extends BaseEntity {
 
     @Column(name = "plagiarism_details", columnDefinition = "TEXT")
     private String plagiarismDetailsJson;
+
+    @Column(name = "plagiarism_extracted_text", columnDefinition = "TEXT")
+    private String plagiarismExtractedText;
 }

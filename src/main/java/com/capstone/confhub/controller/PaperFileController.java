@@ -8,6 +8,11 @@ import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.TicketRepository;
 import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.repository.PaperRepository;
+import com.capstone.confhub.entity.Paper;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.Loader;
 import com.capstone.confhub.service.FirebaseStorageService;
 import com.capstone.confhub.service.PaperFileService;
 import com.capstone.confhub.service.impl.PlagiarismService;
@@ -37,6 +42,7 @@ public class PaperFileController {
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final PaperRepository paperRepository;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload a paper file to Firebase Storage under conferences/{conferenceId}/papers/{paperId}/")
@@ -44,15 +50,53 @@ public class PaperFileController {
             @RequestParam("conferenceId") Integer conferenceId,
             @RequestParam("paperId") Integer paperId,
             @RequestParam("file") MultipartFile file) throws IOException {
+        // Compute SHA-256 hash for duplicate detection BEFORE uploading to Firebase
+        String fileHash = computeSha256(file.getBytes());
+
+        // Check for duplicates first (fail fast, before expensive Firebase upload)
+        PaperFileDTO checkDto = PaperFileDTO.builder()
+                .paperId(paperId)
+                .fileHash(fileHash)
+                .build();
+        // This will throw BadRequestException if duplicate found
+        paperFileService.validateNoDuplicateHash(checkDto);
+
+        // --- SYNCHRONOUS PLAGIARISM CHECK ---
+        Paper paper = paperRepository.findById(paperId)
+                .orElseThrow(() -> new BadRequestException("Paper not found with ID: " + paperId));
+
+        String extractedText = "";
+        try {
+            PDDocument doc = Loader.loadPDF(file.getBytes());
+            PDFTextStripper stripper = new PDFTextStripper();
+            extractedText = stripper.getText(doc);
+            doc.close();
+
+            extractedText = extractedText.replaceAll("\\s{3,}", "\n\n").trim();
+            if (!extractedText.isEmpty()) {
+                plagiarismService.checkPlagiarismSyncAndGetDetails(paper, extractedText);
+            }
+        } catch (BadRequestException bre) {
+            throw bre; // Re-throw the threshold exception
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to analyze PDF file for plagiarism: " + e.getMessage());
+        }
+
         String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
         PaperFileDTO dto = PaperFileDTO.builder()
                 .paperId(paperId)
                 .url(downloadUrl)
                 .isActive(true)
+                .fileHash(fileHash)
                 .build();
         PaperFileResponseDTO response = paperFileService.createPaperFile(dto);
-        // Trigger async plagiarism check
-        plagiarismService.checkPlagiarismAsync(paperId);
+        
+        // Cache the extracted text since we already have it
+        if (!extractedText.isEmpty()) {
+            paper.setPlagiarismExtractedText(extractedText);
+            paperRepository.save(paper);
+        }
+        
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -227,5 +271,24 @@ public class PaperFileController {
     public ResponseEntity<Void> deletePaperFile(@PathVariable Integer id) {
         paperFileService.deletePaperFile(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Compute SHA-256 hash of file bytes for duplicate manuscript detection.
+     */
+    private String computeSha256(byte[] bytes) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(bytes);
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
     }
 }

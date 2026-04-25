@@ -1,6 +1,7 @@
 package com.capstone.confhub.entity;
 
 import com.capstone.confhub.utils.enums.ConferenceStatus;
+import com.capstone.confhub.utils.enums.SubscriptionPlan;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -72,5 +73,12 @@ public class Conference extends BaseEntity {
 
     @Column(name = "program_schedule", columnDefinition = "TEXT")
     private String programSchedule;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
+    @Column(name = "subscription_plan")
+    @Enumerated(EnumType.STRING)
+    private SubscriptionPlan subscriptionPlan;
 
 }

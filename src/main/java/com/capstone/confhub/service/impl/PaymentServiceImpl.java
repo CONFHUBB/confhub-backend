@@ -2,12 +2,15 @@ package com.capstone.confhub.service.impl;
 
 import com.capstone.confhub.entity.PaymentHistory;
 import com.capstone.confhub.entity.Ticket;
+import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.integration.payment.VnPayIntegrationService;
+import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.PaymentHistoryRepository;
 import com.capstone.confhub.repository.TicketRepository;
 import com.capstone.confhub.service.PaymentService;
 import com.capstone.confhub.service.RegistrationService;
 import com.capstone.confhub.utils.VnPayUtil;
+import com.capstone.confhub.utils.enums.ConferenceStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final TicketRepository ticketRepository;
     private final RegistrationService registrationService;
     private final PaymentHistoryRepository paymentHistoryRepository;
+    private final ConferenceRepository conferenceRepository;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -82,21 +86,63 @@ public class PaymentServiceImpl implements PaymentService {
             catch (Exception ignored) {}
         }
 
-        // ── 4. Parse ticketId from orderInfo ──
+        // ── 4. Parse ticketId or conferenceId from orderInfo ──
         Integer ticketId = null;
+        Integer confSubId = null;
         try {
             if (orderInfo.startsWith("TICKET_")) {
                 ticketId = Integer.parseInt(orderInfo.replace("TICKET_", "").trim());
+            } else if (orderInfo.startsWith("CONF_SUB_")) {
+                confSubId = Integer.parseInt(orderInfo.replace("CONF_SUB_", "").trim());
             }
         } catch (NumberFormatException e) {
-            log.warn("Cannot parse ticketId from orderInfo: {}", orderInfo);
+            log.warn("Cannot parse ID from orderInfo: {}", orderInfo);
         }
 
         // ── 5. Determine outcome ──
         boolean isPaid = signatureValid && "00".equals(vnpTransactionStatus);
         String outcome = !signatureValid ? "INVALID" : isPaid ? "PAID" : "FAILED";
 
-        // ── 6. Load ticket and save PaymentHistory ──
+        // ── 6A. Conference Subscription Payment ──
+        if (confSubId != null) {
+            var confOpt = conferenceRepository.findById(confSubId);
+            PaymentHistory history = new PaymentHistory();
+            if (confOpt.isPresent()) {
+                history.setConference(confOpt.get());
+            }
+            history.setVnpTxnRef(vnpTxnRef);
+            history.setVnpTransactionNo(vnpTransactionNo);
+            history.setVnpTransactionStatus(vnpTransactionStatus);
+            history.setVnpResponseCode(vnpResponseCode);
+            history.setAmount(amount);
+            history.setBankCode(vnpBankCode);
+            history.setPayDate(payDate);
+            history.setSignatureValid(signatureValid);
+            history.setOutcome(outcome);
+            history.setRawParams(rawParams);
+            history.setRecordedAt(LocalDateTime.now());
+            paymentHistoryRepository.save(history);
+
+            if (confOpt.isPresent()) {
+                Conference conference = confOpt.get();
+                if (isPaid) {
+                    conference.setStatus(ConferenceStatus.SETUP);
+                    conferenceRepository.save(conference);
+                    log.info("VNPay PAID for conference subscription: confId={} txnRef={}", confSubId, vnpTxnRef);
+                    return frontendUrl + "/conference/" + confSubId + "/subscription?status=success";
+                } else {
+                    conference.setStatus(ConferenceStatus.APPROVED);
+                    conference.setSubscriptionPlan(null);
+                    conferenceRepository.save(conference);
+                    log.warn("VNPay FAILED for conference subscription: confId={} txnRef={}", confSubId, vnpTxnRef);
+                    return frontendUrl + "/conference/" + confSubId + "/subscription?status=failed";
+                }
+            }
+            log.error("VNPay callback for unknown conference: {}", confSubId);
+            return frontendUrl + "/?status=invalid";
+        }
+
+        // ── 6B. Ticket Payment ──
         Ticket ticket = null;
         String conferenceId = "";
         if (ticketId != null) {

@@ -17,4 +17,5 @@ public class PaperFileDTO {
     private Boolean isRevision;
     private Boolean isCopyrightSubmission;
     private Boolean isSupplementary;
+    private String fileHash;
 }

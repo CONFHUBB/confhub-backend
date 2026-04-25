@@ -44,18 +44,30 @@ public class PaperFileServiceImpl implements PaperFileService {
     @Override
     @Transactional
     public PaperFileResponseDTO createPaperFile(PaperFileDTO dto) {
-        // Auto-archive existing active manuscript files for this paper
-        List<PaperFile> existingActive = paperFileRepository.findByPaper_Id(dto.getPaperId()).stream()
-                .filter(f -> Boolean.TRUE.equals(f.getIsActive())
-                        && !Boolean.TRUE.equals(f.getIsCameraReady())
+        // ── Strict duplicate detection via SHA-256 hash ──
+        if (dto.getFileHash() != null && !dto.getFileHash().isBlank()) {
+            List<PaperFile> duplicates = paperFileRepository.findDuplicatesByHash(
+                    dto.getFileHash(), dto.getPaperId());
+            if (!duplicates.isEmpty()) {
+                PaperFile dup = duplicates.get(0);
+                String dupPaperTitle = dup.getPaper().getTitle();
+                String dupConferenceName = dup.getPaper().getTrack().getConference().getName();
+                throw new BadRequestException(
+                        "This manuscript file has already been submitted for paper \"" + dupPaperTitle
+                                + "\" at conference \"" + dupConferenceName
+                                + "\". The same file cannot be submitted to multiple papers or conferences.");
+            }
+        }
+
+        // Auto-delete existing manuscript files for this paper (keep only the latest)
+        List<PaperFile> existingManuscripts = paperFileRepository.findByPaper_Id(dto.getPaperId()).stream()
+                .filter(f -> !Boolean.TRUE.equals(f.getIsCameraReady())
                         && !Boolean.TRUE.equals(f.getIsCopyrightSubmission())
                         && !Boolean.TRUE.equals(f.getIsSupplementary()))
                 .toList();
-        for (PaperFile old : existingActive) {
-            old.setIsActive(false);
-            old.setUpdatedAt(LocalDateTime.now());
-            paperFileRepository.save(old);
-            log.info("Auto-archived old manuscript file {} for paper {}", old.getId(), dto.getPaperId());
+        for (PaperFile old : existingManuscripts) {
+            log.info("Auto-deleting old manuscript file {} for paper {}", old.getId(), dto.getPaperId());
+            paperFileRepository.delete(old);
         }
 
         PaperFile entity = new PaperFile();
@@ -297,6 +309,23 @@ public class PaperFileServiceImpl implements PaperFileService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public void validateNoDuplicateHash(PaperFileDTO dto) {
+        if (dto.getFileHash() != null && !dto.getFileHash().isBlank()) {
+            List<PaperFile> duplicates = paperFileRepository.findDuplicatesByHash(
+                    dto.getFileHash(), dto.getPaperId());
+            if (!duplicates.isEmpty()) {
+                PaperFile dup = duplicates.get(0);
+                String dupPaperTitle = dup.getPaper().getTitle();
+                String dupConferenceName = dup.getPaper().getTrack().getConference().getName();
+                throw new BadRequestException(
+                        "This manuscript file has already been submitted for paper \"" + dupPaperTitle
+                                + "\" at conference \"" + dupConferenceName
+                                + "\". The same file cannot be submitted to multiple papers or conferences.");
+            }
+        }
+    }
+
     // ===================== Private Helpers =====================
 
     private void mapDtoToPaperFileEntity(PaperFileDTO dto, PaperFile entity) {
@@ -310,6 +339,7 @@ public class PaperFileServiceImpl implements PaperFileService {
         entity.setIsRevision(dto.getIsRevision() != null ? dto.getIsRevision() : false);
         entity.setIsCopyrightSubmission(dto.getIsCopyrightSubmission() != null ? dto.getIsCopyrightSubmission() : false);
         entity.setIsSupplementary(dto.getIsSupplementary() != null ? dto.getIsSupplementary() : false);
+        entity.setFileHash(dto.getFileHash());
         if (entity.getId() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }

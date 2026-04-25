@@ -19,12 +19,14 @@ import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.TicketRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.security.services.UserDetailsImpl;
+import com.capstone.confhub.integration.payment.VnPayIntegrationService;
 import com.capstone.confhub.service.ConferenceService;
 import com.capstone.confhub.service.ConferenceActivityService;
 import com.capstone.confhub.utils.PaginationUtils;
 import com.capstone.confhub.utils.enums.ConferenceStatus;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 import com.capstone.confhub.utils.enums.PaperStatus;
+import com.capstone.confhub.utils.enums.SubscriptionPlan;
 import com.capstone.confhub.entity.Notification;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +59,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     private final PaperRepository paperRepository;
     private final ReviewRepository reviewRepository;
     private final TicketRepository ticketRepository;
+    private final VnPayIntegrationService vnPayIntegrationService;
 
     @Override
     @Transactional
@@ -64,7 +67,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         log.info("Creating conference: {}", dto.getName());
         Conference conference = new Conference();
         mapDtoToEntity(dto, conference);
-        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
+        conference.setStatus(ConferenceStatus.SETUP);
         Conference savedConference = repository.save(conference);
 
         User currentUser = getCurrentAuthenticatedUser();
@@ -86,7 +89,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .user(currentUser)
                 .conference(savedConference)
                 .title("Conference created successfully")
-                .message("Your conference \"" + savedConference.getName() + "\" has been created and is pending approval.")
+                .message("Your conference \"" + savedConference.getName() + "\" has been created. Complete the setup and submit for approval.")
                 .type("CONFERENCE_CREATED")
                 .link("/conference/" + savedConference.getId() + "/update?tab=dashboard")
                 .isRead(false)
@@ -148,17 +151,13 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        // BR-1.3: Chỉ SETUP mới chuyển sang OPEN
-        if (conference.getStatus() != ConferenceStatus.SETUP) {
+        // Must have a subscription plan selected (APPROVED + plan chosen)
+        if (conference.getStatus() != ConferenceStatus.OPEN) {
             throw new BadRequestException(
-                    "Can only open submissions for SETUP conferences. Current status: " + conference.getStatus());
+                    "Can only manage submissions for OPEN conferences. Current status: " + conference.getStatus());
         }
 
-        conference.setStatus(ConferenceStatus.OPEN);
-        Conference saved = repository.save(conference);
-        notifyAllMembers(saved, "Conference is now live",
-                "\"" + saved.getName() + "\" is now open for submissions.", "CONFERENCE_STATUS");
-        return mapToResponseDTO(saved);
+        return mapToResponseDTO(conference);
     }
 
     @Override
@@ -168,15 +167,103 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        // BR-1.3: Chỉ PENDING_APPROVAL mới approve
         if (conference.getStatus() != ConferenceStatus.PENDING_APPROVAL) {
             throw new BadRequestException("Only conferences with PENDING_APPROVAL status can be approved.");
         }
-        conference.setStatus(ConferenceStatus.SETUP);
+        conference.setStatus(ConferenceStatus.APPROVED);
+        conference.setRejectionReason(null);
         Conference saved = repository.save(conference);
-        notifyAllMembers(saved, "Conference has been scheduled",
-                "\"" + saved.getName() + "\" has been approved and scheduled.", "CONFERENCE_STATUS");
+        notifyAllMembers(saved, "Conference approved!",
+                "\"" + saved.getName() + "\" has been approved. Please select a subscription plan to activate it.", "CONFERENCE_STATUS");
         return mapToResponseDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO rejectConference(Integer id, String reason) {
+        log.info("Rejecting conference ID: {}", id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        if (conference.getStatus() != ConferenceStatus.PENDING_APPROVAL) {
+            throw new BadRequestException("Only conferences with PENDING_APPROVAL status can be rejected.");
+        }
+        conference.setStatus(ConferenceStatus.REJECTED);
+        conference.setRejectionReason(reason);
+        Conference saved = repository.save(conference);
+        notifyAllMembers(saved, "Conference rejected",
+                "\"" + saved.getName() + "\" has been rejected. Reason: " + reason, "CONFERENCE_STATUS");
+        return mapToResponseDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO submitForApproval(Integer id) {
+        requireChairOf(id);
+        log.info("Submitting conference ID: {} for approval", id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        if (conference.getStatus() != ConferenceStatus.SETUP && conference.getStatus() != ConferenceStatus.REJECTED) {
+            throw new BadRequestException(
+                    "Can only submit for approval from SETUP or REJECTED status. Current status: " + conference.getStatus());
+        }
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
+        conference.setRejectionReason(null);
+        Conference saved = repository.save(conference);
+
+        // Notify admins/staff (notify all members for simplicity)
+        notifyAllMembers(saved, "Conference submitted for approval",
+                "\"" + saved.getName() + "\" has been submitted for approval.", "CONFERENCE_STATUS");
+        return mapToResponseDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> selectPlan(Integer id, String plan, String ipAddr) {
+        requireChairOf(id);
+        log.info("Selecting plan {} for conference ID: {}", plan, id);
+        Conference conference = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+
+        if (conference.getStatus() != ConferenceStatus.APPROVED && conference.getStatus() != ConferenceStatus.PENDING_PAYMENT) {
+            throw new BadRequestException(
+                    "Can only select a plan for APPROVED or PENDING_PAYMENT conferences. Current status: " + conference.getStatus());
+        }
+
+        SubscriptionPlan selectedPlan;
+        try {
+            selectedPlan = SubscriptionPlan.valueOf(plan.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid subscription plan: " + plan);
+        }
+
+        conference.setSubscriptionPlan(selectedPlan);
+
+        Map<String, Object> result = new HashMap<>();
+
+        // For STARTER (free), activate immediately
+        if (selectedPlan == SubscriptionPlan.STARTER) {
+            conference.setStatus(ConferenceStatus.SETUP);
+            Conference saved = repository.save(conference);
+            notifyAllMembers(saved, "Conference is now active",
+                    "\"" + saved.getName() + "\" has been activated with Starter plan.", "CONFERENCE_STATUS");
+            result.put("conference", mapToResponseDTO(saved));
+            return result;
+        }
+
+        // For paid plans: set PENDING_PAYMENT and generate VNPay URL
+        conference.setStatus(ConferenceStatus.PENDING_PAYMENT);
+        Conference saved = repository.save(conference);
+
+        long amount = selectedPlan == SubscriptionPlan.PROFESSIONAL ? 500000L : 2000000L;
+        String orderInfo = "CONF_SUB_" + saved.getId();
+        String txnRef = "CONFSUB" + saved.getId() + "_" + System.currentTimeMillis();
+        String paymentUrl = vnPayIntegrationService.createPaymentUrl(amount, ipAddr, orderInfo, txnRef);
+
+        result.put("conference", mapToResponseDTO(saved));
+        result.put("paymentUrl", paymentUrl);
+        return result;
     }
 
     @Override
@@ -428,6 +515,8 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .contactInformation(entity.getContactInformation())
                 .chairEmails(entity.getChairEmails())
                 .programSchedule(entity.getProgramSchedule())
+                .rejectionReason(entity.getRejectionReason())
+                .subscriptionPlan(entity.getSubscriptionPlan())
                 .build();
     }
 

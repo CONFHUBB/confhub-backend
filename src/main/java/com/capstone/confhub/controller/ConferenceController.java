@@ -80,10 +80,39 @@ public class ConferenceController {
 
     @PutMapping("/{id}/approve-conference")
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    @Operation(summary = "Approve for a conference by setting status to SCHEDULED")
+    @Operation(summary = "Approve for a conference by setting status to APPROVED")
     public ResponseEntity<ConferenceResponseDTO> approveConference(@PathVariable Integer id) {
         ConferenceResponseDTO response = conferenceService.approveConference(id);
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @Operation(summary = "Reject a conference with a reason")
+    public ResponseEntity<ConferenceResponseDTO> rejectConference(
+            @PathVariable Integer id,
+            @RequestBody java.util.Map<String, String> body) {
+        String reason = body.getOrDefault("reason", "No reason specified");
+        return ResponseEntity.ok(conferenceService.rejectConference(id, reason));
+    }
+
+    @PutMapping("/{id}/submit-for-approval")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Submit a conference for admin approval (SETUP/REJECTED → PENDING_APPROVAL)")
+    public ResponseEntity<ConferenceResponseDTO> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(conferenceService.submitForApproval(id));
+    }
+
+    @PutMapping("/{id}/select-plan")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Select a subscription plan for an approved conference")
+    public ResponseEntity<java.util.Map<String, Object>> selectPlan(
+            @PathVariable Integer id,
+            @RequestBody java.util.Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest request) {
+        String plan = body.getOrDefault("plan", "");
+        String ipAddr = request.getRemoteAddr();
+        return ResponseEntity.ok(conferenceService.selectPlan(id, plan, ipAddr));
     }
 
     @PutMapping("/{id}/complete")

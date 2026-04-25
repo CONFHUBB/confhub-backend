@@ -18,15 +18,21 @@ public class VnPayIntegrationServiceImpl implements VnPayIntegrationService {
 
     @Override
     public String createPaymentUrl(long amount, String ipAddr, Integer ticketId) {
+        String txnRef = ticketId + "_" + VnPayUtil.getRandomNumber(6);
+        String orderInfo = "TICKET_" + ticketId;
+        return createPaymentUrl(amount, ipAddr, orderInfo, txnRef);
+    }
+
+    @Override
+    public String createPaymentUrl(long amount, String ipAddr, String orderInfo, String txnRef) {
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", "2.1.0");
         vnp_Params.put("vnp_Command", "pay");
         vnp_Params.put("vnp_TmnCode", vnPayConfig.getVnp_TmnCode());
         vnp_Params.put("vnp_Amount", String.valueOf(amount * 100));
         vnp_Params.put("vnp_CurrCode", "VND");
-        String txnRef = ticketId + "_" + VnPayUtil.getRandomNumber(6);
         vnp_Params.put("vnp_TxnRef", txnRef);
-        vnp_Params.put("vnp_OrderInfo", "TICKET_" + ticketId);
+        vnp_Params.put("vnp_OrderInfo", orderInfo);
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnPayConfig.getVnp_ReturnUrl());

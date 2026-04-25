@@ -1,6 +1,7 @@
 package com.capstone.confhub.dto.response;
 
 import com.capstone.confhub.utils.enums.ConferenceStatus;
+import com.capstone.confhub.utils.enums.SubscriptionPlan;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,6 @@ public class ConferenceResponseDTO {
     private String contactInformation;
     private String chairEmails;
     private String programSchedule;
+    private String rejectionReason;
+    private SubscriptionPlan subscriptionPlan;
 }

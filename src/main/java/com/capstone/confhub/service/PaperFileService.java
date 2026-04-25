@@ -29,4 +29,7 @@ public interface PaperFileService {
     PaperFileResponseDTO setActiveFile(Integer fileId);
 
     java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);
+
+    /** Validate that no active manuscript with the same hash exists. Throws BadRequestException if duplicate found. */
+    void validateNoDuplicateHash(PaperFileDTO dto);
 }

@@ -59,18 +59,15 @@ public class PaperFileServiceImpl implements PaperFileService {
             }
         }
 
-        // Auto-archive existing active manuscript files for this paper
-        List<PaperFile> existingActive = paperFileRepository.findByPaper_Id(dto.getPaperId()).stream()
-                .filter(f -> Boolean.TRUE.equals(f.getIsActive())
-                        && !Boolean.TRUE.equals(f.getIsCameraReady())
+        // Auto-delete existing manuscript files for this paper (keep only the latest)
+        List<PaperFile> existingManuscripts = paperFileRepository.findByPaper_Id(dto.getPaperId()).stream()
+                .filter(f -> !Boolean.TRUE.equals(f.getIsCameraReady())
                         && !Boolean.TRUE.equals(f.getIsCopyrightSubmission())
                         && !Boolean.TRUE.equals(f.getIsSupplementary()))
                 .toList();
-        for (PaperFile old : existingActive) {
-            old.setIsActive(false);
-            old.setUpdatedAt(LocalDateTime.now());
-            paperFileRepository.save(old);
-            log.info("Auto-archived old manuscript file {} for paper {}", old.getId(), dto.getPaperId());
+        for (PaperFile old : existingManuscripts) {
+            log.info("Auto-deleting old manuscript file {} for paper {}", old.getId(), dto.getPaperId());
+            paperFileRepository.delete(old);
         }
 
         PaperFile entity = new PaperFile();

@@ -66,6 +66,7 @@ public class PaperFileController {
                 .orElseThrow(() -> new BadRequestException("Paper not found with ID: " + paperId));
 
         String extractedText = "";
+        String plagiarismDetailsJson = null;
         try {
             PDDocument doc = Loader.loadPDF(file.getBytes());
             PDFTextStripper stripper = new PDFTextStripper();
@@ -74,13 +75,29 @@ public class PaperFileController {
 
             extractedText = extractedText.replaceAll("\\s{3,}", "\n\n").trim();
             if (!extractedText.isEmpty()) {
-                plagiarismService.checkPlagiarismSyncAndGetDetails(paper, extractedText);
+                // This throws BadRequestException if score > 50%
+                plagiarismDetailsJson = plagiarismService.checkPlagiarismSyncAndGetDetails(paper, extractedText);
             }
         } catch (BadRequestException bre) {
-            throw bre; // Re-throw the threshold exception
+            // Save plagiarism results even when rejected, so frontend can show details
+            if (!extractedText.isEmpty()) {
+                paper.setPlagiarismExtractedText(extractedText);
+            }
+            paperRepository.save(paper);
+            throw bre;
         } catch (Exception e) {
             throw new BadRequestException("Failed to analyze PDF file for plagiarism: " + e.getMessage());
         }
+
+        // Save plagiarism results and cached text BEFORE creating PaperFile
+        // to avoid Hibernate session conflicts
+        if (!extractedText.isEmpty()) {
+            paper.setPlagiarismExtractedText(extractedText);
+        }
+        if (plagiarismDetailsJson != null) {
+            paper.setPlagiarismDetailsJson(plagiarismDetailsJson);
+        }
+        paperRepository.save(paper);
 
         String downloadUrl = firebaseStorageService.uploadFile(file, conferenceId, paperId);
         PaperFileDTO dto = PaperFileDTO.builder()
@@ -90,12 +107,6 @@ public class PaperFileController {
                 .fileHash(fileHash)
                 .build();
         PaperFileResponseDTO response = paperFileService.createPaperFile(dto);
-        
-        // Cache the extracted text since we already have it
-        if (!extractedText.isEmpty()) {
-            paper.setPlagiarismExtractedText(extractedText);
-            paperRepository.save(paper);
-        }
         
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }

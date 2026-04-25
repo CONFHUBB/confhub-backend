@@ -219,14 +219,16 @@ public class PlagiarismService {
 
         details.put("checkedAt", Instant.now().toString());
 
-        if (finalScore > 50.0) {
-            throw new com.capstone.confhub.exception.BadRequestException(
-                "Đạo văn vượt quá mức cho phép. Phát hiện tương đồng: " + round(finalScore) + "%. Vui lòng chỉnh sửa trước khi nộp."
-            );
-        }
-        
+        // Always save plagiarism results on the paper (even if rejected)
         paper.setPlagiarismScore(round(finalScore));
         paper.setPlagiarismStatus(PlagiarismStatus.COMPLETED);
+        paper.setPlagiarismDetailsJson(objectMapper.writeValueAsString(details));
+
+        if (finalScore > 50.0) {
+            throw new com.capstone.confhub.exception.BadRequestException(
+                "Plagiarism score exceeds the allowed threshold. Detected similarity: " + round(finalScore) + "%. Please revise your manuscript before submitting."
+            );
+        }
         
         return objectMapper.writeValueAsString(details);
     }

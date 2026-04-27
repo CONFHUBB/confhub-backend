@@ -133,6 +133,19 @@ public class RegistrationServiceImpl implements RegistrationService {
             Ticket saved = ticketRepository.save(ticket);
             ticketType.setQuantitySold(ticketType.getQuantitySold() + 1);
             ticketTypeRepository.save(ticketType);
+
+            // Auto-transition paper: AWAITING_REGISTRATION → AWAITING_CAMERA_READY
+            if (request.getPaperId() != null) {
+                paperRepository.findById(request.getPaperId()).ifPresent(paper -> {
+                    if (paper.getStatus() == com.capstone.confhub.utils.enums.PaperStatus.AWAITING_REGISTRATION) {
+                        paper.setStatus(com.capstone.confhub.utils.enums.PaperStatus.AWAITING_CAMERA_READY);
+                        paper.setUpdatedAt(LocalDateTime.now());
+                        paperRepository.save(paper);
+                        log.info("Paper {} auto-transitioned to AWAITING_CAMERA_READY after free ticket registration", paper.getId());
+                    }
+                });
+            }
+
             log.info("Free ticket registered: {} for conference {}", regNumber, conferenceId);
             return RegistrationResponse.builder()
                     .ticket(mapToTicketResponse(saved))
@@ -252,6 +265,18 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (tt != null) {
             tt.setQuantitySold(tt.getQuantitySold() + 1);
             ticketTypeRepository.save(tt);
+        }
+
+        // Auto-transition paper: AWAITING_REGISTRATION → AWAITING_CAMERA_READY
+        if (ticket.getPaperId() != null) {
+            paperRepository.findById(ticket.getPaperId()).ifPresent(paper -> {
+                if (paper.getStatus() == com.capstone.confhub.utils.enums.PaperStatus.AWAITING_REGISTRATION) {
+                    paper.setStatus(com.capstone.confhub.utils.enums.PaperStatus.AWAITING_CAMERA_READY);
+                    paper.setUpdatedAt(LocalDateTime.now());
+                    paperRepository.save(paper);
+                    log.info("Paper {} auto-transitioned to AWAITING_CAMERA_READY after ticket payment", paper.getId());
+                }
+            });
         }
 
         log.info("Payment completed for ticket {}, txnRef={}", ticketId, vnpTxnRef);

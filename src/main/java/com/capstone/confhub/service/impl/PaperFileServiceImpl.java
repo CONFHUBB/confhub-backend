@@ -163,11 +163,12 @@ public class PaperFileServiceImpl implements PaperFileService {
         Paper paper = paperRepository.findById(dto.getPaperId())
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
 
-        // Validate: only AWAITING_CAMERA_READY or CAMERA_READY_REJECTED papers can upload camera-ready
-        if (paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
+        // Validate: only REGISTERED, AWAITING_CAMERA_READY, or CAMERA_READY_REJECTED papers can upload camera-ready
+        if (paper.getStatus() != PaperStatus.REGISTERED
+                && paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
                 && paper.getStatus() != PaperStatus.CAMERA_READY_REJECTED) {
             throw new BadRequestException(
-                    "Camera-ready upload is only allowed for papers with status AWAITING_CAMERA_READY or CAMERA_READY_REJECTED. Current status: "
+                    "Camera-ready upload is only allowed for papers with status REGISTERED, AWAITING_CAMERA_READY, or CAMERA_READY_REJECTED. Current status: "
                             + paper.getStatus());
         }
 
@@ -214,7 +215,8 @@ public class PaperFileServiceImpl implements PaperFileService {
                 .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
 
         // Validate: only papers in camera-ready phase can upload copyright
-        if (paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
+        if (paper.getStatus() != PaperStatus.REGISTERED
+                && paper.getStatus() != PaperStatus.AWAITING_CAMERA_READY
                 && paper.getStatus() != PaperStatus.CAMERA_READY_SUBMITTED
                 && paper.getStatus() != PaperStatus.CAMERA_READY_REJECTED) {
             throw new BadRequestException(

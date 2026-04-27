@@ -21,6 +21,7 @@ import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceTrackRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.repository.TrackReviewSettingRepository;
+import com.capstone.confhub.repository.UnavailableDayRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.ConferenceUserTrackService;
 import com.capstone.confhub.service.EmailService;
@@ -53,6 +54,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
         private final ReviewRepository reviewRepository;
         private final NotificationRepository notificationRepository;
         private final TrackReviewSettingRepository trackReviewSettingRepository;
+        private final UnavailableDayRepository unavailableDayRepository;
         private final EmailService emailService;
 
         @Value("${app.base-url}")
@@ -185,6 +187,21 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         track = conferenceTrackRepository.findById(request.getTrackId())
                                         .orElseThrow(() -> new ResourceNotFoundException(
                                                         "Track not found with id " + request.getTrackId()));
+                }
+
+                // BR: Block invitation if user is currently unavailable
+                java.time.LocalDate today = java.time.LocalDate.now();
+                if (unavailableDayRepository.existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                                request.getUserId(), today, today)) {
+                        // Find the current unavailable range to show end date in message
+                        java.util.List<com.capstone.confhub.entity.UnavailableDay> ranges =
+                                unavailableDayRepository.findByUser_IdOrderByStartDateDesc(request.getUserId());
+                        String until = ranges.stream()
+                                .filter(r -> !today.isBefore(r.getStartDate()) && !today.isAfter(r.getEndDate()))
+                                .map(r -> r.getEndDate().toString())
+                                .findFirst().orElse("unknown");
+                        throw new BadRequestException(
+                                "User is currently unavailable (until " + until + "). Cannot send invitation.");
                 }
 
                 ConferenceUserTrack entity = new ConferenceUserTrack();

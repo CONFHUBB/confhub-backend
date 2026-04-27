@@ -54,6 +54,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private final UserProfileRepository userProfileRepository;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+    private final UnavailableDayRepository unavailableDayRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -428,6 +429,21 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             if (exists) {
                 errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
                         .message("Duplicate: " + email + " already has role " + role).build());
+                continue;
+            }
+
+            // Check if user is currently unavailable
+            LocalDate today = LocalDate.now();
+            boolean isUnavailable = unavailableDayRepository
+                    .existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(user.getId(), today, today);
+            if (isUnavailable) {
+                List<UnavailableDay> activeDays = unavailableDayRepository.findByUser_IdOrderByStartDateDesc(user.getId());
+                String untilDate = activeDays.stream()
+                        .filter(d -> !d.getStartDate().isAfter(today) && !d.getEndDate().isBefore(today))
+                        .map(d -> d.getEndDate().toString())
+                        .findFirst().orElse("unknown");
+                errors.add(ImportError.builder().sheet("Members").row(rowNum).column("email")
+                        .message("User " + email + " is currently unavailable (until " + untilDate + "). Skipped.").build());
                 continue;
             }
 

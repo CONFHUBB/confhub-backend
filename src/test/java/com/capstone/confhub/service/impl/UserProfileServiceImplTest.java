@@ -6,7 +6,6 @@ import com.capstone.confhub.entity.UserProfile;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.UserProfileRepository;
 import com.capstone.confhub.repository.UserRepository;
-import com.capstone.confhub.utils.enums.UserStatus;
 import com.capstone.confhub.utils.enums.UserType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +44,6 @@ class UserProfileServiceImplTest {
     void setUp() {
         user = new User();
         user.setId(1);
-        user.setStatus(UserStatus.AVAILABLE);
 
         profile = new UserProfile();
         profile.setId(10);
@@ -455,55 +453,5 @@ class UserProfileServiceImplTest {
         ArgumentCaptor<UserProfile> captor = ArgumentCaptor.forClass(UserProfile.class);
         verify(userProfileRepository).save(captor.capture());
         assertEquals(profile, captor.getValue());
-    }
-
-    @Test
-    void createOrUpdateProfileShouldSetStatusUntilWhenStatusIsNotAvailable() {
-        LocalDateTime future = LocalDateTime.now().plusHours(1);
-        UserProfileRequest request = UserProfileRequest.builder()
-                .userStatus(UserStatus.BUSY)
-                .userStatusUntil(future)
-                .build();
-
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(userProfileRepository.findByUserId(1)).thenReturn(Optional.of(profile));
-        when(userProfileRepository.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        var result = userProfileService.createOrUpdateProfile(1, request);
-
-        assertEquals(UserStatus.BUSY, result.getUserStatus());
-        assertEquals(future, result.getUserStatusUntil());
-    }
-
-    @Test
-    void createOrUpdateProfileShouldClearStatusUntilWhenStatusIsAvailable() {
-        user.setStatus(UserStatus.BUSY);
-        user.setStatusUntil(LocalDateTime.now().plusHours(2));
-
-        UserProfileRequest request = UserProfileRequest.builder()
-                .userStatus(UserStatus.AVAILABLE)
-                .build();
-
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(userProfileRepository.findByUserId(1)).thenReturn(Optional.of(profile));
-        when(userProfileRepository.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        var result = userProfileService.createOrUpdateProfile(1, request);
-
-        assertEquals(UserStatus.AVAILABLE, result.getUserStatus());
-        assertNull(result.getUserStatusUntil());
-    }
-
-    @Test
-    void createOrUpdateProfileShouldThrowWhenStatusIsNotAvailableAndDurationMissing() {
-        UserProfileRequest request = UserProfileRequest.builder()
-                .userStatus(UserStatus.VACATION)
-                .build();
-
-        when(userRepository.findById(1)).thenReturn(Optional.of(user));
-        when(userProfileRepository.findByUserId(1)).thenReturn(Optional.of(profile));
-
-        assertThrows(com.capstone.confhub.exception.BadRequestException.class,
-                () -> userProfileService.createOrUpdateProfile(1, request));
     }
 }

@@ -18,8 +18,6 @@ public class ConferenceUserTrackResponseDTO {
     private String invitationToken;
     private LocalDateTime tokenExpiresAt;
     private Integer reviewerQuota;
-    private Boolean skipped;
-    private String message;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -1,6 +1,5 @@
 package com.capstone.confhub.dto.response;
 
-import com.capstone.confhub.utils.enums.UserStatus;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +15,5 @@ public class UserResponseDTO {
     private String email;
     private String country;
     private Boolean isActive;
-    private UserStatus status;
-    private LocalDateTime statusUntil;
     private LocalDateTime createdAt;
 }

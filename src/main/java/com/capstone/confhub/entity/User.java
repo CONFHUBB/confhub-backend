@@ -1,19 +1,14 @@
 package com.capstone.confhub.entity;
 
-import com.capstone.confhub.utils.enums.UserStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -49,27 +44,9 @@ public class User extends BaseEntity {
     @Column(name = "is_active")
     private Boolean isActive;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
-    private UserStatus status = UserStatus.AVAILABLE;
-
-    @Column(name = "status_until")
-    private LocalDateTime statusUntil;
-
     @Column(name = "otp_code", length = 6)
     private String otpCode;
 
     @Column(name = "otp_expiration")
     private LocalDateTime otpExpiration;
-
-    @PrePersist
-    void prePersist() {
-        if (status == null) {
-            status = UserStatus.AVAILABLE;
-        }
-        if (status == UserStatus.AVAILABLE) {
-            statusUntil = null;
-        }
-    }
-
 }

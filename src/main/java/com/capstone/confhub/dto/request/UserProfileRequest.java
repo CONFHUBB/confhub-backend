@@ -1,7 +1,5 @@
 package com.capstone.confhub.dto.request;
 
-import com.capstone.confhub.utils.enums.UserStatus;
-import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,6 +37,4 @@ public class UserProfileRequest {
     private String googleScholarLink;
     private String orcid;
     private String semanticScholarId;
-    private UserStatus userStatus;
-    private LocalDateTime userStatusUntil;
 }

@@ -4,14 +4,11 @@ import com.capstone.confhub.dto.request.UserProfileRequest;
 import com.capstone.confhub.dto.response.UserProfileResponseDTO;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.entity.UserProfile;
-import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.UserProfileRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.UserProfileService;
-import com.capstone.confhub.utils.enums.UserStatus;
 import com.capstone.confhub.utils.enums.UserType;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,7 +26,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional(readOnly = true)
     public UserProfileResponseDTO getProfileByUserId(Integer userId) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found for userId " + userId));
+                                                   .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found for userId " + userId));
         return mapToResponseDTO(profile);
     }
 
@@ -37,14 +34,14 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional
     public UserProfileResponseDTO createOrUpdateProfile(Integer userId, UserProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
+                                  .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    UserProfile newProfile = new UserProfile();
-                    newProfile.setUser(user);
-                    return newProfile;
-                });
+                                                   .orElseGet(() -> {
+                                                       UserProfile newProfile = new UserProfile();
+                                                       newProfile.setUser(user);
+                                                       return newProfile;
+                                                   });
 
         mapRequestToEntity(request, profile);
         return mapToResponseDTO(userProfileRepository.save(profile));
@@ -102,56 +99,31 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getSemanticScholarId() != null) {
             entity.setSemanticScholarId(request.getSemanticScholarId());
         }
-        if (request.getUserStatus() != null) {
-            applyUserStatusUpdate(entity.getUser(), request.getUserStatus(), request.getUserStatusUntil());
-        } else if (request.getUserStatusUntil() != null) {
-            throw new BadRequestException("userStatus is required when userStatusUntil is provided.");
-        }
-    }
-
-    private void applyUserStatusUpdate(User user, UserStatus status, LocalDateTime statusUntil) {
-        if (status == UserStatus.AVAILABLE) {
-            user.setStatus(UserStatus.AVAILABLE);
-            user.setStatusUntil(null);
-            return;
-        }
-
-        if (statusUntil == null) {
-            throw new BadRequestException("Duration is required when status is not AVAILABLE.");
-        }
-        if (!statusUntil.isAfter(LocalDateTime.now())) {
-            throw new BadRequestException("Duration must be a future date-time.");
-        }
-
-        user.setStatus(status);
-        user.setStatusUntil(statusUntil);
     }
 
     private UserProfileResponseDTO mapToResponseDTO(UserProfile entity) {
         return UserProfileResponseDTO.builder()
-                .id(entity.getId())
-                .userId(entity.getUser().getId())
-                .userType(entity.getUserType() != null ? entity.getUserType().name() : null)
-                .jobTitle(entity.getJobTitle())
-                .department(entity.getDepartment())
-                .institution(entity.getInstitution())
-                .institutionCountry(entity.getInstitutionCountry())
-                .institutionUrl(entity.getInstitutionUrl())
-                .secondaryInstitution(entity.getSecondaryInstitution())
-                .secondaryCountry(entity.getSecondaryCountry())
-                .phoneOffice(entity.getPhoneOffice())
-                .phoneMobile(entity.getPhoneMobile())
-                .avatarUrl(entity.getAvatarUrl())
-                .biography(entity.getBiography())
-                .websiteUrl(entity.getWebsiteUrl())
-                .dblpId(entity.getDblpId())
-                .googleScholarLink(entity.getGoogleScholarLink())
-                .orcid(entity.getOrcid())
-                .semanticScholarId(entity.getSemanticScholarId())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .userStatus(entity.getUser().getStatus())
-                .userStatusUntil(entity.getUser().getStatusUntil())
-                .build();
+                                     .id(entity.getId())
+                                     .userId(entity.getUser().getId())
+                                     .userType(entity.getUserType() != null ? entity.getUserType().name() : null)
+                                     .jobTitle(entity.getJobTitle())
+                                     .department(entity.getDepartment())
+                                     .institution(entity.getInstitution())
+                                     .institutionCountry(entity.getInstitutionCountry())
+                                     .institutionUrl(entity.getInstitutionUrl())
+                                     .secondaryInstitution(entity.getSecondaryInstitution())
+                                     .secondaryCountry(entity.getSecondaryCountry())
+                                     .phoneOffice(entity.getPhoneOffice())
+                                     .phoneMobile(entity.getPhoneMobile())
+                                     .avatarUrl(entity.getAvatarUrl())
+                                     .biography(entity.getBiography())
+                                     .websiteUrl(entity.getWebsiteUrl())
+                                     .dblpId(entity.getDblpId())
+                                     .googleScholarLink(entity.getGoogleScholarLink())
+                                     .orcid(entity.getOrcid())
+                                     .semanticScholarId(entity.getSemanticScholarId())
+                                     .createdAt(entity.getCreatedAt())
+                                     .updatedAt(entity.getUpdatedAt())
+                                     .build();
     }
 }

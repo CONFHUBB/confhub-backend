@@ -4,11 +4,14 @@ import com.capstone.confhub.dto.request.UserProfileRequest;
 import com.capstone.confhub.dto.response.UserProfileResponseDTO;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.entity.UserProfile;
+import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.UserProfileRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.UserProfileService;
+import com.capstone.confhub.utils.enums.UserStatus;
 import com.capstone.confhub.utils.enums.UserType;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -99,6 +102,29 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getSemanticScholarId() != null) {
             entity.setSemanticScholarId(request.getSemanticScholarId());
         }
+        if (request.getUserStatus() != null) {
+            applyUserStatusUpdate(entity.getUser(), request.getUserStatus(), request.getUserStatusUntil());
+        } else if (request.getUserStatusUntil() != null) {
+            throw new BadRequestException("userStatus is required when userStatusUntil is provided.");
+        }
+    }
+
+    private void applyUserStatusUpdate(User user, UserStatus status, LocalDateTime statusUntil) {
+        if (status == UserStatus.AVAILABLE) {
+            user.setStatus(UserStatus.AVAILABLE);
+            user.setStatusUntil(null);
+            return;
+        }
+
+        if (statusUntil == null) {
+            throw new BadRequestException("Duration is required when status is not AVAILABLE.");
+        }
+        if (!statusUntil.isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Duration must be a future date-time.");
+        }
+
+        user.setStatus(status);
+        user.setStatusUntil(statusUntil);
     }
 
     private UserProfileResponseDTO mapToResponseDTO(UserProfile entity) {
@@ -124,6 +150,8 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .semanticScholarId(entity.getSemanticScholarId())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .userStatus(entity.getUser().getStatus())
+                .userStatusUntil(entity.getUser().getStatusUntil())
                 .build();
     }
 }

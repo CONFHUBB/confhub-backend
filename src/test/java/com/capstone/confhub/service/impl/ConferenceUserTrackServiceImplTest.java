@@ -16,6 +16,7 @@ import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.UserStatus;
 import com.capstone.confhub.security.services.UserDetailsImpl;
 import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ForbiddenException;
@@ -32,12 +33,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +90,7 @@ public class ConferenceUserTrackServiceImplTest {
         user.setLastName("Doe");
         user.setEmail("jane@example.com");
         user.setIsActive(true);
+        user.setStatus(UserStatus.AVAILABLE);
 
         chairUser = new User();
         chairUser.setId(CHAIR_USER_ID);
@@ -345,6 +350,63 @@ public class ConferenceUserTrackServiceImplTest {
     }
 
     @Test
+    void assignRoleToUserTrackShouldSkipReviewerWhenUserIsNotAvailable() throws Exception {
+        user.setStatus(UserStatus.BUSY);
+
+        AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(TRACK_ID);
+        request.setAssignedRole(ConferenceTrackRole.REVIEWER);
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
+
+        var result = conferenceUserTrackService.assignRoleToUserTrack(request);
+        assertNotNull(result);
+        assertEquals(true, result.getSkipped());
+        assertTrue(result.getMessage().contains("can not invite this user as role REVIEWER"));
+        verify(conferenceUserTrackRepository, never()).save(any(ConferenceUserTrack.class));
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(emailService, never()).sendInvitationEmail(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void assignRoleToUserTrackShouldAllowReviewerWhenUserStatusExpired() throws Exception {
+        user.setStatus(UserStatus.BUSY);
+        user.setStatusUntil(LocalDateTime.now().minusMinutes(5));
+
+        AssignConferenceUserTrackRequest request = new AssignConferenceUserTrackRequest();
+        request.setUserId(USER_ID);
+        request.setConferenceId(CONFERENCE_ID);
+        request.setTrackId(TRACK_ID);
+        request.setAssignedRole(ConferenceTrackRole.REVIEWER);
+
+        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+                CHAIR_USER_ID, CONFERENCE_ID, ConferenceTrackRole.CONFERENCE_CHAIR)).thenReturn(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
+        when(conferenceTrackRepository.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(conferenceUserTrackRepository.save(any(ConferenceUserTrack.class))).thenAnswer(invocation -> {
+            ConferenceUserTrack saved = invocation.getArgument(0);
+            saved.setId(REVIEWER_ASSIGNMENT_ID);
+            return saved;
+        });
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = conferenceUserTrackService.assignRoleToUserTrack(request);
+
+        assertNotNull(result);
+        assertEquals(false, result.getSkipped());
+        assertEquals(ConferenceTrackRole.REVIEWER, result.getAssignedRole());
+        verify(userRepository).save(user);
+        verify(emailService).sendInvitationEmail(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void acceptInvitationShouldReturnResponse() {
         ConferenceUserTrack pending = new ConferenceUserTrack();
         pending.setId(REVIEWER_ASSIGNMENT_ID);
@@ -517,7 +579,3 @@ public class ConferenceUserTrackServiceImplTest {
         assertEquals(0, result.getContent().size());
     }
 }
-
-
-
-

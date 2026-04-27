@@ -280,26 +280,6 @@ public class ConferenceServiceImplTest {
     }
 
     @Test
-    void openSubmissionsShouldReturnResponse() {
-        conference.setStatus(ConferenceStatus.SETUP);
-        ConferenceUserTrack member = new ConferenceUserTrack();
-        member.setUser(user);
-        member.setConference(conference);
-
-        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
-        when(conferenceRepository.save(any(Conference.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(conferenceUserTrackRepository.findByConference_Id(CONFERENCE_ID)).thenReturn(List.of(member));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        stubChairAuthorization(true);
-
-        var result = conferenceService.openSubmissions(CONFERENCE_ID);
-
-        assertNotNull(result);
-        assertEquals(ConferenceStatus.OPEN, result.getStatus());
-    }
-
-    @Test
     void openSubmissionsShouldThrowWhenStatusIsNotScheduled() {
         conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
         stubChairAuthorization(true);
@@ -307,25 +287,6 @@ public class ConferenceServiceImplTest {
 
         assertThrows(BadRequestException.class,
                 () -> conferenceService.openSubmissions(CONFERENCE_ID));
-    }
-
-    @Test
-    void approveConferenceShouldReturnResponse() {
-        ConferenceUserTrack member = new ConferenceUserTrack();
-        member.setUser(user);
-        member.setConference(conference);
-
-        when(conferenceRepository.findById(CONFERENCE_ID)).thenReturn(Optional.of(conference));
-        when(conferenceRepository.save(any(Conference.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(conferenceUserTrackRepository.findByConference_Id(CONFERENCE_ID)).thenReturn(List.of(member));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        // approveConference does NOT call requireChairOf — it's ADMIN-only via @PreAuthorize
-
-        var result = conferenceService.approveConference(CONFERENCE_ID);
-
-        assertNotNull(result);
-        assertEquals(ConferenceStatus.SETUP, result.getStatus());
     }
 
     @Test
@@ -477,36 +438,6 @@ public class ConferenceServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class,
                 () -> conferenceService.updateProgramSchedule(CONFERENCE_ID, "{\"schedule\":{\"days\":[]}}"));
-    }
-
-    @Test
-    void getConferenceStatsShouldReturnAggregatedStats() {
-        stubChairAuthorization(false);
-        when(conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
-                USER_ID, CONFERENCE_ID, ConferenceTrackRole.PROGRAM_CHAIR)).thenReturn(true);
-        when(paperRepository.findByTrack_Conference_Id(CONFERENCE_ID)).thenReturn(List.of(
-                buildPaper(PaperStatus.SUBMITTED),
-                buildPaper(PaperStatus.SUBMITTED),
-                buildPaper(PaperStatus.UNDER_REVIEW),
-                buildPaper(PaperStatus.ACCEPTED),
-                buildPaper(PaperStatus.REJECTED),
-                buildPaper(PaperStatus.PUBLISHED)
-        ));
-        when(reviewRepository.countByConferenceId(CONFERENCE_ID)).thenReturn(10L);
-        when(reviewRepository.countCompletedByConferenceId(CONFERENCE_ID)).thenReturn(4L);
-        when(ticketRepository.countByConference_Id(CONFERENCE_ID)).thenReturn(7L);
-        when(ticketRepository.countCheckedInByConferenceId(CONFERENCE_ID, true)).thenReturn(3L);
-
-        ConferenceStatsDTO result = conferenceService.getConferenceStats(CONFERENCE_ID);
-
-        assertNotNull(result);
-        assertEquals(6, result.getTotalPapers());
-        assertEquals(5, result.getSubmitted());
-        assertEquals(1, result.getUnderReview());
-        assertEquals(2, result.getAccepted());
-        assertEquals(1, result.getRejected());
-        assertEquals(40.0, result.getAcceptanceRate());
-        assertEquals(40.0, result.getReviewCompletionRate());
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.capstone.confhub.dto.response;
 
-import com.capstone.confhub.utils.enums.UserStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -41,6 +40,4 @@ public class UserProfileResponseDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private UserStatus userStatus;
-    private LocalDateTime userStatusUntil;
 }

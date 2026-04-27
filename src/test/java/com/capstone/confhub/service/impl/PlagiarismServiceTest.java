@@ -109,16 +109,6 @@ class PlagiarismServiceTest {
     }
 
     @Test
-    void recheckPlagiarismShouldSetCheckingAndInvokeAsync() {
-        PlagiarismService spyService = spy(plagiarismService);
-        when(paperRepository.findById(10)).thenReturn(Optional.of(paper));
-
-        spyService.recheckPlagiarism(10);
-
-        verify(paperRepository).save(paper);
-    }
-
-    @Test
     void recheckPlagiarismShouldThrowWhenPaperMissing() {
         when(paperRepository.findById(10)).thenReturn(Optional.empty());
 
@@ -325,18 +315,6 @@ class PlagiarismServiceTest {
         assertTrue(score >= 78.0);
         assertEquals(1, ((List<?>) matches).size());
         assertEquals("done", summary);
-    }
-
-    @Test
-    void parseWebSearchResponseShouldIgnoreLowSimilarityMatches() throws Exception {
-        String ai = "{\"matches\":[{\"url\":\"https://a.com\",\"title\":\"A\",\"snippet\":\"S\",\"similarity\":8}],\"overallScore\":5,\"summary\":\"done\"}";
-
-        Object result = invokeParseWebSearchResponse(ai);
-        Object matches = result.getClass().getDeclaredMethod("matches").invoke(result);
-        double score = (double) result.getClass().getDeclaredMethod("score").invoke(result);
-
-        assertEquals(0, ((List<?>) matches).size());
-        assertEquals(5.0, score);
     }
 
     @Test

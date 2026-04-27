@@ -3,7 +3,6 @@ package com.capstone.confhub.service.impl;
 import com.capstone.confhub.dto.UserDTO;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.repository.UserRepository;
-import com.capstone.confhub.utils.enums.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +45,6 @@ class UserServiceImplTest {
         user.setPassword("password123");
         user.setCountry("Vietnam");
         user.setIsActive(true);
-        user.setStatus(UserStatus.BUSY);
     }
 
     @Test
@@ -87,7 +85,6 @@ class UserServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getId());
         assertEquals("jane@example.com", result.getEmail());
-        assertEquals(UserStatus.AVAILABLE, result.getStatus());
     }
 
     @Test
@@ -119,8 +116,6 @@ class UserServiceImplTest {
 
         assertNotNull(result);
         assertEquals(1, result.getId());
-        assertEquals(UserStatus.BUSY, result.getStatus());
-        assertNull(result.getStatusUntil());
     }
 
     @Test

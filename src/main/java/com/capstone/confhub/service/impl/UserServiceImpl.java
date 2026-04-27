@@ -99,6 +99,8 @@ public class UserServiceImpl implements UserService {
                 .email(entity.getEmail())
                 .country(entity.getCountry())
                 .isActive(entity.getIsActive())
+                .status(entity.getStatus())
+                .statusUntil(entity.getStatusUntil())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

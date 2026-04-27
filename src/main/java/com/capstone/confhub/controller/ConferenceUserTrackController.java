@@ -30,7 +30,7 @@ public class ConferenceUserTrackController {
     public ResponseEntity<ConferenceUserTrackResponseDTO> assignRole(
             @Valid @RequestBody AssignConferenceUserTrackRequest request) {
         ConferenceUserTrackResponseDTO result = conferenceUserTrackService.assignRoleToUserTrack(request);
-        return new ResponseEntity<>(result, HttpStatus.CREATED);
+        return new ResponseEntity<>(result, Boolean.TRUE.equals(result.getSkipped()) ? HttpStatus.OK : HttpStatus.CREATED);
     }
 
     @GetMapping("/conferences/{conferenceId}/track-chairs")

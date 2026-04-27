@@ -25,6 +25,7 @@ import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.service.ConferenceUserTrackService;
 import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.UserStatus;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -185,6 +186,20 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         track = conferenceTrackRepository.findById(request.getTrackId())
                                         .orElseThrow(() -> new ResourceNotFoundException(
                                                         "Track not found with id " + request.getTrackId()));
+                }
+
+                UserStatus userStatus = resolveEffectiveUserStatus(user);
+                if (request.getAssignedRole() == ConferenceTrackRole.REVIEWER && userStatus != UserStatus.AVAILABLE) {
+                        ConferenceUserTrackResponseDTO skipped = new ConferenceUserTrackResponseDTO();
+                        skipped.setUserId(user.getId());
+                        skipped.setConferenceId(conference.getId());
+                        skipped.setConferenceTrackId(track != null ? track.getId() : null);
+                        skipped.setAssignedRole(request.getAssignedRole());
+                        skipped.setSkipped(true);
+                        skipped.setMessage(
+                                        "This user is " + userStatus + ", can not invite this user as role "
+                                                        + ConferenceTrackRole.REVIEWER + ".");
+                        return skipped;
                 }
 
                 ConferenceUserTrack entity = new ConferenceUserTrack();
@@ -547,6 +562,7 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 dto.setInvitationToken(entity.getInvitationToken());
                 dto.setTokenExpiresAt(entity.getTokenExpiresAt());
                 dto.setReviewerQuota(entity.getReviewerQuota());
+                dto.setSkipped(false);
                 dto.setCreatedAt(entity.getCreatedAt());
                 dto.setUpdatedAt(entity.getUpdatedAt());
                 return dto;
@@ -562,6 +578,8 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                                 .email(entity.getEmail())
                                 .country(entity.getCountry())
                                 .isActive(entity.getIsActive())
+                                .status(entity.getStatus())
+                                .statusUntil(entity.getStatusUntil())
                                 .createdAt(entity.getCreatedAt())
                                 .build();
         }
@@ -608,6 +626,23 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                         case AUTHOR -> "Author";
                         case ATTENDEE -> "Attendee";
                 };
+        }
+
+        private UserStatus resolveEffectiveUserStatus(User user) {
+                UserStatus status = user.getStatus() != null ? user.getStatus() : UserStatus.AVAILABLE;
+                if (status == UserStatus.AVAILABLE) {
+                        return UserStatus.AVAILABLE;
+                }
+
+                LocalDateTime statusUntil = user.getStatusUntil();
+                if (statusUntil != null && !statusUntil.isAfter(LocalDateTime.now())) {
+                        user.setStatus(UserStatus.AVAILABLE);
+                        user.setStatusUntil(null);
+                        userRepository.save(user);
+                        return UserStatus.AVAILABLE;
+                }
+
+                return status;
         }
 
         private UserDetailsImpl getCurrentUserDetails() {

@@ -936,7 +936,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         conf.setBannerImageUrl(data.getOrDefault("bannerImageUrl", ""));
 
         conf.setSocietySponsor(data.getOrDefault("societySponsor", ""));
-        conf.setStatus(ConferenceStatus.SETUP);
+        conf.setStatus(ConferenceStatus.PENDING_APPROVAL);
         Conference saved = conferenceRepository.save(conf);
 
         ConferenceUserTrack chair = new ConferenceUserTrack();

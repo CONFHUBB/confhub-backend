@@ -67,7 +67,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         log.info("Creating conference: {}", dto.getName());
         Conference conference = new Conference();
         mapDtoToEntity(dto, conference);
-        conference.setStatus(ConferenceStatus.SETUP);
+        conference.setStatus(ConferenceStatus.PENDING_APPROVAL);
         Conference savedConference = repository.save(conference);
 
         User currentUser = getCurrentAuthenticatedUser();
@@ -89,7 +89,7 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .user(currentUser)
                 .conference(savedConference)
                 .title("Conference created successfully")
-                .message("Your conference \"" + savedConference.getName() + "\" has been created. Complete the setup and submit for approval.")
+                .message("Your conference \"" + savedConference.getName() + "\" has been created and submitted for admin approval.")
                 .type("CONFERENCE_CREATED")
                 .link("/conference/" + savedConference.getId() + "/update?tab=dashboard")
                 .isRead(false)

@@ -18,4 +18,9 @@ public interface ConferenceActivityRepository extends JpaRepository<ConferenceAc
     void deleteByConferenceId(Integer conferenceId);
 
     List<ConferenceActivity> findByIsEnabledTrueAndDeadlineBetween(LocalDateTime from, LocalDateTime to);
+
+    List<ConferenceActivity> findByConferenceIdInAndIsEnabledTrueAndDeadlineAfterOrderByConferenceIdAscDeadlineAsc(
+            List<Integer> conferenceIds,
+            LocalDateTime now
+    );
 }

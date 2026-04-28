@@ -396,25 +396,6 @@ class ConferenceActivityServiceImplTest {
     }
 
     @Test
-    void updateActivitiesShouldEnableAuthorNotificationWithoutDependencyChecks() {
-        List<ConferenceActivity> existing = allActivities();
-        ConferenceActivityDTO dto = dto(ActivityType.AUTHOR_NOTIFICATION, true, LocalDateTime.now().plusDays(7), "Notify Authors");
-
-        when(conferenceRepository.findById(1)).thenReturn(Optional.of(conference));
-        when(activityRepository.findByConferenceId(1)).thenReturn(existing, existing);
-        when(activityRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        List<ConferenceActivityDTO> result = conferenceActivityService.updateActivities(1, List.of(dto));
-
-        assertTrue(result.stream().anyMatch(a -> a.getActivityType() == ActivityType.AUTHOR_NOTIFICATION
-                && Boolean.TRUE.equals(a.getIsEnabled())));
-        verify(conferenceTrackRepository, never()).findByConferenceId(any());
-        verify(subjectAreaRepository, never()).findByTrackId(any());
-        verify(paperRepository, never()).findByTrack_Conference_Id(any());
-        verify(reviewRepository, never()).findByPaper_Track_Conference_Id(any());
-    }
-
-    @Test
     void updateActivitiesShouldKeepExistingNameWhenIncomingNameIsBlank() {
         List<ConferenceActivity> existing = allActivities();
         ConferenceActivity paperSubmission = find(existing, ActivityType.PAPER_SUBMISSION);

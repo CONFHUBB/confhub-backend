@@ -170,7 +170,7 @@ public class ConferenceServiceImpl implements ConferenceService {
         if (conference.getStatus() != ConferenceStatus.PENDING_APPROVAL) {
             throw new BadRequestException("Only conferences with PENDING_APPROVAL status can be approved.");
         }
-        conference.setStatus(ConferenceStatus.APPROVED);
+        conference.setStatus(ConferenceStatus.PENDING_PAYMENT);
         conference.setRejectionReason(null);
         Conference saved = repository.save(conference);
         notifyAllMembers(saved, "Conference approved!",
@@ -226,9 +226,9 @@ public class ConferenceServiceImpl implements ConferenceService {
         Conference conference = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
 
-        if (conference.getStatus() != ConferenceStatus.APPROVED && conference.getStatus() != ConferenceStatus.PENDING_PAYMENT) {
+        if (conference.getStatus() != ConferenceStatus.PENDING_PAYMENT) {
             throw new BadRequestException(
-                    "Can only select a plan for APPROVED or PENDING_PAYMENT conferences. Current status: " + conference.getStatus());
+                    "Can only select a plan for PENDING_PAYMENT conferences. Current status: " + conference.getStatus());
         }
 
         SubscriptionPlan selectedPlan;

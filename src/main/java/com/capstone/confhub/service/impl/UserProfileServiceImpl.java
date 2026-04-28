@@ -26,7 +26,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional(readOnly = true)
     public UserProfileResponseDTO getProfileByUserId(Integer userId) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found for userId " + userId));
+                                                   .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found for userId " + userId));
         return mapToResponseDTO(profile);
     }
 
@@ -34,14 +34,14 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional
     public UserProfileResponseDTO createOrUpdateProfile(Integer userId, UserProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
+                                  .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    UserProfile newProfile = new UserProfile();
-                    newProfile.setUser(user);
-                    return newProfile;
-                });
+                                                   .orElseGet(() -> {
+                                                       UserProfile newProfile = new UserProfile();
+                                                       newProfile.setUser(user);
+                                                       return newProfile;
+                                                   });
 
         mapRequestToEntity(request, profile);
         return mapToResponseDTO(userProfileRepository.save(profile));
@@ -103,27 +103,27 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private UserProfileResponseDTO mapToResponseDTO(UserProfile entity) {
         return UserProfileResponseDTO.builder()
-                .id(entity.getId())
-                .userId(entity.getUser().getId())
-                .userType(entity.getUserType() != null ? entity.getUserType().name() : null)
-                .jobTitle(entity.getJobTitle())
-                .department(entity.getDepartment())
-                .institution(entity.getInstitution())
-                .institutionCountry(entity.getInstitutionCountry())
-                .institutionUrl(entity.getInstitutionUrl())
-                .secondaryInstitution(entity.getSecondaryInstitution())
-                .secondaryCountry(entity.getSecondaryCountry())
-                .phoneOffice(entity.getPhoneOffice())
-                .phoneMobile(entity.getPhoneMobile())
-                .avatarUrl(entity.getAvatarUrl())
-                .biography(entity.getBiography())
-                .websiteUrl(entity.getWebsiteUrl())
-                .dblpId(entity.getDblpId())
-                .googleScholarLink(entity.getGoogleScholarLink())
-                .orcid(entity.getOrcid())
-                .semanticScholarId(entity.getSemanticScholarId())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
+                                     .id(entity.getId())
+                                     .userId(entity.getUser().getId())
+                                     .userType(entity.getUserType() != null ? entity.getUserType().name() : null)
+                                     .jobTitle(entity.getJobTitle())
+                                     .department(entity.getDepartment())
+                                     .institution(entity.getInstitution())
+                                     .institutionCountry(entity.getInstitutionCountry())
+                                     .institutionUrl(entity.getInstitutionUrl())
+                                     .secondaryInstitution(entity.getSecondaryInstitution())
+                                     .secondaryCountry(entity.getSecondaryCountry())
+                                     .phoneOffice(entity.getPhoneOffice())
+                                     .phoneMobile(entity.getPhoneMobile())
+                                     .avatarUrl(entity.getAvatarUrl())
+                                     .biography(entity.getBiography())
+                                     .websiteUrl(entity.getWebsiteUrl())
+                                     .dblpId(entity.getDblpId())
+                                     .googleScholarLink(entity.getGoogleScholarLink())
+                                     .orcid(entity.getOrcid())
+                                     .semanticScholarId(entity.getSemanticScholarId())
+                                     .createdAt(entity.getCreatedAt())
+                                     .updatedAt(entity.getUpdatedAt())
+                                     .build();
     }
 }

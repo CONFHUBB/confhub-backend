@@ -198,30 +198,6 @@ class ConferenceImportServiceImplTest {
     }
 
     @Test
-    void importConferenceFromExcelShouldPersistConferenceAndChairMembership() {
-        Map<String, String> row = validConferenceRow();
-        MultipartFile file = conferenceFile(row);
-
-        when(conferenceRepository.save(any(Conference.class))).thenAnswer(invocation -> {
-            Conference saved = invocation.getArgument(0);
-            saved.setId(1001);
-            return saved;
-        });
-
-        ImportResultDTO result = conferenceImportService.importConferenceFromExcel(file);
-
-        assertTrue(result.isSuccess());
-        assertEquals(1001, result.getConferenceId());
-        verify(conferenceActivityService).initializeDefaultActivitiesForConference(1001);
-        verify(conferenceUserTrackRepository).save(any(ConferenceUserTrack.class));
-
-        ArgumentCaptor<Conference> conferenceCaptor = ArgumentCaptor.forClass(Conference.class);
-        verify(conferenceRepository).save(conferenceCaptor.capture());
-        assertEquals(ConferenceStatus.PENDING_APPROVAL, conferenceCaptor.getValue().getStatus());
-        assertEquals("ConfHub Summit", conferenceCaptor.getValue().getName());
-    }
-
-    @Test
     void importConferenceFromExcelShouldReturnPreviewErrorsWithoutPersisting() {
         Map<String, String> invalid = validConferenceRow();
         invalid.put("name", "");

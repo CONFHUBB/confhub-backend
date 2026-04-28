@@ -143,6 +143,43 @@ public class ReviewServiceImpl implements ReviewService {
             }
         }
 
+        // Notification: review declined → notify chairs
+        if (dto.getStatus() == ReviewStatus.DECLINED && oldStatus == ReviewStatus.ASSIGNED) {
+            try {
+                Conference conference = saved.getPaper().getTrack().getConference();
+                String reviewerName = saved.getReviewer().getFirstName() + " " + saved.getReviewer().getLastName();
+                List<ConferenceUserTrack> chairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.CONFERENCE_CHAIR);
+                List<ConferenceUserTrack> pChairs = conferenceUserTrackRepository
+                        .findByConference_IdAndAssignedRole(conference.getId(), ConferenceTrackRole.PROGRAM_CHAIR);
+                Set<Integer> notifiedIds = new java.util.HashSet<>();
+                for (ConferenceUserTrack chair : chairs) {
+                    if (notifiedIds.add(chair.getUser().getId())) {
+                        notificationRepository.save(Notification.builder()
+                                .user(chair.getUser()).conference(conference)
+                                .title("Review declined by " + reviewerName)
+                                .message(reviewerName + " has declined to review \"" + saved.getPaper().getTitle() + "\". Please assign another reviewer.")
+                                .type("REVIEW_DECLINED")
+                                .link("/conference/" + conference.getId() + "/update?tab=features-review-management")
+                                .isRead(false).build());
+                    }
+                }
+                for (ConferenceUserTrack pc : pChairs) {
+                    if (notifiedIds.add(pc.getUser().getId())) {
+                        notificationRepository.save(Notification.builder()
+                                .user(pc.getUser()).conference(conference)
+                                .title("Review declined by " + reviewerName)
+                                .message(reviewerName + " has declined to review \"" + saved.getPaper().getTitle() + "\". Please assign another reviewer.")
+                                .type("REVIEW_DECLINED")
+                                .link("/conference/" + conference.getId() + "/update?tab=features-review-management")
+                                .isRead(false).build());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to create review declined notification: {}", e.getMessage());
+            }
+        }
+
         return mapToResponseDTO(saved);
     }
 

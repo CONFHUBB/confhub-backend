@@ -290,6 +290,27 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Integer, ConferenceActivityDTO> getUpcomingActivitiesByConferenceIds(List<Integer> conferenceIds) {
+        if (conferenceIds == null || conferenceIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<ConferenceActivity> upcomingActivities = activityRepository
+                .findByConferenceIdInAndIsEnabledTrueAndDeadlineAfterOrderByConferenceIdAscDeadlineAsc(
+                        conferenceIds, now
+                );
+
+        Map<Integer, ConferenceActivityDTO> result = new LinkedHashMap<>();
+        for (ConferenceActivity activity : upcomingActivities) {
+            Integer conferenceId = activity.getConference().getId();
+            result.computeIfAbsent(conferenceId, ignored -> mapToDTO(activity));
+        }
+        return result;
+    }
+
     private String getCurrentUser() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();

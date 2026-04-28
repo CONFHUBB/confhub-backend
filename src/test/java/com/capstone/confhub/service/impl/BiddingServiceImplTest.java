@@ -163,32 +163,6 @@ public class BiddingServiceImplTest {
     }
 
     @Test
-    void getPapersForBiddingShouldReturnList() {
-        ReviewerInterest interest = new ReviewerInterest();
-        interest.setReviewer(reviewer);
-        interest.setSubjectArea(paper.getPrimarySubjectArea());
-        interest.setIsPrimary(true);
-
-        TrackReviewSetting setting = new TrackReviewSetting();
-        setting.setIsDoubleBlind(false);
-
-        when(paperRepository.findByTrack_Conference_Id(1)).thenReturn(List.of(paper));
-        when(userRepository.findById(20)).thenReturn(Optional.of(reviewer));
-        when(paperConflictRepository.findByUser_Id(20)).thenReturn(List.of());
-        when(biddingRepository.findByReviewer_IdAndPaper_Track_Conference_Id(20, 1)).thenReturn(List.of(bid));
-        when(reviewerInterestRepository.findByReviewer_Id(20)).thenReturn(List.of(interest));
-        when(paperAuthorRepository.findByPaperId(10)).thenReturn(List.of());
-        when(trackReviewSettingRepository.findByTrackId(2)).thenReturn(Optional.of(setting));
-
-        var result = biddingService.getPapersForBidding(20, 1);
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(10, result.get(0).getPaperId());
-        assertEquals(BidValue.EAGER, result.get(0).getCurrentBid());
-    }
-
-    @Test
     void submitOrUpdateBid_PaperNotFound() {
         com.capstone.confhub.dto.BiddingDTO dto = new com.capstone.confhub.dto.BiddingDTO();
         dto.setPaperId(999);

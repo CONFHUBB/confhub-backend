@@ -154,6 +154,7 @@ public class ConferenceServiceImplTest {
 
         assertNotNull(result);
         assertEquals(CONFERENCE_ID, result.getId());
+        assertEquals(ConferenceStatus.PENDING_APPROVAL, result.getStatus());
         verify(conferenceActivityService).initializeDefaultActivitiesForConference(CONFERENCE_ID);
     }
 

@@ -490,6 +490,9 @@ public class ConferenceServiceImpl implements ConferenceService {
         entity.setCountry(dto.getCountry());
         entity.setProvince(dto.getProvince());
         entity.setBannerImageUrl(dto.getBannerImageUrl());
+        if (dto.getPaperTemplateUrl() != null) {
+            entity.setPaperTemplateUrl(dto.getPaperTemplateUrl());
+        }
         entity.setContactInformation(dto.getContactInformation());
         entity.setChairEmails(dto.getChairEmails());
     }
@@ -512,12 +515,23 @@ public class ConferenceServiceImpl implements ConferenceService {
                 .country(entity.getCountry())
                 .province(entity.getProvince())
                 .bannerImageUrl(entity.getBannerImageUrl())
+                .paperTemplateUrl(entity.getPaperTemplateUrl())
                 .contactInformation(entity.getContactInformation())
                 .chairEmails(entity.getChairEmails())
                 .programSchedule(entity.getProgramSchedule())
                 .rejectionReason(entity.getRejectionReason())
                 .subscriptionPlan(entity.getSubscriptionPlan())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public ConferenceResponseDTO updatePaperTemplateUrl(Integer id, String paperTemplateUrl) {
+        requireChairOf(id);
+        Conference existing = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + id));
+        existing.setPaperTemplateUrl(paperTemplateUrl);
+        return mapToResponseDTO(repository.save(existing));
     }
 
     private void notifyAllMembers(Conference conference, String title, String message, String type) {

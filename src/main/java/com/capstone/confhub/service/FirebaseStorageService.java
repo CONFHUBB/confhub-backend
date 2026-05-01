@@ -36,4 +36,10 @@ public interface FirebaseStorageService {
      * and returns the public download URL.
      */
     String uploadChatFile(MultipartFile file) throws IOException;
+
+    /**
+     * Uploads a paper template to Firebase Storage under conferences/{conferenceId}/paper-templates/
+     * and returns the public download URL.
+     */
+    String uploadPaperTemplateFile(MultipartFile file, Integer conferenceId) throws IOException;
 }

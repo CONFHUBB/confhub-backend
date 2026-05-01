@@ -144,9 +144,61 @@ public class GeminiApiClient {
     }
 
     /**
+     * Send a chat request with a custom maxOutputTokens limit.
+     * Use this for tasks that need longer responses (e.g., plagiarism analysis).
+     */
+    public String generateContent(String systemPrompt, List<Map<String, String>> messages, int customMaxTokens) {
+        int totalAttempts = apiKeys.size() + 1;
+
+        for (int attempt = 1; attempt <= totalAttempts; attempt++) {
+            String currentKey = getNextKey();
+            try {
+                ObjectNode requestBody = buildRequestBody(systemPrompt, messages, customMaxTokens);
+
+                log.info("[GeminiAPI] Request using key [{}], model [{}], maxTokens={} (attempt {}/{})",
+                        maskKey(currentKey), model, customMaxTokens, attempt, totalAttempts);
+
+                String responseJson = webClient.post()
+                        .uri("/models/{model}:generateContent?key={key}", model, currentKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody.toString())
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+
+                return extractTextFromResponse(responseJson);
+
+            } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+                int statusCode = e.getStatusCode().value();
+                log.error("[GeminiAPI] Key [{}] returned HTTP {}: {}",
+                        maskKey(currentKey), statusCode, e.getResponseBodyAsString());
+
+                if ((statusCode == 429 || statusCode >= 500) && attempt < totalAttempts) {
+                    log.warn("[GeminiAPI] Rotating to next key (attempt {}/{})", attempt, totalAttempts);
+                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    continue;
+                }
+                throw new RuntimeException("AI Provider Error: " + e.getStatusCode(), e);
+            } catch (Exception e) {
+                log.error("[GeminiAPI] Key [{}] error: {}", maskKey(currentKey), e.getMessage(), e);
+                if (attempt < totalAttempts) {
+                    try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    continue;
+                }
+                throw new RuntimeException("Internal Error calling Google: " + e.getMessage(), e);
+            }
+        }
+        throw new RuntimeException("Gemini API failed after trying all " + apiKeys.size() + " API keys");
+    }
+
+    /**
      * Build the JSON request body for Gemini API.
      */
     private ObjectNode buildRequestBody(String systemPrompt, List<Map<String, String>> messages) {
+        return buildRequestBody(systemPrompt, messages, maxOutputTokens);
+    }
+
+    private ObjectNode buildRequestBody(String systemPrompt, List<Map<String, String>> messages, int tokenLimit) {
         ObjectNode body = mapper.createObjectNode();
 
         // System instruction
@@ -170,7 +222,7 @@ public class GeminiApiClient {
 
         // Generation config
         ObjectNode genConfig = mapper.createObjectNode();
-        genConfig.put("maxOutputTokens", maxOutputTokens);
+        genConfig.put("maxOutputTokens", tokenLimit);
         genConfig.put("temperature", 0.7);
         body.set("generationConfig", genConfig);
 

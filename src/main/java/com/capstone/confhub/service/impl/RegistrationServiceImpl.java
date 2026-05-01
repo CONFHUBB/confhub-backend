@@ -69,9 +69,16 @@ public class RegistrationServiceImpl implements RegistrationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // Check duplicate registration
-        if (ticketRepository.findByUserAndConferenceId(user, conferenceId).isPresent()) {
-            throw new BadRequestException("You have already registered for this conference.");
+        // Check duplicate registration — per paper (authors with multiple papers need separate tickets)
+        if (request.getPaperId() != null) {
+            if (ticketRepository.findByUser_IdAndPaperId(userId, request.getPaperId()).isPresent()) {
+                throw new BadRequestException("You have already registered a ticket for this paper.");
+            }
+        } else {
+            // Attendee (no paper) — only one ticket per conference
+            if (ticketRepository.findByUserAndConferenceId(user, conferenceId).isPresent()) {
+                throw new BadRequestException("You have already registered for this conference.");
+            }
         }
 
         TicketType ticketType = ticketTypeRepository.findById(request.getTicketTypeId())

@@ -6,6 +6,7 @@ import com.capstone.confhub.entity.*;
 import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.*;
+import com.capstone.confhub.service.NotificationService;
 import com.capstone.confhub.service.PaperFileService;
 import com.capstone.confhub.utils.PaginationUtils;
 import com.capstone.confhub.utils.enums.ActivityType;
@@ -32,6 +33,8 @@ public class PaperFileServiceImpl implements PaperFileService {
     private final PaperFileRepository paperFileRepository;
     private final PaperRepository paperRepository;
     private final ConferenceActivityRepository conferenceActivityRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -44,18 +47,15 @@ public class PaperFileServiceImpl implements PaperFileService {
     @Override
     @Transactional
     public PaperFileResponseDTO createPaperFile(PaperFileDTO dto) {
-        // ── Strict duplicate detection via SHA-256 hash ──
+        // Duplicate detection is now advisory — handled by findDuplicateInfo
+        // Just log if duplicate found (info is already in plagiarism report)
         if (dto.getFileHash() != null && !dto.getFileHash().isBlank()) {
             List<PaperFile> duplicates = paperFileRepository.findDuplicatesByHash(
                     dto.getFileHash(), dto.getPaperId());
             if (!duplicates.isEmpty()) {
                 PaperFile dup = duplicates.get(0);
-                String dupPaperTitle = dup.getPaper().getTitle();
-                String dupConferenceName = dup.getPaper().getTrack().getConference().getName();
-                throw new BadRequestException(
-                        "This manuscript file has already been submitted for paper \"" + dupPaperTitle
-                                + "\" at conference \"" + dupConferenceName
-                                + "\". The same file cannot be submitted to multiple papers or conferences.");
+                log.warn("[DuplicateFile] File hash {} matches paper '{}' — proceeding with upload (advisory)",
+                        dto.getFileHash().substring(0, 8), dup.getPaper().getTitle());
             }
         }
 
@@ -280,6 +280,11 @@ public class PaperFileServiceImpl implements PaperFileService {
         paperRepository.save(paper);
 
         log.info("Paper {} approved as camera-ready → status PUBLISHED", paperId);
+
+        // Send notification to all authors
+        notifyAuthors(paper, "✅ Camera-Ready Approved",
+                "Your camera-ready submission for paper \"" + paper.getTitle() + "\" has been approved. The paper is now published!",
+                "CAMERA_READY_APPROVED");
     }
 
     @Override
@@ -298,6 +303,11 @@ public class PaperFileServiceImpl implements PaperFileService {
         paperRepository.save(paper);
 
         log.info("Paper {} camera-ready rejected → status CAMERA_READY_REJECTED", paperId);
+
+        // Send notification to all authors
+        notifyAuthors(paper, "❌ Camera-Ready Revision Required",
+                "Your camera-ready submission for paper \"" + paper.getTitle() + "\" requires revisions. Please update and re-submit.",
+                "CAMERA_READY_REJECTED");
     }
 
     @Override
@@ -313,19 +323,29 @@ public class PaperFileServiceImpl implements PaperFileService {
 
     @Override
     public void validateNoDuplicateHash(PaperFileDTO dto) {
-        if (dto.getFileHash() != null && !dto.getFileHash().isBlank()) {
-            List<PaperFile> duplicates = paperFileRepository.findDuplicatesByHash(
-                    dto.getFileHash(), dto.getPaperId());
-            if (!duplicates.isEmpty()) {
-                PaperFile dup = duplicates.get(0);
-                String dupPaperTitle = dup.getPaper().getTitle();
-                String dupConferenceName = dup.getPaper().getTrack().getConference().getName();
-                throw new BadRequestException(
-                        "This manuscript file has already been submitted for paper \"" + dupPaperTitle
-                                + "\" at conference \"" + dupConferenceName
-                                + "\". The same file cannot be submitted to multiple papers or conferences.");
-            }
+        // Deprecated — duplicate detection is now advisory
+        String info = findDuplicateInfo(dto);
+        if (info != null) {
+            throw new BadRequestException(info);
         }
+    }
+
+    @Override
+    public String findDuplicateInfo(PaperFileDTO dto) {
+        if (dto.getFileHash() == null || dto.getFileHash().isBlank()) {
+            return null;
+        }
+        List<PaperFile> duplicates = paperFileRepository.findDuplicatesByHash(
+                dto.getFileHash(), dto.getPaperId());
+        if (duplicates.isEmpty()) {
+            return null;
+        }
+        PaperFile dup = duplicates.get(0);
+        String dupPaperTitle = dup.getPaper().getTitle();
+        String dupConferenceName = dup.getPaper().getTrack().getConference().getName();
+        return "This manuscript file has already been submitted for paper \"" + dupPaperTitle
+                + "\" at conference \"" + dupConferenceName
+                + "\". Duplicate submission detected.";
     }
 
     // ===================== Private Helpers =====================
@@ -359,5 +379,32 @@ public class PaperFileServiceImpl implements PaperFileService {
                 .isCopyrightSubmission(entity.getIsCopyrightSubmission())
                 .isSupplementary(entity.getIsSupplementary())
                 .build();
+    }
+
+    /**
+     * Send a notification to all authors of a paper.
+     */
+    private void notifyAuthors(Paper paper, String title, String message, String type) {
+        try {
+            Integer conferenceId = paper.getTrack() != null ? paper.getTrack().getConference().getId() : null;
+            String link = conferenceId != null
+                    ? "/conference/" + conferenceId + "/paper/" + paper.getId()
+                    : "/paper/" + paper.getId();
+
+            List<PaperAuthor> authors = paperAuthorRepository.findByPaperId(paper.getId());
+            for (PaperAuthor pa : authors) {
+                NotificationDTO notifDTO = new NotificationDTO();
+                notifDTO.setUserId(pa.getUser().getId());
+                notifDTO.setConferenceId(conferenceId);
+                notifDTO.setTitle(title);
+                notifDTO.setMessage(message);
+                notifDTO.setType(type);
+                notifDTO.setLink(link);
+                notificationService.createNotification(notifDTO);
+            }
+            log.info("Sent {} notification to {} authors for paper {}", type, authors.size(), paper.getId());
+        } catch (Exception e) {
+            log.error("Failed to send {} notifications for paper {}: {}", type, paper.getId(), e.getMessage());
+        }
     }
 }

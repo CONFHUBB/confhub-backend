@@ -30,4 +30,10 @@ public interface FirebaseStorageService {
      * and returns the public download URL.
      */
     String uploadImage(MultipartFile file, Integer conferenceId) throws IOException;
+
+    /**
+     * Uploads a chat attachment to Firebase Storage under chat-files/
+     * and returns the public download URL.
+     */
+    String uploadChatFile(MultipartFile file) throws IOException;
 }

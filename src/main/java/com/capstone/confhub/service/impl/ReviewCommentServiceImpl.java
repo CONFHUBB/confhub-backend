@@ -37,6 +37,7 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
     private final NotificationRepository notificationRepository;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final ConferenceActivityRepository conferenceActivityRepository;
+    private final com.capstone.confhub.service.WebSocketNotificationService webSocketNotificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -114,7 +115,14 @@ public class ReviewCommentServiceImpl implements ReviewCommentService {
             }
         }
 
-        return mapToResponseDTO(saved);
+        ReviewCommentResponseDTO responseDTO = mapToResponseDTO(saved);
+
+        // --- WebSocket: broadcast discussion comment in real-time ---
+        if (Boolean.TRUE.equals(dto.getIsDiscussionPost()) && entity.getPaper() != null) {
+            webSocketNotificationService.broadcastDiscussionComment(entity.getPaper().getId(), responseDTO);
+        }
+
+        return responseDTO;
     }
 
     @Override

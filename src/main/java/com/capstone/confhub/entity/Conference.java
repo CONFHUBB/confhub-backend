@@ -65,6 +65,9 @@ public class Conference extends BaseEntity {
     @Column(name = "banner_image_url")
     private String bannerImageUrl;
 
+    @Column(name = "paper_template_url", columnDefinition = "TEXT")
+    private String paperTemplateUrl;
+
     @Column(name = "contact_information")
     private String contactInformation;
 

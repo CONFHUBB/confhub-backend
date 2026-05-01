@@ -181,4 +181,15 @@ public class ConferenceController {
         String downloadUrl = firebaseStorageService.uploadImage(file, id);
         return ResponseEntity.ok(Map.of("url", downloadUrl));
     }
+
+    @PostMapping(value = "/{id}/upload-paper-template", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Upload a paper template file for the conference")
+    public ResponseEntity<Map<String, String>> uploadPaperTemplate(
+            @PathVariable Integer id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        String downloadUrl = firebaseStorageService.uploadPaperTemplateFile(file, id);
+        conferenceService.updatePaperTemplateUrl(id, downloadUrl);
+        return ResponseEntity.ok(Map.of("url", downloadUrl));
+    }
 }

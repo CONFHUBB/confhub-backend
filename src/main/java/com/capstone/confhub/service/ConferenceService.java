@@ -19,6 +19,8 @@ public interface ConferenceService {
     ConferenceResponseDTO completeConference(Integer id);
     ConferenceResponseDTO cancelConference(Integer id);
 
+    ConferenceResponseDTO updatePaperTemplateUrl(Integer id, String paperTemplateUrl);
+
     String getProgramSchedule(Integer conferenceId);
     void updateProgramSchedule(Integer conferenceId, String programScheduleJson);
     ConferenceStatsDTO getConferenceStats(Integer conferenceId);

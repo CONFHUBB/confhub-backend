@@ -5,12 +5,12 @@ COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 # Make wrapper executable
 RUN chmod +x mvnw
-# Download dependencies
-RUN ./mvnw dependency:go-offline -B
+# Download dependencies (resolve instead of go-offline to handle platform-specific artifacts)
+RUN ./mvnw dependency:resolve -B -q || true
 
 COPY src ./src
 # Build the application
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -DskipTests -q
 
 # Run stage
 FROM eclipse-temurin:21-jre-alpine

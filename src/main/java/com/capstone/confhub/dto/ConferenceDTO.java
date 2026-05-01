@@ -47,6 +47,7 @@ public class ConferenceDTO {
     private String country;
     private String province;
     private String bannerImageUrl;
+    private String paperTemplateUrl;
     private String contactInformation;
     private String chairEmails;
 }

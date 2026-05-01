@@ -86,6 +86,7 @@ public class PlagiarismService {
         paper.setPlagiarismScore(null);
         paper.setPlagiarismStatus(null);
         paper.setPlagiarismDetailsJson(null);
+        paper.setPlagiarismExtractedText(null);
         paperRepository.save(paper);
         log.info("[Plagiarism] Reset plagiarism data for paper {}", paperId);
     }
@@ -100,6 +101,8 @@ public class PlagiarismService {
                 .orElseThrow(() -> new ResourceNotFoundException("Paper not found: " + paperId));
 
         paper.setPlagiarismStatus(PlagiarismStatus.CHECKING);
+        // Clear cached text to force re-extraction from the current active PDF
+        paper.setPlagiarismExtractedText(null);
         paperRepository.save(paper);
 
         // Extract text from the ACTIVE PDF file
@@ -219,15 +222,14 @@ public class PlagiarismService {
 
         details.put("checkedAt", Instant.now().toString());
 
-        // Always save plagiarism results on the paper (even if rejected)
+        // Save plagiarism results on the paper — never block upload, just warn
         paper.setPlagiarismScore(round(finalScore));
         paper.setPlagiarismStatus(PlagiarismStatus.COMPLETED);
         paper.setPlagiarismDetailsJson(objectMapper.writeValueAsString(details));
 
         if (finalScore > 50.0) {
-            throw new com.capstone.confhub.exception.BadRequestException(
-                "Plagiarism score exceeds the allowed threshold. Detected similarity: " + round(finalScore) + "%. Please revise your manuscript before submitting."
-            );
+            log.warn("[Plagiarism] High similarity detected for paper {}: {}%. Upload will proceed — chairs can review.",
+                    paper.getId(), round(finalScore));
         }
         
         return objectMapper.writeValueAsString(details);
@@ -238,8 +240,11 @@ public class PlagiarismService {
     // ═══════════════════════════════════════════════════════
 
     private InternalCheckResult performInternalCheck(Paper targetPaper, String targetText) {
-        // Compare against ALL papers in the system (cross-conference duplicate detection)
-        List<Paper> candidatePapers = paperRepository.findAll();
+        // Only compare against papers that already have cached text — avoid downloading PDFs during upload
+        // Papers without cached text will be checked when they are uploaded or re-checked
+        List<Paper> candidatePapers = paperRepository.findAll().stream()
+                .filter(p -> p.getPlagiarismExtractedText() != null && !p.getPlagiarismExtractedText().isBlank())
+                .toList();
 
         Map<String, Double> targetVector = buildTfIdfVector(targetText);
         List<String> targetNgrams = extractNgrams(targetText, 5);
@@ -346,28 +351,18 @@ public class PlagiarismService {
                     .build();
 
     private static final String PLAGIARISM_ANALYSIS_PROMPT = """
-            You are a plagiarism detection assistant. I will provide:
-            1. An excerpt from an academic paper
-            2. Google search results that were found for key phrases from this paper
+            You are a plagiarism detection assistant. Analyze if search results indicate plagiarism of the paper excerpt.
 
-            Analyze whether the search results indicate potential plagiarism.
-            Compare the paper excerpt with the search result snippets.
+            IMPORTANT: Return ONLY a compact JSON (no markdown fences, no extra whitespace):
+            {"overallScore":0-100,"summary":"1 sentence max","matchAnalysis":[{"url":"URL","title":"short title","snippet":"max 50 chars","similarity":0-100}]}
 
-            IMPORTANT: Return ONLY the raw JSON object below. Do NOT wrap it in markdown code fences.
-            {
-              "overallScore": 0-100 (plagiarism likelihood based on how much the paper content matches web sources),
-              "summary": "brief explanation of your analysis",
-              "matchAnalysis": [
-                {
-                  "url": "URL from search results",
-                  "title": "page title",
-                  "snippet": "the relevant snippet",
-                  "similarity": 0-100 (how similar this specific result is to the paper)
-                }
-              ]
-            }
-            If search results show no meaningful overlap, return {"overallScore": 0, "summary": "No significant similarity found.", "matchAnalysis": []}.
-            Be honest, conservative, and only flag genuine textual overlap.
+            Rules:
+            - Keep summary under 100 characters
+            - Keep each snippet under 50 characters
+            - Return at most 3 matches in matchAnalysis (highest similarity only)
+            - If no overlap found: {"overallScore":0,"summary":"No significant similarity found.","matchAnalysis":[]}
+            - Be conservative, only flag genuine textual overlap.
+            
             """;
 
     private WebSearchResult performWebSearch(String text) {
@@ -565,7 +560,7 @@ public class PlagiarismService {
                     Map.of("role", "user", "content", sb.toString())
             );
 
-            String aiReply = geminiClient.generateContent(PLAGIARISM_ANALYSIS_PROMPT, messages);
+            String aiReply = geminiClient.generateContent(PLAGIARISM_ANALYSIS_PROMPT, messages, 4096);
             log.info("[Plagiarism] Gemini analysis (first 300 chars): {}",
                     aiReply.length() > 300 ? aiReply.substring(0, 300) : aiReply);
 
@@ -692,7 +687,25 @@ public class PlagiarismService {
 
         } catch (Exception e) {
             log.warn("[Plagiarism] Failed to parse web search response: {}", e.getMessage());
-            throw new RuntimeException("Failed to parse web search results: " + e.getMessage(), e);
+            // Try to salvage partial data from truncated JSON
+            try {
+                String partial = aiReply;
+                // Extract overallScore if present
+                java.util.regex.Matcher scoreMatcher = java.util.regex.Pattern
+                        .compile("\"overallScore\"\\s*:\\s*(\\d+)")
+                        .matcher(partial);
+                double salvageScore = scoreMatcher.find() ? Double.parseDouble(scoreMatcher.group(1)) : 0;
+                // Extract summary if present
+                java.util.regex.Matcher summaryMatcher = java.util.regex.Pattern
+                        .compile("\"summary\"\\s*:\\s*\"([^\"]+)\"")
+                        .matcher(partial);
+                String salvageSummary = summaryMatcher.find() ? summaryMatcher.group(1) : "Analysis incomplete (response truncated).";
+                log.info("[Plagiarism] Salvaged from truncated response: score={}, summary={}", salvageScore, salvageSummary);
+                return new WebSearchResult(salvageScore, List.of(), salvageSummary);
+            } catch (Exception ex2) {
+                log.warn("[Plagiarism] Could not salvage truncated response, returning 0");
+                return new WebSearchResult(0, List.of(), "Web search analysis failed: response was truncated.");
+            }
         }
     }
 

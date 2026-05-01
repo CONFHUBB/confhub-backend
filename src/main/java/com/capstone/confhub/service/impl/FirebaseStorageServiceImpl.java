@@ -106,4 +106,30 @@ public class FirebaseStorageServiceImpl implements FirebaseStorageService {
         log.info("Uploaded banner image to Firebase Storage path '{}'. URL: {}", storagePath, downloadUrl);
         return downloadUrl;
     }
+
+    @Override
+    public String uploadChatFile(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty() || file.getOriginalFilename() == null) {
+            throw new IllegalArgumentException("File must not be null or empty");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = originalFilename.substring(dotIndex);
+        }
+
+        String storagePath = "chat-files/" + UUID.randomUUID() + extension;
+
+        Bucket bucket = storageClient.bucket();
+        Blob blob = bucket.create(storagePath, file.getBytes(), file.getContentType());
+
+        String downloadToken = getDownloadToken(blob);
+        String encodedPath = URLEncoder.encode(storagePath, StandardCharsets.UTF_8);
+        String downloadUrl = BASE_URL + encodedPath + "?alt=media&token=" + downloadToken;
+
+        log.info("Uploaded chat file to Firebase Storage path '{}'. URL: {}", storagePath, downloadUrl);
+        return downloadUrl;
+    }
 }

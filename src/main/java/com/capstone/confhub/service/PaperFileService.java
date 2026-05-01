@@ -30,6 +30,9 @@ public interface PaperFileService {
 
     java.util.List<PaperFileResponseDTO> getCameraReadyFilesByConference(Integer conferenceId);
 
-    /** Validate that no active manuscript with the same hash exists. Throws BadRequestException if duplicate found. */
+    /** @deprecated Use findDuplicateInfo instead — duplicate detection is now advisory. */
     void validateNoDuplicateHash(PaperFileDTO dto);
+
+    /** Returns human-readable duplicate info if the file hash matches another paper, or null if no duplicate found. */
+    String findDuplicateInfo(PaperFileDTO dto);
 }

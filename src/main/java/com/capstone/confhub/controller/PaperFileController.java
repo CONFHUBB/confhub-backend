@@ -50,20 +50,33 @@ public class PaperFileController {
             @RequestParam("conferenceId") Integer conferenceId,
             @RequestParam("paperId") Integer paperId,
             @RequestParam("file") MultipartFile file) throws IOException {
-        // Compute SHA-256 hash for duplicate detection BEFORE uploading to Firebase
-        String fileHash = computeSha256(file.getBytes());
-
-        // Check for duplicates first (fail fast, before expensive Firebase upload)
-        PaperFileDTO checkDto = PaperFileDTO.builder()
-                .paperId(paperId)
-                .fileHash(fileHash)
-                .build();
-        // This will throw BadRequestException if duplicate found
-        paperFileService.validateNoDuplicateHash(checkDto);
 
         // --- SYNCHRONOUS PLAGIARISM CHECK ---
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new BadRequestException("Paper not found with ID: " + paperId));
+
+        // Compute SHA-256 hash for duplicate detection (advisory, not blocking)
+        String fileHash = computeSha256(file.getBytes());
+
+        // Check for duplicate file submissions (advisory — record in report, don't block)
+        String duplicateWarning = null;
+        try {
+            PaperFileDTO checkDto = PaperFileDTO.builder()
+                    .paperId(paperId)
+                    .fileHash(fileHash)
+                    .build();
+            duplicateWarning = paperFileService.findDuplicateInfo(checkDto);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(PaperFileController.class)
+                    .warn("[Upload] Duplicate check failed for paper {}: {}", paperId, e.getMessage());
+        }
+
+        // Clear ALL old plagiarism data before running new check
+        paper.setPlagiarismScore(null);
+        paper.setPlagiarismStatus(null);
+        paper.setPlagiarismDetailsJson(null);
+        paper.setPlagiarismExtractedText(null);
+        paperRepository.save(paper);
 
         String extractedText = "";
         String plagiarismDetailsJson = null;
@@ -75,22 +88,45 @@ public class PaperFileController {
 
             extractedText = extractedText.replaceAll("\\s{3,}", "\n\n").trim();
             if (!extractedText.isEmpty()) {
-                // This throws BadRequestException if score > 50%
-                plagiarismDetailsJson = plagiarismService.checkPlagiarismSyncAndGetDetails(paper, extractedText);
+                // Plagiarism check is advisory — runs synchronously, never blocks upload on failure
+                try {
+                    plagiarismDetailsJson = plagiarismService.checkPlagiarismSyncAndGetDetails(paper, extractedText);
+                } catch (Exception ex) {
+                    org.slf4j.LoggerFactory.getLogger(PaperFileController.class)
+                            .warn("[Upload] Plagiarism check failed for paper {}: {}", paperId, ex.getMessage());
+                }
             }
-        } catch (BadRequestException bre) {
-            // Save plagiarism results even when rejected, so frontend can show details
-            if (!extractedText.isEmpty()) {
-                paper.setPlagiarismExtractedText(extractedText);
-            }
-            paperRepository.save(paper);
-            throw bre;
         } catch (Exception e) {
-            throw new BadRequestException("Failed to analyze PDF file for plagiarism: " + e.getMessage());
+            // PDF extraction failure should NOT block file upload
+            org.slf4j.LoggerFactory.getLogger(PaperFileController.class)
+                    .warn("[Upload] PDF processing failed for paper {}, continuing with upload: {}",
+                            paperId, e.getMessage());
         }
 
-        // Save plagiarism results and cached text BEFORE creating PaperFile
-        // to avoid Hibernate session conflicts
+        // Append duplicate warning to plagiarism report if found
+        if (duplicateWarning != null) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                if (plagiarismDetailsJson != null) {
+                    com.fasterxml.jackson.databind.node.ObjectNode node = (com.fasterxml.jackson.databind.node.ObjectNode) om.readTree(plagiarismDetailsJson);
+                    node.put("duplicateFileWarning", duplicateWarning);
+                    plagiarismDetailsJson = om.writeValueAsString(node);
+                } else {
+                    // No plagiarism result — create minimal report with just the duplicate warning
+                    com.fasterxml.jackson.databind.node.ObjectNode node = om.createObjectNode();
+                    node.put("duplicateFileWarning", duplicateWarning);
+                    node.put("checkedAt", java.time.Instant.now().toString());
+                    plagiarismDetailsJson = om.writeValueAsString(node);
+                    paper.setPlagiarismStatus(com.capstone.confhub.utils.enums.PlagiarismStatus.COMPLETED);
+                }
+                paper.setPlagiarismDetailsJson(plagiarismDetailsJson);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(PaperFileController.class)
+                        .warn("[Upload] Failed to append duplicate warning: {}", e.getMessage());
+            }
+        }
+
+        // Save plagiarism results (if any) and cached text
         if (!extractedText.isEmpty()) {
             paper.setPlagiarismExtractedText(extractedText);
         }

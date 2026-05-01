@@ -44,12 +44,18 @@ public class EmailService {
     private String fromEmail;
 
     public void sendSimpleMessage(String to, String subject, String text) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromEmail);
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(text);
-        emailSender.send(message);
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(text);
+            emailSender.send(message);
+            log.info("[Email] ✅ Sent to={}, subject=\"{}\"", to, subject);
+        } catch (Exception e) {
+            log.error("[Email] ❌ Failed to={}, subject=\"{}\", error={}", to, subject, e.getMessage());
+            throw e;
+        }
     }
 
     @Async

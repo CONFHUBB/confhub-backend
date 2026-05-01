@@ -15,6 +15,7 @@ import java.util.Optional;
 public interface TicketRepository extends JpaRepository<Ticket, Integer> {
     Optional<Ticket> findByUserAndConferenceId(User user, Integer conferenceId);
     Optional<Ticket> findByUser_IdAndConference_Id(Integer userId, Integer conferenceId);
+    Optional<Ticket> findByUser_IdAndPaperId(Integer userId, Integer paperId);
     List<Ticket> findByUser(User user);
     boolean existsByUserAndConferenceIdAndPaymentStatus(User user, Integer conferenceId, PaymentStatus paymentStatus);
     List<Ticket> findByConferenceId(Integer conferenceId);

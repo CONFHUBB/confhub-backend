@@ -74,6 +74,15 @@ public class RegistrationController {
         return ResponseEntity.ok(registrationService.checkIn(code));
     }
 
+    @PostMapping("/conferences/{conferenceId}/check-in")
+    @Operation(summary = "Check in an attendee by QR code for a specific conference (Chair/Program Chair only)")
+    public ResponseEntity<CheckInResponse> checkInForConference(
+            @PathVariable Integer conferenceId,
+            @RequestParam String code,
+            @RequestParam Integer actorUserId) {
+        return ResponseEntity.ok(registrationService.checkInForConference(code, conferenceId, actorUserId));
+    }
+
     @PostMapping("/conferences/{conferenceId}/retry-payment")
     @Operation(summary = "Retry payment for a pending/failed registration")
     public ResponseEntity<RegistrationResponse> retryPayment(

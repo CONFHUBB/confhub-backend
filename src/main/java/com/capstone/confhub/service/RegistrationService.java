@@ -21,6 +21,7 @@ public interface RegistrationService {
     void failPayment(Integer ticketId, String vnpTxnRef);
     Payment failPaymentAndGet(Integer ticketId, String vnpTxnRef);
     CheckInResponse checkIn(String code);
+    CheckInResponse checkInForConference(String code, Integer conferenceId, Integer actorUserId);
     RegistrationResponse retryPayment(Integer conferenceId, Integer userId, String clientIp);
     void cancelPendingTicket(Integer conferenceId, Integer userId);
     void refundTicket(Integer conferenceId, Integer ticketId);

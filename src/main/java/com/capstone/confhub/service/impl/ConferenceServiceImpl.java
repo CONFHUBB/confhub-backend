@@ -20,6 +20,7 @@ import com.capstone.confhub.repository.TicketRepository;
 import com.capstone.confhub.repository.UserRepository;
 import com.capstone.confhub.security.services.UserDetailsImpl;
 import com.capstone.confhub.integration.payment.VnPayIntegrationService;
+import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.service.ConferenceService;
 import com.capstone.confhub.service.ConferenceActivityService;
 import com.capstone.confhub.utils.PaginationUtils;
@@ -30,11 +31,15 @@ import com.capstone.confhub.utils.enums.SubscriptionPlan;
 import com.capstone.confhub.entity.Notification;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -60,6 +65,7 @@ public class ConferenceServiceImpl implements ConferenceService {
     private final ReviewRepository reviewRepository;
     private final TicketRepository ticketRepository;
     private final VnPayIntegrationService vnPayIntegrationService;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -318,6 +324,12 @@ public class ConferenceServiceImpl implements ConferenceService {
     public void updateProgramSchedule(Integer conferenceId, String programScheduleJson) {
         requireChairOrProgramChairOf(conferenceId);
 
+        Conference conf = repository.findById(conferenceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
+
+        final boolean wasPublished = isProgramPublished(conf.getProgramSchedule());
+        final ProgramDateRange dateRange = extractProgramDateRange(programScheduleJson);
+
         // Parse and validate schedule for overlaps
         if (programScheduleJson != null && !programScheduleJson.isBlank()) {
             try {
@@ -363,10 +375,107 @@ public class ConferenceServiceImpl implements ConferenceService {
             }
         }
 
-        Conference conf = repository.findById(conferenceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
         conf.setProgramSchedule(programScheduleJson);
-        repository.save(conf);
+
+        if (dateRange != null) {
+            conf.setStartDate(dateRange.startDate.atStartOfDay());
+            conf.setEndDate(dateRange.endDate.atTime(LocalTime.MAX));
+        }
+
+        Conference saved = repository.save(conf);
+
+        if (!wasPublished && isProgramPublished(programScheduleJson)) {
+            sendProgramFinalizedEmails(saved, dateRange);
+        }
+    }
+
+    private boolean isProgramPublished(String programScheduleJson) {
+        if (programScheduleJson == null || programScheduleJson.isBlank()) {
+            return false;
+        }
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(programScheduleJson);
+            return root.path("published").asBoolean(false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private ProgramDateRange extractProgramDateRange(String programScheduleJson) {
+        if (programScheduleJson == null || programScheduleJson.isBlank()) {
+            return null;
+        }
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(programScheduleJson);
+            JsonNode days = root.path("schedule").path("days");
+            if (!days.isArray() || days.isEmpty()) {
+                return null;
+            }
+
+            Set<LocalDate> dates = new TreeSet<>();
+            for (JsonNode day : days) {
+                String dateText = day.path("date").asText(null);
+                if (dateText != null && !dateText.isBlank()) {
+                    dates.add(LocalDate.parse(dateText));
+                }
+            }
+            if (dates.isEmpty()) {
+                return null;
+            }
+            return new ProgramDateRange(dates.iterator().next(), ((TreeSet<LocalDate>) dates).last());
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid program schedule date format.");
+        }
+    }
+
+    private void sendProgramFinalizedEmails(Conference conference, ProgramDateRange dateRange) {
+        String subject = "[" + conference.getName() + "] Program schedule finalized";
+        String reminder = buildProgramReminderBody(conference, dateRange);
+
+        sendProgramEmailToRoles(conference, subject,
+                "The conference program schedule has been finalized. Please check the latest schedule in the system.\n\n" + reminder,
+                ConferenceTrackRole.CONFERENCE_CHAIR,
+                ConferenceTrackRole.PROGRAM_CHAIR,
+                ConferenceTrackRole.REVIEWER,
+                ConferenceTrackRole.AUTHOR,
+                ConferenceTrackRole.ATTENDEE);
+    }
+
+    private String buildProgramReminderBody(Conference conference, ProgramDateRange dateRange) {
+        String start = dateRange != null ? dateRange.startDate.toString() : String.valueOf(conference.getStartDate());
+        String end = dateRange != null ? dateRange.endDate.toString() : String.valueOf(conference.getEndDate());
+        return "Reminder timeline:\n"
+                + "- Starts: " + start + "\n"
+                + "- Ends: " + end + "\n\n"
+                + "Please review the finalized program and prepare accordingly.";
+    }
+
+    private void sendProgramEmailToRoles(Conference conference, String subject, String body, ConferenceTrackRole... roles) {
+        List<ConferenceUserTrack> members = conferenceUserTrackRepository.findByConference_Id(conference.getId());
+        members.stream()
+                .filter(cut -> {
+                    for (ConferenceTrackRole role : roles) {
+                        if (role == cut.getAssignedRole()) return true;
+                    }
+                    return false;
+                })
+                .map(cut -> cut.getUser())
+                .filter(user -> user != null && user.getEmail() != null && !user.getEmail().isBlank())
+                .collect(java.util.stream.Collectors.toMap(User::getEmail, u -> u, (a, b) -> a))
+                .values()
+                .forEach(user -> emailService.sendSimpleMessage(user.getEmail(), subject, body));
+    }
+
+    private static class ProgramDateRange {
+        private final LocalDate startDate;
+        private final LocalDate endDate;
+
+        private ProgramDateRange(LocalDate startDate, LocalDate endDate) {
+            this.startDate = startDate;
+            this.endDate = endDate;
+        }
     }
 
     private void checkOverlap(List<JsonNode> sessions, String date) {

@@ -42,6 +42,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final UserRepository userRepository;
     private final PaperRepository paperRepository;
     private final PaperAuthorRepository paperAuthorRepository;
+    private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final VnPayIntegrationService vnPayIntegrationService;
 
     // Counter for registration number suffix — seeded from DB on startup to prevent duplicates after restarts
@@ -357,6 +358,79 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .message("Check-in successful!")
                 .build();
     }
+
+        @Override
+        @Transactional
+        public CheckInResponse checkInForConference(String code, Integer conferenceId, Integer actorUserId) {
+        Ticket ticket = code.startsWith("CONF")
+            ? ticketRepository.findByRegistrationNumber(code)
+            .orElseThrow(() -> new ResourceNotFoundException("Ticket not found: " + code))
+            : ticketRepository.findByQrCode(code)
+            .orElseThrow(() -> new ResourceNotFoundException("Invalid QR code: " + code));
+
+        if (ticket.getConference() == null || !ticket.getConference().getId().equals(conferenceId)) {
+            throw new BadRequestException("This QR code does not belong to conference: " + conferenceId);
+        }
+
+        // Check actor role: must be CONFERENCE_CHAIR or PROGRAM_CHAIR for the conference
+        boolean isChair = conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+            actorUserId, conferenceId, com.capstone.confhub.utils.enums.ConferenceTrackRole.CONFERENCE_CHAIR
+        );
+        boolean isProgramChair = conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+            actorUserId, conferenceId, com.capstone.confhub.utils.enums.ConferenceTrackRole.PROGRAM_CHAIR
+        );
+
+        if (!isChair && !isProgramChair) {
+            throw new BadRequestException("Unauthorized: user is not a chair for this conference.");
+        }
+
+        // Null-safe attendee values
+        final String attendeeName = ticket.getUser() != null
+            ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+            : "";
+        final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+
+        if (!PaymentStatus.COMPLETED.equals(ticket.getPaymentStatus())) {
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(false)
+                .message("Payment not completed for this ticket.")
+                .build();
+        }
+
+        if (Boolean.TRUE.equals(ticket.getIsCheckedIn())) {
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(true)
+                .message("Already checked in at " + ticket.getCheckInTime())
+                .build();
+        }
+
+        ticket.setIsCheckedIn(true);
+        ticket.setCheckInTime(LocalDateTime.now());
+        ticketRepository.save(ticket);
+
+        log.info("Chair {} checked in attendee {} for conference {}",
+            actorUserId, ticket.getRegistrationNumber(), ticket.getConference().getId());
+
+        return CheckInResponse.builder()
+            .ticketId(ticket.getId())
+            .registrationNumber(ticket.getRegistrationNumber())
+            .attendeeName(attendeeName)
+            .attendeeEmail(attendeeEmail)
+            .ticketTypeName(ticket.getTicketTypeName())
+            .isCheckedIn(true)
+            .message("Check-in successful!")
+            .build();
+        }
 
     @Override
     @Transactional

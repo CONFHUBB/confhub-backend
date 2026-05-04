@@ -74,6 +74,23 @@ public class RegistrationController {
         return ResponseEntity.ok(registrationService.checkIn(code));
     }
 
+    @PostMapping("/check-in/mobile")
+    @Operation(summary = "Check in an attendee via mobile (Chair only) — includes comprehensive validation with status codes")
+    public ResponseEntity<CheckInResponse> checkInMobileChair(
+            @RequestParam String code,
+            @RequestParam Integer actorUserId) {
+        return ResponseEntity.ok(registrationService.checkInForMobileChair(code, actorUserId));
+    }
+
+    @PostMapping("/conferences/{conferenceId}/check-in")
+    @Operation(summary = "Check in an attendee by QR code for a specific conference (Chair/Program Chair only)")
+    public ResponseEntity<CheckInResponse> checkInForConference(
+            @PathVariable Integer conferenceId,
+            @RequestParam String code,
+            @RequestParam Integer actorUserId) {
+        return ResponseEntity.ok(registrationService.checkInForConference(code, conferenceId, actorUserId));
+    }
+
     @PostMapping("/conferences/{conferenceId}/retry-payment")
     @Operation(summary = "Retry payment for a pending/failed registration")
     public ResponseEntity<RegistrationResponse> retryPayment(

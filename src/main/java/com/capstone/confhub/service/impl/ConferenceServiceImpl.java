@@ -379,7 +379,7 @@ public class ConferenceServiceImpl implements ConferenceService {
 
         if (dateRange != null) {
             conf.setStartDate(dateRange.startDate.atStartOfDay());
-            conf.setEndDate(dateRange.endDate.atTime(LocalTime.MAX));
+            conf.setEndDate(dateRange.endDate.atTime(LocalTime.of(23, 59)));
         }
 
         Conference saved = repository.save(conf);

@@ -434,6 +434,122 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     @Transactional
+    public CheckInResponse checkInForMobileChair(String code, Integer actorUserId) {
+        // Step 1: Find ticket by QR code or registration number
+        Ticket ticket = code.startsWith("CONF")
+            ? ticketRepository.findByRegistrationNumber(code)
+                .orElse(null)
+            : ticketRepository.findByQrCode(code)
+                .orElse(null);
+
+        if (ticket == null) {
+            return CheckInResponse.builder()
+                .message("Ticket not found. Invalid QR code or registration number.")
+                .status("TICKET_NOT_FOUND")
+                .build();
+        }
+
+        // Step 2: Check payment status
+        if (!PaymentStatus.COMPLETED.equals(ticket.getPaymentStatus())) {
+            final String attendeeName = ticket.getUser() != null
+                ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+                : "";
+            final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+            
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(false)
+                .message("Payment not completed for this ticket.")
+                .status("PAYMENT_NOT_COMPLETED")
+                .build();
+        }
+
+        // Step 3: Check if already checked in
+        if (Boolean.TRUE.equals(ticket.getIsCheckedIn())) {
+            final String attendeeName = ticket.getUser() != null
+                ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+                : "";
+            final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+            
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(true)
+                .message("Already checked in at " + ticket.getCheckInTime())
+                .status("ALREADY_CHECKED_IN")
+                .build();
+        }
+
+        // Step 4: Verify actor is chair for this conference
+        Integer conferenceId = ticket.getConference() != null ? ticket.getConference().getId() : null;
+        if (conferenceId == null) {
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .message("Conference information not found for this ticket.")
+                .status("TICKET_NOT_FOUND")
+                .build();
+        }
+
+        boolean isChair = conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+            actorUserId, conferenceId, com.capstone.confhub.utils.enums.ConferenceTrackRole.CONFERENCE_CHAIR
+        );
+        boolean isProgramChair = conferenceUserTrackRepository.existsByUser_IdAndConference_IdAndAssignedRole(
+            actorUserId, conferenceId, com.capstone.confhub.utils.enums.ConferenceTrackRole.PROGRAM_CHAIR
+        );
+
+        if (!isChair && !isProgramChair) {
+            final String attendeeName = ticket.getUser() != null
+                ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+                : "";
+            final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+            
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(false)
+                .message("You do not have permission to check in attendees for this conference.")
+                .status("UNAUTHORIZED")
+                .build();
+        }
+
+        // Step 5: All validations passed — proceed with check-in
+        ticket.setIsCheckedIn(true);
+        ticket.setCheckInTime(LocalDateTime.now());
+        ticketRepository.save(ticket);
+
+        final String attendeeName = ticket.getUser() != null
+            ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+            : "";
+        final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+
+        log.info("Chair {} checked in attendee {} for conference {}",
+            actorUserId, ticket.getRegistrationNumber(), conferenceId);
+
+        return CheckInResponse.builder()
+            .ticketId(ticket.getId())
+            .registrationNumber(ticket.getRegistrationNumber())
+            .attendeeName(attendeeName)
+            .attendeeEmail(attendeeEmail)
+            .ticketTypeName(ticket.getTicketTypeName())
+            .isCheckedIn(true)
+            .message("Check-in successful!")
+            .status("SUCCESS")
+            .build();
+    }
+
+    @Override
+    @Transactional
     public RegistrationResponse retryPayment(Integer conferenceId, Integer userId, String clientIp) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));

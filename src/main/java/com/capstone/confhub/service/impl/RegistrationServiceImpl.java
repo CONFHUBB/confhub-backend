@@ -468,26 +468,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .build();
         }
 
-        // Step 3: Check if already checked in
-        if (Boolean.TRUE.equals(ticket.getIsCheckedIn())) {
-            final String attendeeName = ticket.getUser() != null
-                ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
-                : "";
-            final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
-            
-            return CheckInResponse.builder()
-                .ticketId(ticket.getId())
-                .registrationNumber(ticket.getRegistrationNumber())
-                .attendeeName(attendeeName)
-                .attendeeEmail(attendeeEmail)
-                .ticketTypeName(ticket.getTicketTypeName())
-                .isCheckedIn(true)
-                .message("Already checked in at " + ticket.getCheckInTime())
-                .status("ALREADY_CHECKED_IN")
-                .build();
-        }
-
-        // Step 4: Verify actor is chair for this conference
+        // Step 3: Verify actor is chair for this conference
         Integer conferenceId = ticket.getConference() != null ? ticket.getConference().getId() : null;
         if (conferenceId == null) {
             return CheckInResponse.builder()
@@ -520,6 +501,25 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .isCheckedIn(false)
                 .message("You do not have permission to check in attendees for this conference.")
                 .status("UNAUTHORIZED")
+                .build();
+        }
+
+        // Step 4: Check if already checked in (after permission validation)
+        if (Boolean.TRUE.equals(ticket.getIsCheckedIn())) {
+            final String attendeeName = ticket.getUser() != null
+                ? (ticket.getUser().getFirstName() + " " + ticket.getUser().getLastName())
+                : "";
+            final String attendeeEmail = ticket.getUser() != null ? ticket.getUser().getEmail() : "";
+
+            return CheckInResponse.builder()
+                .ticketId(ticket.getId())
+                .registrationNumber(ticket.getRegistrationNumber())
+                .attendeeName(attendeeName)
+                .attendeeEmail(attendeeEmail)
+                .ticketTypeName(ticket.getTicketTypeName())
+                .isCheckedIn(true)
+                .message("Already checked in at " + ticket.getCheckInTime())
+                .status("ALREADY_CHECKED_IN")
                 .build();
         }
 

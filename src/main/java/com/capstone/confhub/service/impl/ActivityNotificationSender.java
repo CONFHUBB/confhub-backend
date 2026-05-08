@@ -122,7 +122,7 @@ public class ActivityNotificationSender {
                         notifDTO.setLink(link);
                         notificationService.createNotification(notifDTO);
 
-                        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+                        if (!"ENABLED".equals(auditLog.getAction()) && user.getEmail() != null && !user.getEmail().isEmpty()) {
                             String emailSubject = "[" + conference.getName() + "] " + title;
                             emailService.sendSimpleMessage(user.getEmail(), emailSubject, message);
                         }

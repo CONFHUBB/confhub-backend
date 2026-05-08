@@ -782,6 +782,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                     user.getEmail(),
                     fullName.trim(),
                     "Invitation to " + conference.getName() + " as " + roleName + trackLabel,
+                    conference,
                     conference.getName(),
                     roleName,
                     trackName,

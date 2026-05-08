@@ -7,6 +7,7 @@ import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.*;
 import com.capstone.confhub.security.services.UserDetailsImpl;
+import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.service.PaperService;
 import com.capstone.confhub.utils.PaginationUtils;
 import com.capstone.confhub.utils.enums.ActivityType;
@@ -47,6 +48,7 @@ public class PaperServiceImpl implements PaperService {
     private final NotificationRepository notificationRepository;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
     private final ObjectMapper objectMapper;
+    private final EmailService emailService;
 
     // ==================== VALID STATUS TRANSITIONS (BR-2.16) ====================
     private static final Map<PaperStatus, Set<PaperStatus>> VALID_TRANSITIONS = Map.ofEntries(
@@ -107,6 +109,19 @@ public class PaperServiceImpl implements PaperService {
                             .isRead(false)
                             .build();
                     notificationRepository.save(notification);
+
+                    String authorName = ((currentUser.getFirstName() != null ? currentUser.getFirstName() : "") + " " +
+                            (currentUser.getLastName() != null ? currentUser.getLastName() : "")).trim();
+                    if (authorName.isBlank()) {
+                        authorName = currentUser.getEmail();
+                    }
+                    emailService.sendSubmissionConfirmationEmail(
+                            currentUser.getEmail(),
+                            authorName,
+                            saved.getTitle(),
+                            track.getConference(),
+                            saved.getId()
+                    );
                 }
             }
         } catch (Exception e) {

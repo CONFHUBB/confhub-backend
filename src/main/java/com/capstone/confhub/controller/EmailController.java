@@ -6,6 +6,7 @@ import com.capstone.confhub.dto.request.BulkEmailRequestDTO;
 import com.capstone.confhub.dto.request.ExternalInvitationRequest;
 import com.capstone.confhub.dto.response.ExternalInvitationResponseDTO;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
+import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.service.ExternalInvitationService;
 import com.capstone.confhub.service.ConferenceUserTrackService;
 import com.capstone.confhub.service.EmailService;
@@ -37,6 +38,7 @@ public class EmailController {
     private final ExternalInvitationService externalInvitationService;
     private final ConferenceUserTrackService conferenceUserTrackService;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final ConferenceRepository conferenceRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -96,8 +98,9 @@ public class EmailController {
             String acceptLink = baseUrl + "/api/v1/email/accept/" + invitationToken;
             String declineLink = baseUrl + "/api/v1/email/decline/" + invitationToken;
 
-            emailService.sendInvitationEmail(to, recipientName, subject, conferenceName,
-                    role, trackName, acceptLink, declineLink, fileData, fileName);
+            var conference = conferenceRepository.findById(conferenceId).orElse(null);
+            emailService.sendInvitationEmail(to, recipientName, subject, conference,
+                    conferenceName, role, trackName, acceptLink, declineLink, fileData, fileName);
             return ResponseEntity.ok("Invitation email sent successfully to: " + to);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Send email unsuccessfully. Internal mail server error: " + e.getMessage());

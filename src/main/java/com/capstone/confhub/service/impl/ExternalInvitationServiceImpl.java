@@ -124,6 +124,7 @@ public class ExternalInvitationServiceImpl implements ExternalInvitationService 
                     request.getEmail(),
                     request.getRecipientName(),
                     "Invitation to " + conference.getName() + " as " + roleLabel + trackLabel,
+                    conference,
                     conference.getName(),
                     roleLabel,
                     request.getTrackName(),

@@ -20,6 +20,7 @@ import com.capstone.confhub.repository.ReviewRepository;
 import com.capstone.confhub.repository.SubjectAreaRepository;
 import com.capstone.confhub.repository.TrackReviewSettingRepository;
 import com.capstone.confhub.service.ConferenceActivityService;
+import com.capstone.confhub.service.EmailService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,7 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     private final ActivityAuditLogRepository auditLogRepository;
     private final ActivityNotificationSender notificationSender;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
+    private final EmailService emailService;
 
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -271,6 +273,20 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
             auditLogRepository.saveAll(auditLogs);
             // Send notifications async via separate bean (avoids @Async self-call issue)
             notificationSender.sendNotifications(conference, auditLogs);
+        }
+
+        if (enablingType != null) {
+            final ActivityType enabledType = enablingType;
+            ConferenceActivity enabledActivity = savedActivities.stream()
+                    .filter(a -> a.getActivityType() == enabledType)
+                    .findFirst()
+                    .orElse(null);
+            emailService.sendTimelinePhaseChangeEmails(
+                    conference,
+                    enabledType,
+                    formatActivityName(enabledType),
+                    enabledActivity != null ? enabledActivity.getDeadline() : null
+            );
         }
 
         return savedActivities.stream()

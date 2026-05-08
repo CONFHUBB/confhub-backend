@@ -127,7 +127,7 @@ public class PaperController {
         var conference = conferenceRepository.findById(conferenceId)
                 .orElseThrow(() -> new BadRequestException("Conference not found: " + conferenceId));
         List<Paper> papers = paperRepository.findByTrack_Conference_Id(conferenceId);
-        emailService.sendBatchDecisionNotifications(papers, conference.getName());
+        emailService.sendBatchDecisionNotifications(papers, conference);
         return ResponseEntity.ok("Batch notification queued for " + papers.size() + " papers.");
     }
 

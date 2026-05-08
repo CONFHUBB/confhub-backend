@@ -3,11 +3,16 @@ package com.capstone.confhub.service;
 import com.capstone.confhub.dto.request.BulkEmailRequestDTO;
 import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.ConferenceUserTrack;
+import com.capstone.confhub.entity.EmailHistory;
 import com.capstone.confhub.entity.User;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
+import com.capstone.confhub.repository.EmailHistoryRepository;
 import com.capstone.confhub.repository.PaperAuthorRepository;
+import com.capstone.confhub.utils.enums.ActivityType;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
+import com.capstone.confhub.utils.enums.EmailSentStatus;
+import com.capstone.confhub.utils.enums.EmailType;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -19,11 +24,17 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.util.List;
 import java.util.Objects;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +50,17 @@ public class EmailService {
     private final ConferenceRepository conferenceRepository;
 
     private final PaperAuthorRepository paperAuthorRepository;
+
+    private final EmailHistoryRepository emailHistoryRepository;
+
+    private static final Set<ConferenceTrackRole> PHASE_CHANGE_RECIPIENT_ROLES = Set.of(
+            ConferenceTrackRole.AUTHOR,
+            ConferenceTrackRole.REVIEWER,
+            ConferenceTrackRole.CONFERENCE_CHAIR,
+            ConferenceTrackRole.PROGRAM_CHAIR
+    );
+
+    private static final DateTimeFormatter MAIL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -58,10 +80,48 @@ public class EmailService {
         }
     }
 
+    private void sendHtmlMessage(String to, String subject, String htmlBody) throws MessagingException {
+        MimeMessage message = emailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(fromEmail);
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(htmlBody, true);
+        emailSender.send(message);
+    }
+
+    private void recordEmailHistory(Conference conference, String to, String subject, String body,
+                                    EmailType emailType, EmailSentStatus status, String errorMessage) {
+        try {
+            EmailHistory history = EmailHistory.builder()
+                    .fromEmail(fromEmail)
+                    .toEmail(to)
+                    .subject(subject)
+                    .body(body)
+                    .emailType(emailType)
+                    .status(status)
+                    .errorMessage(errorMessage)
+                    .conference(conference)
+                    .sentAt(status == EmailSentStatus.SENT ? LocalDateTime.now() : null)
+                    .build();
+            emailHistoryRepository.save(history);
+        } catch (Exception e) {
+            log.warn("[EmailHistory] Could not record email history for {}: {}", to, e.getMessage());
+        }
+    }
+
     @Async
     public void sendInvitationEmail(String to, String recipientName, String subject, String conferenceName,
                                     String role, String trackName, String acceptLink, String declineLink,
                                     ByteArrayResource fileData, String fileName) throws MessagingException {
+        sendInvitationEmail(to, recipientName, subject, null, conferenceName, role, trackName,
+                acceptLink, declineLink, fileData, fileName);
+    }
+
+    @Async
+    public void sendInvitationEmail(String to, String recipientName, String subject, Conference conference,
+                                    String conferenceName, String role, String trackName, String acceptLink,
+                                    String declineLink, ByteArrayResource fileData, String fileName) throws MessagingException {
         MimeMessage message = emailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -84,11 +144,18 @@ public class EmailService {
             helper.addAttachment(Objects.requireNonNull(fileName), fileData);
         }
 
-        emailSender.send(message);
-        log.info("Invitation email sent to {} for conference {}", to, conferenceName);
+        try {
+            emailSender.send(message);
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.INVITATION, EmailSentStatus.SENT, null);
+            log.info("Invitation email sent to {} for conference {}", to, conferenceName);
+        } catch (Exception e) {
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.INVITATION, EmailSentStatus.ERROR, e.getMessage());
+            throw e;
+        }
     }
 
     @Async
+    @Transactional
     public void sendBulkEmail(BulkEmailRequestDTO request) {
         Conference conference = conferenceRepository.findById(request.getConferenceId())
                 .orElseThrow(() -> new RuntimeException("Conference not found with id " + request.getConferenceId()));
@@ -109,9 +176,13 @@ public class EmailService {
                 String resolvedSubject = resolvePlaceholders(request.getSubject(), conference, user);
 
                 sendSimpleMessage(user.getEmail(), resolvedSubject, resolvedBody);
+                recordEmailHistory(conference, user.getEmail(), resolvedSubject, resolvedBody,
+                        EmailType.BULK, EmailSentStatus.SENT, null);
                 sentCount++;
             } catch (Exception e) {
                 log.error("Failed to send bulk email to {}: {}", user.getEmail(), e.getMessage());
+                recordEmailHistory(conference, user.getEmail(), request.getSubject(), request.getBody(),
+                        EmailType.BULK, EmailSentStatus.ERROR, e.getMessage());
             }
         }
         log.info("Bulk email sent to {}/{} recipients for conference {}", sentCount, recipients.size(), conference.getName());
@@ -119,14 +190,9 @@ public class EmailService {
 
     @Async
     public void sendSubmissionConfirmationEmail(String to, String authorName, String paperTitle,
-                                                 String conferenceName, Integer paperId) throws MessagingException {
-        MimeMessage message = emailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-        helper.setFrom(fromEmail);
-        helper.setTo(to);
-        helper.setSubject("Submission Confirmation - " + conferenceName);
-
+                                                 Conference conference, Integer paperId) {
+        String conferenceName = conference != null ? conference.getName() : "";
+        String subject = "Submission Confirmation - " + conferenceName;
         Context context = new Context();
         context.setVariable("authorName", authorName);
         context.setVariable("paperTitle", paperTitle);
@@ -134,10 +200,70 @@ public class EmailService {
         context.setVariable("paperId", paperId);
 
         String htmlBody = templateEngine.process("submission-confirmation", context);
-        helper.setText(htmlBody, true);
+        try {
+            sendHtmlMessage(to, subject, htmlBody);
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
+            log.info("Submission confirmation email sent to {} for paper '{}' in {}", to, paperTitle, conferenceName);
+        } catch (Exception e) {
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
+            log.error("Submission confirmation email failed to {} for paper '{}' in {}: {}",
+                    to, paperTitle, conferenceName, e.getMessage());
+        }
+    }
 
-        emailSender.send(message);
-        log.info("Submission confirmation email sent to {} for paper '{}' in {}", to, paperTitle, conferenceName);
+    @Async
+    @Transactional
+    public void sendTimelinePhaseChangeEmails(Conference conference, ActivityType phaseType, String phaseName,
+                                              LocalDateTime deadline) {
+        if (conference == null || conference.getId() == null) {
+            return;
+        }
+
+        List<ConferenceUserTrack> roles = conferenceUserTrackRepository.findByConference_Id(conference.getId());
+        Map<String, User> recipientsByEmail = new LinkedHashMap<>();
+        for (ConferenceUserTrack cut : roles) {
+            if (cut.getAssignedRole() == null || !PHASE_CHANGE_RECIPIENT_ROLES.contains(cut.getAssignedRole())) {
+                continue;
+            }
+            User user = cut.getUser();
+            if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+                continue;
+            }
+            recipientsByEmail.putIfAbsent(user.getEmail().toLowerCase(), user);
+        }
+
+        String subject = "[" + conference.getName() + "] Activity timeline moved to " + phaseName;
+        String formattedDeadline = deadline != null ? deadline.format(MAIL_DATE_FORMAT) : "No deadline set";
+
+        int sentCount = 0;
+        for (User user : recipientsByEmail.values()) {
+            String recipientName = ((user.getFirstName() != null ? user.getFirstName() : "") + " " +
+                    (user.getLastName() != null ? user.getLastName() : "")).trim();
+            if (recipientName.isBlank()) {
+                recipientName = user.getEmail();
+            }
+
+            Context context = new Context();
+            context.setVariable("recipientName", recipientName);
+            context.setVariable("conferenceName", conference.getName());
+            context.setVariable("phaseName", phaseName);
+            context.setVariable("phaseType", phaseType.name());
+            context.setVariable("deadline", formattedDeadline);
+            context.setVariable("conferenceId", conference.getId());
+
+            String htmlBody = templateEngine.process("timeline-phase-change", context);
+            try {
+                sendHtmlMessage(user.getEmail(), subject, htmlBody);
+                recordEmailHistory(conference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
+                sentCount++;
+            } catch (Exception e) {
+                recordEmailHistory(conference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
+                log.error("Timeline phase email failed to {} for conference {}: {}",
+                        user.getEmail(), conference.getId(), e.getMessage());
+            }
+        }
+        log.info("Timeline phase change emails sent to {}/{} recipients for conference {}",
+                sentCount, recipientsByEmail.size(), conference.getName());
     }
 
     private String resolvePlaceholders(String template, Conference conference, User recipient) {
@@ -159,7 +285,9 @@ public class EmailService {
      * Called from ConferenceController after chair finalises decisions.
      */
     @Async
-    public void sendBatchDecisionNotifications(List<com.capstone.confhub.entity.Paper> papers, String conferenceName) {
+    @Transactional
+    public void sendBatchDecisionNotifications(List<com.capstone.confhub.entity.Paper> papers, Conference conference) {
+        String conferenceName = conference != null ? conference.getName() : "Conference";
         int sent = 0;
         for (com.capstone.confhub.entity.Paper paper : papers) {
             String statusLabel = switch (paper.getStatus()) {
@@ -187,8 +315,10 @@ public class EmailService {
                     if (email == null || email.isBlank()) continue;
                     try {
                         sendSimpleMessage(email, subject, body);
+                        recordEmailHistory(conference, email, subject, body, EmailType.SYSTEM, EmailSentStatus.SENT, null);
                         sent++;
                     } catch (Exception ex) {
+                        recordEmailHistory(conference, email, subject, body, EmailType.SYSTEM, EmailSentStatus.ERROR, ex.getMessage());
                         log.error("[BatchDecisionNotify] Could not send to {}: {}", email, ex.getMessage());
                     }
                 }

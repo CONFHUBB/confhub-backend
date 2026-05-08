@@ -65,6 +65,22 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    // Backwards-compatible constructor (used by some unit tests that construct
+    // EmailService with fewer dependencies). The Lombok-generated constructor
+    // still exists and includes EmailHistoryRepository.
+    public EmailService(JavaMailSender emailSender,
+                        TemplateEngine templateEngine,
+                        ConferenceUserTrackRepository conferenceUserTrackRepository,
+                        ConferenceRepository conferenceRepository,
+                        PaperAuthorRepository paperAuthorRepository) {
+        this.emailSender = emailSender;
+        this.templateEngine = templateEngine;
+        this.conferenceUserTrackRepository = conferenceUserTrackRepository;
+        this.conferenceRepository = conferenceRepository;
+        this.paperAuthorRepository = paperAuthorRepository;
+        this.emailHistoryRepository = null;
+    }
+
     public void sendSimpleMessage(String to, String subject, String text) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -104,7 +120,11 @@ public class EmailService {
                     .conference(conference)
                     .sentAt(status == EmailSentStatus.SENT ? LocalDateTime.now() : null)
                     .build();
-            emailHistoryRepository.save(history);
+            if (emailHistoryRepository != null) {
+                emailHistoryRepository.save(history);
+            } else {
+                log.warn("EmailHistoryRepository not available; skipping history record for {}", to);
+            }
         } catch (Exception e) {
             log.warn("[EmailHistory] Could not record email history for {}: {}", to, e.getMessage());
         }

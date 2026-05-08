@@ -324,13 +324,9 @@ public class ConferenceServiceImpl implements ConferenceService {
     public void updateProgramSchedule(Integer conferenceId, String programScheduleJson) {
         requireChairOrProgramChairOf(conferenceId);
 
-        Conference conf = repository.findById(conferenceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
-
-        final boolean wasPublished = isProgramPublished(conf.getProgramSchedule());
         final ProgramDateRange dateRange = extractProgramDateRange(programScheduleJson);
 
-        // Parse and validate schedule for overlaps
+        // Parse and validate schedule for overlaps (validate JSON before fetching conference)
         if (programScheduleJson != null && !programScheduleJson.isBlank()) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
@@ -374,6 +370,11 @@ public class ConferenceServiceImpl implements ConferenceService {
                 throw new BadRequestException("Invalid program schedule JSON format.");
             }
         }
+
+        Conference conf = repository.findById(conferenceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Conference not found with id " + conferenceId));
+
+        final boolean wasPublished = isProgramPublished(conf.getProgramSchedule());
 
         conf.setProgramSchedule(programScheduleJson);
 

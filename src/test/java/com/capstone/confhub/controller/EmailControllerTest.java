@@ -1,6 +1,7 @@
 package com.capstone.confhub.controller;
 
 import com.capstone.confhub.dto.EmailDTO;
+import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.service.ExternalInvitationService;
 import com.capstone.confhub.service.ConferenceUserTrackService;
@@ -15,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
 class EmailControllerTest {
@@ -31,11 +34,14 @@ class EmailControllerTest {
     @Mock
     private ConferenceUserTrackRepository conferenceUserTrackRepository;
 
+    @Mock
+    private ConferenceRepository conferenceRepository;
+
     private EmailController emailController;
 
     @BeforeEach
     void setUp() {
-        emailController = new EmailController(emailService, externalInvitationService, conferenceUserTrackService, conferenceUserTrackRepository);
+        emailController = new EmailController(emailService, externalInvitationService, conferenceUserTrackService, conferenceUserTrackRepository, conferenceRepository);
     }
 
     @Test
@@ -58,6 +64,7 @@ class EmailControllerTest {
 
     @Test
     void sendInvitationEmailShouldReturnOk() {
+        when(conferenceRepository.findById(1)).thenReturn(Optional.empty());
         var result = emailController.sendInvitationEmail(
                 "user@example.com", "User", "Subject", "Conference",
                 1, "REVIEWER", "AI Track", "test-token-123", null);

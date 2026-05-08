@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Activity Timeline Phase Change</title>
+</head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0;">
+<div style="max-width: 620px; margin: 30px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="background-color: #4f46e5; padding: 24px 32px;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Conference Phase Updated</h2>
+    </div>
+
+    <div style="padding: 32px;">
+        <p style="color: #333333; font-size: 16px; margin-top: 0;">
+            Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,
+        </p>
+
+        <p style="color: #555555; font-size: 15px; line-height: 1.6;">
+            The activity timeline for
+            <strong th:text="${conferenceName}">[Conference Name]</strong>
+            has moved to a new phase.
+        </p>
+
+        <div style="background-color: #eef2ff; border-left: 4px solid #4f46e5; padding: 16px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 8px 0; color: #555555; font-size: 14px;">
+                <strong>Current Phase:</strong> <span th:text="${phaseName}">[Phase Name]</span>
+            </p>
+            <p style="margin: 0 0 8px 0; color: #555555; font-size: 14px;">
+                <strong>Phase Code:</strong> <span th:text="${phaseType}">[PHASE_CODE]</span>
+            </p>
+            <p style="margin: 0; color: #555555; font-size: 14px;">
+                <strong>Deadline:</strong> <span th:text="${deadline}">[Deadline]</span>
+            </p>
+        </div>
+
+        <p style="color: #555555; font-size: 15px; line-height: 1.6;">
+            Please sign in to review the tasks and actions now available for your conference role.
+        </p>
+
+        <p style="color: #999999; font-size: 13px; margin-top: 28px; border-top: 1px solid #eeeeee; padding-top: 16px;">
+            This automated notification is sent only to Authors, Reviewers, Conference Chairs, and Program Chairs participating in this conference.
+        </p>
+    </div>
+
+    <div style="background-color: #f8f9fa; padding: 16px 32px; text-align: center;">
+        <p style="color: #999999; font-size: 12px; margin: 0;">
+            Conference Management System (CONFHUB)
+        </p>
+    </div>
+</div>
+</body>
+</html>

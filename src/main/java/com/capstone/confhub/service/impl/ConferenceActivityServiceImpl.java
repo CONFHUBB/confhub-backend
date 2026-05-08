@@ -50,7 +50,8 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
     private final ActivityAuditLogRepository auditLogRepository;
     private final ActivityNotificationSender notificationSender;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
-    private final EmailService emailService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailService emailService;
 
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -281,12 +282,16 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                     .filter(a -> a.getActivityType() == enabledType)
                     .findFirst()
                     .orElse(null);
-            emailService.sendTimelinePhaseChangeEmails(
-                    conference,
-                    enabledType,
-                    formatActivityName(enabledType),
-                    enabledActivity != null ? enabledActivity.getDeadline() : null
-            );
+            if (emailService != null) {
+                emailService.sendTimelinePhaseChangeEmails(
+                        conference,
+                        enabledType,
+                        formatActivityName(enabledType),
+                        enabledActivity != null ? enabledActivity.getDeadline() : null
+                );
+            } else {
+                log.debug("EmailService not available; skipping timeline phase change emails for conference {}", conference.getId());
+            }
         }
 
         return savedActivities.stream()

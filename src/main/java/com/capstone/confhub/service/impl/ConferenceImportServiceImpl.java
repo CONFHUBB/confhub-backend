@@ -54,7 +54,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private final UserProfileRepository userProfileRepository;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
-    private final UnavailableDayRepository unavailableDayRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UnavailableDayRepository unavailableDayRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -434,10 +436,10 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
             // Check if user is currently unavailable
             LocalDate today = LocalDate.now();
-            boolean isUnavailable = unavailableDayRepository
+                boolean isUnavailable = unavailableDayRepository != null && unavailableDayRepository
                     .existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(user.getId(), today, today);
-            if (isUnavailable) {
-                List<UnavailableDay> activeDays = unavailableDayRepository.findByUser_IdOrderByStartDateDesc(user.getId());
+                if (isUnavailable) {
+                List<UnavailableDay> activeDays = unavailableDayRepository != null ? unavailableDayRepository.findByUser_IdOrderByStartDateDesc(user.getId()) : List.of();
                 String untilDate = activeDays.stream()
                         .filter(d -> !d.getStartDate().isAfter(today) && !d.getEndDate().isBefore(today))
                         .map(d -> d.getEndDate().toString())
@@ -778,11 +780,10 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             String fullName = (user.getFirstName() != null ? user.getFirstName() : "") + " "
                     + (user.getLastName() != null ? user.getLastName() : "");
 
-            emailService.sendInvitationEmail(
+                emailService.sendInvitationEmail(
                     user.getEmail(),
                     fullName.trim(),
                     "Invitation to " + conference.getName() + " as " + roleName + trackLabel,
-                    conference,
                     conference.getName(),
                     roleName,
                     trackName,

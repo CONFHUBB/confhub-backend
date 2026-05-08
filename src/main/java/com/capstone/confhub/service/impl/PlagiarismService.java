@@ -630,14 +630,14 @@ public class PlagiarismService {
      * Parse Gemini's web search response into structured WebSearchResult.
      */
     private WebSearchResult parseWebSearchResponse(String aiReply) {
-        try {
-            // Detect non-JSON responses (e.g. "I'm sorry, I couldn't generate a response")
-            String trimmed = aiReply.trim();
-            if (!trimmed.contains("{")) {
-                throw new RuntimeException(
-                        "AI returned non-JSON: " + trimmed.substring(0, Math.min(100, trimmed.length())));
-            }
+        // Detect non-JSON responses (e.g. "I'm sorry, I couldn't generate a response")
+        String trimmed = aiReply == null ? "" : aiReply.trim();
+        if (!trimmed.contains("{")) {
+            throw new RuntimeException(
+                    "AI returned non-JSON: " + trimmed.substring(0, Math.min(100, trimmed.length())));
+        }
 
+        try {
             String json = extractJsonFromReply(aiReply);
 
             // Sanitize: replace unescaped newlines/tabs inside JSON string values

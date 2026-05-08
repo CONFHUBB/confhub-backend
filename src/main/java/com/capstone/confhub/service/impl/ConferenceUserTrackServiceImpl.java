@@ -54,7 +54,8 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
     private final ReviewRepository reviewRepository;
     private final NotificationRepository notificationRepository;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
-    private final UnavailableDayRepository unavailableDayRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UnavailableDayRepository unavailableDayRepository;
     private final EmailService emailService;
 
     @Value("${app.base-url}")
@@ -191,11 +192,11 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
 
         // BR: Block invitation if user is currently unavailable
         java.time.LocalDate today = java.time.LocalDate.now();
-        if (unavailableDayRepository.existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+        if (unavailableDayRepository != null && unavailableDayRepository.existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
                 request.getUserId(), today, today)) {
             // Find the current unavailable range to show end date in message
             java.util.List<com.capstone.confhub.entity.UnavailableDay> ranges =
-                unavailableDayRepository.findByUser_IdOrderByStartDateDesc(request.getUserId());
+                unavailableDayRepository != null ? unavailableDayRepository.findByUser_IdOrderByStartDateDesc(request.getUserId()) : java.util.List.of();
             String until = ranges.stream()
                 .filter(r -> !today.isBefore(r.getStartDate()) && !today.isAfter(r.getEndDate()))
                 .map(r -> r.getEndDate().toString())
@@ -242,7 +243,6 @@ public class ConferenceUserTrackServiceImpl implements ConferenceUserTrackServic
                 user.getEmail(),
                 fullName.trim(),
                 "Invitation to " + conference.getName() + " as " + roleName + trackLabel,
-                conference,
                 conference.getName(),
                 roleName,
                 trackName,

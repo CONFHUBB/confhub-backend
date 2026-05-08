@@ -16,6 +16,7 @@ import com.capstone.confhub.utils.enums.EmailType;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.SimpleMailMessage;
@@ -63,23 +64,8 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    // Backwards-compatible constructor (used by some unit tests that construct
-    // EmailService with fewer dependencies). The Lombok-generated constructor
-    // still exists and includes EmailHistoryRepository.
-    public EmailService(JavaMailSender emailSender,
-                        TemplateEngine templateEngine,
-                        ConferenceUserTrackRepository conferenceUserTrackRepository,
-                        ConferenceRepository conferenceRepository,
-                        PaperAuthorRepository paperAuthorRepository) {
-        this.emailSender = emailSender;
-        this.templateEngine = templateEngine;
-        this.conferenceUserTrackRepository = conferenceUserTrackRepository;
-        this.conferenceRepository = conferenceRepository;
-        this.paperAuthorRepository = paperAuthorRepository;
-        this.emailHistoryRepository = null;
-    }
-
     // Full constructor with all dependencies for Spring to use
+    @Autowired
     public EmailService(JavaMailSender emailSender,
                         TemplateEngine templateEngine,
                         ConferenceUserTrackRepository conferenceUserTrackRepository,

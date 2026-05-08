@@ -15,7 +15,6 @@ import com.capstone.confhub.utils.enums.EmailSentStatus;
 import com.capstone.confhub.utils.enums.EmailType;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -37,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
@@ -79,6 +77,21 @@ public class EmailService {
         this.conferenceRepository = conferenceRepository;
         this.paperAuthorRepository = paperAuthorRepository;
         this.emailHistoryRepository = null;
+    }
+
+    // Full constructor with all dependencies for Spring to use
+    public EmailService(JavaMailSender emailSender,
+                        TemplateEngine templateEngine,
+                        ConferenceUserTrackRepository conferenceUserTrackRepository,
+                        ConferenceRepository conferenceRepository,
+                        PaperAuthorRepository paperAuthorRepository,
+                        EmailHistoryRepository emailHistoryRepository) {
+        this.emailSender = emailSender;
+        this.templateEngine = templateEngine;
+        this.conferenceUserTrackRepository = conferenceUserTrackRepository;
+        this.conferenceRepository = conferenceRepository;
+        this.paperAuthorRepository = paperAuthorRepository;
+        this.emailHistoryRepository = emailHistoryRepository;
     }
 
     public void sendSimpleMessage(String to, String subject, String text) {

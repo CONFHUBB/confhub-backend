@@ -219,6 +219,14 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<TopReviewerResponseDTO> getTopReviewers(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 20));
+        Pageable pageable = PageRequest.of(0, safeLimit);
+        return reviewRepository.findTopReviewers(pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ReviewVersionResponseDTO> getReviewVersions(Integer reviewId) {
         List<ReviewVersion> versions = reviewVersionRepository.findByReview_IdOrderByVersionNumberAsc(reviewId);
         return versions.stream().map(version -> {

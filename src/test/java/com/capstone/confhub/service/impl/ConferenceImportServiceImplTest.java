@@ -482,7 +482,7 @@ class ConferenceImportServiceImplTest {
 
         assertTrue(result.isSuccess());
         assertEquals(1, result.getMembersCreated());
-        verify(emailService).sendInvitationEmail(eq("reviewer@test.com"), any(), any(), any(), eq("Reviewer"), eq("Machine Learning"), any(), any(), any(), any());
+        verify(emailService).sendInvitationEmail(eq("reviewer@test.com"), any(), any(), any(), any(), eq("Reviewer"), eq("Machine Learning"), any(), any(), any(), any());
         verify(notificationRepository).save(any(Notification.class));
     }
 
@@ -522,7 +522,7 @@ class ConferenceImportServiceImplTest {
         verify(userRoleRepository).save(any(UserRole.class));
         verify(userProfileRepository).save(any(UserProfile.class));
         verify(notificationRepository, never()).save(any(Notification.class));
-        verify(emailService).sendInvitationEmail(eq("new-reviewer@test.com"), any(), any(), any(), eq("Reviewer"), eq("Machine Learning"), any(), any(), any(), any());
+        verify(emailService).sendInvitationEmail(eq("new-reviewer@test.com"), any(), any(), any(), any(), eq("Reviewer"), eq("Machine Learning"), any(), any(), any(), any());
     }
 
     @Test
@@ -782,7 +782,7 @@ class ConferenceImportServiceImplTest {
         assertTrue(result.isSuccess());
         assertEquals(1, result.getMembersCreated());
         verify(conferenceTrackRepository, never()).findByConferenceAndName(any(), any());
-        verify(emailService).sendInvitationEmail(eq("chair3@test.com"), any(), any(), any(), eq("Conference Chair"), isNull(), any(), any(), any(), any());
+        verify(emailService).sendInvitationEmail(eq("chair3@test.com"), any(), any(), any(), any(), eq("Conference Chair"), isNull(), any(), any(), any(), any());
     }
 
     private void setAuth(Integer userId) {

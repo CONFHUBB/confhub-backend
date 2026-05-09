@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.time.LocalDateTime;
@@ -53,6 +54,8 @@ public class EmailService {
     private final PaperAuthorRepository paperAuthorRepository;
 
     private final EmailHistoryRepository emailHistoryRepository;
+
+    private final com.capstone.confhub.repository.TicketRepository ticketRepository;
 
     private static final Set<ConferenceTrackRole> PHASE_CHANGE_RECIPIENT_ROLES = Set.of(
             ConferenceTrackRole.AUTHOR,
@@ -89,13 +92,15 @@ public class EmailService {
                         ConferenceUserTrackRepository conferenceUserTrackRepository,
                         ConferenceRepository conferenceRepository,
                         PaperAuthorRepository paperAuthorRepository,
-                        EmailHistoryRepository emailHistoryRepository) {
+                        EmailHistoryRepository emailHistoryRepository,
+                        com.capstone.confhub.repository.TicketRepository ticketRepository) {
         this.emailSender = emailSender;
         this.templateEngine = templateEngine;
         this.conferenceUserTrackRepository = conferenceUserTrackRepository;
         this.conferenceRepository = conferenceRepository;
         this.paperAuthorRepository = paperAuthorRepository;
         this.emailHistoryRepository = emailHistoryRepository;
+        this.ticketRepository = ticketRepository;
     }
 
     public void sendSimpleMessage(String to, String subject, String text) {
@@ -419,5 +424,113 @@ public class EmailService {
             }
         }
         log.info("[BatchDecisionNotify] Batch complete — processed {}/{} papers for {}", sent, papers.size(), conferenceName);
+    }
+
+    @Async
+    @Transactional(readOnly = true)
+    public void sendEventDayProgramEmails(Conference conference, LocalDateTime deadline) {
+        if (conference == null || conference.getId() == null) {
+            return;
+        }
+
+        Conference managedConference = conferenceRepository.findById(conference.getId()).orElse(null);
+        if (managedConference == null) {
+            return;
+        }
+
+        Map<String, User> recipientsByEmail = new LinkedHashMap<>();
+
+        List<ConferenceUserTrack> roles = conferenceUserTrackRepository.findByConference_Id(conference.getId());
+        for (ConferenceUserTrack cut : roles) {
+            if (cut.getAssignedRole() == null || !PHASE_CHANGE_RECIPIENT_ROLES.contains(cut.getAssignedRole())) {
+                continue;
+            }
+            User user = cut.getUser();
+            if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+                continue;
+            }
+            recipientsByEmail.putIfAbsent(user.getEmail().toLowerCase(), user);
+        }
+
+        List<com.capstone.confhub.entity.Ticket> tickets = ticketRepository.findByConference_IdAndPaymentStatus(
+                conference.getId(), com.capstone.confhub.utils.enums.PaymentStatus.COMPLETED);
+        for (com.capstone.confhub.entity.Ticket ticket : tickets) {
+            User user = ticket.getUser();
+            if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+                continue;
+            }
+            recipientsByEmail.putIfAbsent(user.getEmail().toLowerCase(), user);
+        }
+
+        String subject = "[" + managedConference.getName() + "] Event Day Program";
+        String formattedDeadline = deadline != null ? deadline.format(MAIL_DATE_FORMAT) : "To be announced";
+
+        String programScheduleJson = managedConference.getProgramSchedule();
+        boolean hasProgramSchedule = programScheduleJson != null && !programScheduleJson.isBlank();
+        List<Map<String, Object>> programDays = new ArrayList<>();
+
+        if (hasProgramSchedule) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(programScheduleJson);
+                com.fasterxml.jackson.databind.JsonNode days = root.path("schedule").path("days");
+
+                if (days.isArray()) {
+                    for (com.fasterxml.jackson.databind.JsonNode dayNode : days) {
+                        Map<String, Object> day = new LinkedHashMap<>();
+                        day.put("date", dayNode.path("date").asText(""));
+
+                        List<Map<String, Object>> sessions = new ArrayList<>();
+                        com.fasterxml.jackson.databind.JsonNode sessionsNode = dayNode.path("sessions");
+                        if (sessionsNode.isArray()) {
+                            for (com.fasterxml.jackson.databind.JsonNode sessionNode : sessionsNode) {
+                                Map<String, Object> session = new LinkedHashMap<>();
+                                session.put("title", sessionNode.path("title").asText(""));
+                                session.put("startTime", sessionNode.path("startTime").asText(null));
+                                session.put("endTime", sessionNode.path("endTime").asText(null));
+                                session.put("location", sessionNode.path("location").asText(null));
+                                sessions.add(session);
+                            }
+                        }
+                        day.put("sessions", sessions);
+                        programDays.add(day);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse program schedule JSON for conference {}: {}",
+                        managedConference.getId(), e.getMessage());
+                hasProgramSchedule = false;
+            }
+        }
+
+        int sentCount = 0;
+        for (User user : recipientsByEmail.values()) {
+            String recipientName = ((user.getFirstName() != null ? user.getFirstName() : "") + " " +
+                    (user.getLastName() != null ? user.getLastName() : "")).trim();
+            if (recipientName.isBlank()) {
+                recipientName = user.getEmail();
+            }
+
+            Context context = new Context();
+            context.setVariable("recipientName", recipientName);
+            context.setVariable("conferenceName", managedConference.getName());
+            context.setVariable("deadline", formattedDeadline);
+            context.setVariable("conferenceId", managedConference.getId());
+            context.setVariable("hasProgramSchedule", hasProgramSchedule);
+            context.setVariable("programDays", programDays);
+
+            String htmlBody = templateEngine.process("event-day-program", context);
+            try {
+                sendHtmlMessage(user.getEmail(), subject, htmlBody);
+                recordEmailHistory(managedConference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
+                sentCount++;
+            } catch (Exception e) {
+                recordEmailHistory(managedConference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
+                log.error("Event Day program email failed to {} for conference {}: {}",
+                        user.getEmail(), managedConference.getId(), e.getMessage());
+            }
+        }
+        log.info("Event Day program emails sent to {}/{} recipients (members + attendees) for conference {}",
+                sentCount, recipientsByEmail.size(), managedConference.getName());
     }
 }

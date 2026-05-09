@@ -5,6 +5,7 @@ import com.capstone.confhub.entity.ActivityAuditLog;
 import com.capstone.confhub.entity.Conference;
 import com.capstone.confhub.entity.ConferenceUserTrack;
 import com.capstone.confhub.entity.User;
+import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.service.NotificationService;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 public class ActivityNotificationSender {
 
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
+    private final ConferenceRepository conferenceRepository;
     private final NotificationService notificationService;
     private final EmailService emailService;
 
@@ -56,7 +58,12 @@ public class ActivityNotificationSender {
     @Async
     @Transactional(readOnly = true)
     public void sendNotifications(Conference conference, List<ActivityAuditLog> auditLogs) {
+        // Re-fetch to get a managed entity in this thread's persistence context
+        Conference managedConference = conferenceRepository.findById(conference.getId()).orElse(null);
+        if (managedConference == null) return;
+
         try {
+
             List<ConferenceUserTrack> members = conferenceUserTrackRepository.findByConference_Id(conference.getId());
             Set<User> uniqueUsers = members.stream()
                     .map(ConferenceUserTrack::getUser)
@@ -79,7 +86,7 @@ public class ActivityNotificationSender {
                 switch (auditLog.getAction()) {
                     case "ENABLED" -> {
                         title = "📢 " + activityLabel + " is now open";
-                        message = "The " + activityLabel + " phase for \"" + conference.getName()
+                        message = "The " + activityLabel + " phase for \"" + managedConference.getName()
                                 + "\" is now active."
                                 + (auditLog.getNewValue() != null && !"none".equals(auditLog.getNewValue())
                                 ? " Please complete before the deadline." : "");
@@ -88,7 +95,7 @@ public class ActivityNotificationSender {
                         String oldDeadline = "none".equals(auditLog.getOldValue()) ? "not set" : auditLog.getOldValue();
                         String newDeadline = "none".equals(auditLog.getNewValue()) ? "removed" : auditLog.getNewValue();
                         title = "📅 Deadline updated: " + activityLabel;
-                        message = "The deadline for " + activityLabel + " in \"" + conference.getName()
+                        message = "The deadline for " + activityLabel + " in \"" + managedConference.getName()
                                 + "\" has changed from " + oldDeadline + " to " + newDeadline + ".";
                     }
                     default -> {
@@ -108,14 +115,14 @@ public class ActivityNotificationSender {
                                         m.getAssignedRole() == ConferenceTrackRole.REVIEWER);
 
                         if (isChair) {
-                            link = "/conference/" + conference.getId() + "/update?tab=features-activity-timeline";
+                            link = "/conference/" + managedConference.getId() + "/update?tab=features-activity-timeline";
                         } else if (isReviewer) {
-                            link = "/conference/" + conference.getId() + "/reviewer";
+                            link = "/conference/" + managedConference.getId() + "/reviewer";
                         }
 
                         NotificationDTO notifDTO = new NotificationDTO();
                         notifDTO.setUserId(user.getId());
-                        notifDTO.setConferenceId(conference.getId());
+                        notifDTO.setConferenceId(managedConference.getId());
                         notifDTO.setTitle(title);
                         notifDTO.setMessage(message);
                         notifDTO.setType("ACTIVITY_UPDATE");
@@ -124,7 +131,7 @@ public class ActivityNotificationSender {
 
                         if (("ENABLED".equals(auditLog.getAction()) || "DEADLINE_CHANGED".equals(auditLog.getAction()))
                                 && user.getEmail() != null && !user.getEmail().isEmpty()) {
-                            String emailSubject = "[" + conference.getName() + "] " + title;
+                            String emailSubject = "[" + managedConference.getName() + "] " + title;
                             emailService.sendSimpleMessage(user.getEmail(), emailSubject, message);
                         }
                     } catch (Exception e) {
@@ -134,7 +141,7 @@ public class ActivityNotificationSender {
             }
         } catch (Exception e) {
             log.error("Failed to send activity change notifications for conference {}: {}",
-                    conference.getId(), e.getMessage());
+                    managedConference.getId(), e.getMessage());
         }
     }
 }

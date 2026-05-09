@@ -25,6 +25,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
@@ -281,9 +282,16 @@ public class EmailService {
     }
 
     @Async
+    @Transactional(readOnly = true)
     public void sendTimelinePhaseChangeEmails(Conference conference, ActivityType phaseType, String phaseName,
                                               LocalDateTime deadline) {
         if (conference == null || conference.getId() == null) {
+            return;
+        }
+
+        // Re-fetch to get a managed entity in this thread's persistence context
+        Conference managedConference = conferenceRepository.findById(conference.getId()).orElse(null);
+        if (managedConference == null) {
             return;
         }
 
@@ -300,7 +308,7 @@ public class EmailService {
             recipientsByEmail.putIfAbsent(user.getEmail().toLowerCase(), user);
         }
 
-        String subject = "[" + conference.getName() + "] Activity timeline moved to " + phaseName;
+        String subject = "[" + managedConference.getName() + "] Activity timeline moved to " + phaseName;
         String formattedDeadline = deadline != null ? deadline.format(MAIL_DATE_FORMAT) : "No deadline set";
 
         int sentCount = 0;
@@ -313,25 +321,25 @@ public class EmailService {
 
             Context context = new Context();
             context.setVariable("recipientName", recipientName);
-            context.setVariable("conferenceName", conference.getName());
+            context.setVariable("conferenceName", managedConference.getName());
             context.setVariable("phaseName", phaseName);
             context.setVariable("phaseType", phaseType.name());
             context.setVariable("deadline", formattedDeadline);
-            context.setVariable("conferenceId", conference.getId());
+            context.setVariable("conferenceId", managedConference.getId());
 
             String htmlBody = templateEngine.process("timeline-phase-change", context);
             try {
                 sendHtmlMessage(user.getEmail(), subject, htmlBody);
-                recordEmailHistory(conference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
+                recordEmailHistory(managedConference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
                 sentCount++;
             } catch (Exception e) {
-                recordEmailHistory(conference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
+                recordEmailHistory(managedConference, user.getEmail(), subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
                 log.error("Timeline phase email failed to {} for conference {}: {}",
-                        user.getEmail(), conference.getId(), e.getMessage());
+                        user.getEmail(), managedConference.getId(), e.getMessage());
             }
         }
         log.info("Timeline phase change emails sent to {}/{} recipients for conference {}",
-                sentCount, recipientsByEmail.size(), conference.getName());
+                sentCount, recipientsByEmail.size(), managedConference.getName());
     }
 
     private String resolvePlaceholders(String template, Conference conference, User recipient) {

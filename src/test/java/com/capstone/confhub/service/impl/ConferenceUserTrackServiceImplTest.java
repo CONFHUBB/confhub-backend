@@ -285,7 +285,7 @@ public class ConferenceUserTrackServiceImplTest {
         assertNotNull(result);
         assertEquals(REVIEWER_ASSIGNMENT_ID, result.getId());
         assertEquals(ConferenceTrackRole.REVIEWER, result.getAssignedRole());
-        verify(emailService).sendInvitationEmail(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(emailService).sendInvitationEmail(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

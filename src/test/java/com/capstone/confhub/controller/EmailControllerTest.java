@@ -4,7 +4,6 @@ import com.capstone.confhub.dto.EmailDTO;
 import com.capstone.confhub.repository.ConferenceRepository;
 import com.capstone.confhub.repository.ConferenceUserTrackRepository;
 import com.capstone.confhub.service.ExternalInvitationService;
-import com.capstone.confhub.service.ConferenceUserTrackService;
 import com.capstone.confhub.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,9 +28,6 @@ class EmailControllerTest {
     private ExternalInvitationService externalInvitationService;
 
     @Mock
-    private ConferenceUserTrackService conferenceUserTrackService;
-
-    @Mock
     private ConferenceUserTrackRepository conferenceUserTrackRepository;
 
     @Mock
@@ -41,7 +37,7 @@ class EmailControllerTest {
 
     @BeforeEach
     void setUp() {
-        emailController = new EmailController(emailService, externalInvitationService, conferenceUserTrackService, conferenceUserTrackRepository, conferenceRepository);
+        emailController = new EmailController(emailService, externalInvitationService, conferenceUserTrackRepository, conferenceRepository);
     }
 
     @Test

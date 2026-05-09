@@ -13,6 +13,7 @@ import com.capstone.confhub.utils.enums.ActivityType;
 import com.capstone.confhub.utils.enums.ConferenceTrackRole;
 import com.capstone.confhub.utils.enums.EmailSentStatus;
 import com.capstone.confhub.utils.enums.EmailType;
+import com.capstone.confhub.utils.enums.PlagiarismStatus;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 
 @Service
@@ -88,9 +89,9 @@ public class EmailService {
             message.setSubject(subject);
             message.setText(text);
             emailSender.send(message);
-            log.info("[Email] ✅ Sent to={}, subject=\"{}\"", to, subject);
+            log.info("[Email] Sent to={}, subject=\"{}\"", to, subject);
         } catch (Exception e) {
-            log.error("[Email] ❌ Failed to={}, subject=\"{}\", error={}", to, subject, e.getMessage());
+            log.error("[Email] Failed to={}, subject=\"{}\", error={}", to, subject, e.getMessage());
             throw e;
         }
     }
@@ -174,7 +175,6 @@ public class EmailService {
     }
 
     @Async
-    @Transactional
     public void sendBulkEmail(BulkEmailRequestDTO request) {
         Conference conference = conferenceRepository.findById(request.getConferenceId())
                 .orElseThrow(() -> new RuntimeException("Conference not found with id " + request.getConferenceId()));
@@ -209,7 +209,7 @@ public class EmailService {
 
     @Async
     public void sendSubmissionConfirmationEmail(String to, String authorName, String paperTitle,
-                                                 Conference conference, Integer paperId) {
+                                                Conference conference, Integer paperId) {
         String conferenceName = conference != null ? conference.getName() : "";
         String subject = "Submission Confirmation - " + conferenceName;
         Context context = new Context();
@@ -231,7 +231,56 @@ public class EmailService {
     }
 
     @Async
-    @Transactional
+    public void sendManuscriptUploadConfirmationEmail(String to, String authorName, String paperTitle,
+                                                      Conference conference, Integer paperId,
+                                                      Double plagiarismScore, PlagiarismStatus plagiarismStatus) {
+        String conferenceName = conference != null ? conference.getName() : "";
+        String subject = "Manuscript Upload Confirmation - " + conferenceName;
+        String uploadedAt = LocalDateTime.now().format(MAIL_DATE_FORMAT);
+        String scoreLabel = plagiarismScore != null
+                ? String.format(Locale.US, "%.1f%%", plagiarismScore)
+                : "N/A";
+        String statusLabel = plagiarismStatus != null ? plagiarismStatus.name() : "PENDING";
+        String resultLabel = resolvePlagiarismResultLabel(plagiarismScore, plagiarismStatus);
+
+        Context context = new Context();
+        context.setVariable("authorName", authorName);
+        context.setVariable("paperTitle", paperTitle);
+        context.setVariable("conferenceName", conferenceName);
+        context.setVariable("paperId", paperId);
+        context.setVariable("uploadedAt", uploadedAt);
+        context.setVariable("plagiarismScore", scoreLabel);
+        context.setVariable("plagiarismStatus", statusLabel);
+        context.setVariable("plagiarismResult", resultLabel);
+
+        String htmlBody = templateEngine.process("manuscript-upload-confirmation", context);
+        try {
+            sendHtmlMessage(to, subject, htmlBody);
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.SENT, null);
+            log.info("Manuscript upload confirmation email sent to {} for paper '{}' in {}",
+                    to, paperTitle, conferenceName);
+        } catch (Exception e) {
+            recordEmailHistory(conference, to, subject, htmlBody, EmailType.SYSTEM, EmailSentStatus.ERROR, e.getMessage());
+            log.error("Manuscript upload confirmation email failed to {} for paper '{}' in {}: {}",
+                    to, paperTitle, conferenceName, e.getMessage());
+        }
+    }
+
+    private String resolvePlagiarismResultLabel(Double plagiarismScore, PlagiarismStatus plagiarismStatus) {
+        if (plagiarismStatus == null || plagiarismStatus == PlagiarismStatus.CHECKING
+                || plagiarismStatus == PlagiarismStatus.PENDING) {
+            return "PENDING";
+        }
+        if (plagiarismStatus == PlagiarismStatus.FAILED) {
+            return "FAILED";
+        }
+        if (plagiarismScore == null) {
+            return "PENDING";
+        }
+        return plagiarismScore <= 50.0 ? "PASS" : "REVIEW";
+    }
+
+    @Async
     public void sendTimelinePhaseChangeEmails(Conference conference, ActivityType phaseType, String phaseName,
                                               LocalDateTime deadline) {
         if (conference == null || conference.getId() == null) {
@@ -304,15 +353,14 @@ public class EmailService {
      * Called from ConferenceController after chair finalises decisions.
      */
     @Async
-    @Transactional
     public void sendBatchDecisionNotifications(List<com.capstone.confhub.entity.Paper> papers, Conference conference) {
         String conferenceName = conference != null ? conference.getName() : "Conference";
         int sent = 0;
         for (com.capstone.confhub.entity.Paper paper : papers) {
             String statusLabel = switch (paper.getStatus()) {
-                case ACCEPTED  -> "✅ Accepted";
-                case REJECTED  -> "❌ Rejected";
-                default        -> null;
+                case ACCEPTED -> " Accepted";
+                case REJECTED -> " Rejected";
+                default -> null;
             };
             if (statusLabel == null) continue; // skip non-decision statuses
 

@@ -1,39 +1,21 @@
 package com.capstone.confhub.service.impl;
 
-import com.capstone.confhub.entity.Conference;
-import com.capstone.confhub.entity.Paper;
-import com.capstone.confhub.entity.PaperFile;
-import com.capstone.confhub.entity.Ticket;
-import com.capstone.confhub.entity.User;
+import com.capstone.confhub.entity.*;
 import com.capstone.confhub.exception.BadRequestException;
-import com.capstone.confhub.exception.ResourceNotFoundException;
-import com.capstone.confhub.repository.PaperAuthorRepository;
-import com.capstone.confhub.repository.PaperFileRepository;
-import com.capstone.confhub.repository.PaperRepository;
-import com.capstone.confhub.repository.TicketRepository;
-import com.capstone.confhub.repository.UserRepository;
+import com.capstone.confhub.repository.*;
 import com.capstone.confhub.service.DocumentGenerationService;
-import com.capstone.confhub.utils.enums.PaymentStatus;
 import com.capstone.confhub.utils.enums.PaperStatus;
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Element;
+import com.capstone.confhub.utils.enums.PaymentStatus;
 import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
-import com.lowagie.text.Image;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.PageSize;
 import com.lowagie.text.Rectangle;
+import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.lowagie.text.pdf.PdfContentByte;
-import com.lowagie.text.pdf.PdfPageEventHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.awt.Color;
+import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,12 +31,6 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class DocumentGenerationServiceImpl implements DocumentGenerationService {
 
-    private final PaperRepository paperRepository;
-    private final PaperAuthorRepository paperAuthorRepository;
-    private final TicketRepository ticketRepository;
-    private final UserRepository userRepository;
-    private final PaperFileRepository paperFileRepository;
-
     // ── Brand Colors ──
     private static final Color PRIMARY = new Color(67, 56, 202);       // Indigo-600
     private static final Color PRIMARY_LIGHT = new Color(238, 242, 255); // Indigo-50
@@ -64,7 +40,6 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
     private static final Color BORDER = new Color(229, 231, 235);       // Gray-200
     private static final Color BG_LIGHT = new Color(249, 250, 251);     // Gray-50
     private static final Color GOLD = new Color(180, 140, 36);          // Gold for certificate
-
     // ── Fonts ──
     private static final Font FONT_BRAND = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 22, PRIMARY);
     private static final Font FONT_TITLE = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, TEXT_DARK);
@@ -76,6 +51,11 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
     private static final Font FONT_LABEL = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, TEXT_MUTED);
     private static final Font FONT_VALUE = FontFactory.getFont(FontFactory.HELVETICA, 11, TEXT_DARK);
     private static final Font FONT_BIG_VALUE = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, PRIMARY);
+    private final PaperRepository paperRepository;
+    private final PaperAuthorRepository paperAuthorRepository;
+    private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
+    private final PaperFileRepository paperFileRepository;
 
     // ════════════════════════════════════════════════════════════════════════════
     // ACCEPTANCE LETTER
@@ -475,7 +455,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         }
     }
 
-    /** Adds a bold colored bar at the very top of the page. */
+    /**
+     * Adds a bold colored bar at the very top of the page.
+     */
     private void addColoredTopBar(Document document) throws DocumentException {
         PdfPTable bar = new PdfPTable(1);
         bar.setWidthPercentage(110);
@@ -487,7 +469,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(bar);
     }
 
-    /** Adds a colored section banner (e.g., "LETTER OF ACCEPTANCE"). */
+    /**
+     * Adds a colored section banner (e.g., "LETTER OF ACCEPTANCE").
+     */
     private void addSectionBanner(Document document, String text, float spacingBefore) throws DocumentException {
         PdfPTable banner = new PdfPTable(1);
         banner.setWidthPercentage(100);
@@ -503,7 +487,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(banner);
     }
 
-    /** Adds a styled info box with key-value pairs. */
+    /**
+     * Adds a styled info box with key-value pairs.
+     */
     private void addInfoBox(Document document, String[][] rows, float spacingBefore) throws DocumentException {
         PdfPTable box = new PdfPTable(2);
         box.setWidthPercentage(100);
@@ -532,7 +518,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(box);
     }
 
-    /** Adds a horizontal divider line. */
+    /**
+     * Adds a horizontal divider line.
+     */
     private void addDivider(Document document) throws DocumentException {
         PdfPTable divider = new PdfPTable(1);
         divider.setWidthPercentage(100);
@@ -548,7 +536,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(divider);
     }
 
-    /** Adds a table header cell with styling. */
+    /**
+     * Adds a table header cell with styling.
+     */
     private void addTableHeaderCell(PdfPTable table, String text) {
         PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.WHITE)));
         cell.setBackgroundColor(PRIMARY);
@@ -558,7 +548,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         table.addCell(cell);
     }
 
-    /** Adds a table body cell with alternating background. */
+    /**
+     * Adds a table body cell with alternating background.
+     */
     private void addTableBodyCell(PdfPTable table, String text, boolean isAlt) {
         PdfPCell cell = new PdfPCell(new Phrase(text, FONT_BODY));
         cell.setBackgroundColor(isAlt ? BG_LIGHT : Color.WHITE);
@@ -569,7 +561,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         table.addCell(cell);
     }
 
-    /** Adds a totals row to the summary table. */
+    /**
+     * Adds a totals row to the summary table.
+     */
     private void addTotalsRow(PdfPTable table, String label, String value, boolean isTotal) {
         Font labelFont = isTotal ? FONT_BODY_BOLD : FONT_BODY;
         Font valueFont = isTotal ? FONT_BIG_VALUE : FONT_BODY;
@@ -591,7 +585,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         table.addCell(valueCell);
     }
 
-    /** Adds a payment status badge. */
+    /**
+     * Adds a payment status badge.
+     */
     private void addPaymentStatusBadge(Document document, Ticket ticket) throws DocumentException {
         String statusText = ticket.getPaymentStatus() != null ? ticket.getPaymentStatus().name() : "UNKNOWN";
         boolean isPaid = PaymentStatus.COMPLETED.equals(ticket.getPaymentStatus());
@@ -613,7 +609,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(badgeTable);
     }
 
-    /** Adds a professional signature block. */
+    /**
+     * Adds a professional signature block.
+     */
     private void addProfessionalSignature(Document document, Conference conference) throws DocumentException {
         Paragraph spacer = new Paragraph(" ");
         spacer.setSpacingBefore(40f);
@@ -642,7 +640,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(sigConf);
     }
 
-    /** Adds a footer note at the bottom. */
+    /**
+     * Adds a footer note at the bottom.
+     */
     private void addFooterNote(Document document, String text) throws DocumentException {
         PdfPTable footer = new PdfPTable(1);
         footer.setWidthPercentage(100);
@@ -658,7 +658,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         document.add(footer);
     }
 
-    /** Adds a decorative double-border for certificates. */
+    /**
+     * Adds a decorative double-border for certificates.
+     */
     private void addCertificateBorder(Document document) throws DocumentException {
         PdfPTable border = new PdfPTable(1);
         border.setWidthPercentage(100);
@@ -687,7 +689,9 @@ public class DocumentGenerationServiceImpl implements DocumentGenerationService 
         return start.format(fmt) + " — " + end.format(fmt);
     }
 
-    /** Download bytes from a URL (public Firebase storage URL). */
+    /**
+     * Download bytes from a URL (public Firebase storage URL).
+     */
     private byte[] downloadUrl(String urlStr) throws IOException {
         URL url = new URL(urlStr);
         URLConnection connection = url.openConnection();

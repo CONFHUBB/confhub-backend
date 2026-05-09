@@ -41,11 +41,14 @@ class EmailServiceImplTest {
     @Mock
     private EmailHistoryRepository emailHistoryRepository;
 
+    @Mock
+    private com.capstone.confhub.repository.TicketRepository ticketRepository;
+
     private EmailService emailService;
 
     @BeforeEach
     void setUp() {
-        emailService = new EmailService(emailSender, templateEngine, conferenceUserTrackRepository, conferenceRepository, paperAuthorRepository, emailHistoryRepository);
+        emailService = new EmailService(emailSender, templateEngine, conferenceUserTrackRepository, conferenceRepository, paperAuthorRepository, emailHistoryRepository, ticketRepository);
         ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@example.com");
     }
 

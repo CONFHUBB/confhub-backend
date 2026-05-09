@@ -98,6 +98,7 @@ public class WebSecurityConfig {
                                 "/api/v1/conferences-track/**",
                                 "/api/v1/subject-areas/**",
                                 "/api/v1/paper/published",
+                                "/api/v1/review/top-reviewers",
                                 "/api/v1/paper-file/paper/**").permitAll()
                         .anyRequest().authenticated());
 

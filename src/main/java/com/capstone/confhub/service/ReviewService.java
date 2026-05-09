@@ -20,4 +20,6 @@ public interface ReviewService {
     java.util.List<ReviewResponseDTO> getReviewsByPaper(Integer paperId);
     
     java.util.List<ReviewVersionResponseDTO> getReviewVersions(Integer reviewId);
+
+    java.util.List<TopReviewerResponseDTO> getTopReviewers(int limit);
 }

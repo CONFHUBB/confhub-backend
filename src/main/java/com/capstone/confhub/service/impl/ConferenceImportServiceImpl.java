@@ -30,9 +30,9 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.time.OffsetDateTime;
 import java.util.*;
 
 @Service
@@ -40,6 +40,18 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ConferenceImportServiceImpl implements ConferenceImportService {
 
+    private static final int OTP_LENGTH = 6;
+    private static final String[] CONFERENCE_HEADERS = {
+            "name", "acronym", "description", "location", "startDate", "endDate",
+            "websiteUrl", "country", "province", "area", "contactInformation", "chairEmails",
+            "bannerImageUrl", "societySponsor"
+    };
+    private static final String[] TICKET_TYPE_HEADERS = {
+            "name", "description", "price", "currency", "category", "maxQuantity", "deadline", "active"
+    };
+    private static final String[] TRACK_HEADERS = {"name", "description"};
+    private static final String[] SA_HEADERS = {"trackName", "name", "description", "parentName"};
+    private static final String[] MEMBER_HEADERS = {"email", "role", "trackName"};
     private final ConferenceRepository conferenceRepository;
     private final ConferenceTrackRepository trackRepository;
     private final TrackReviewSettingRepository trackReviewSettingRepository;
@@ -54,30 +66,14 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private final UserProfileRepository userProfileRepository;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
-
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private UnavailableDayRepository unavailableDayRepository;
-
     @Value("${app.base-url}")
     private String baseUrl;
 
+    // ===================== CONFERENCE =====================
     @Value("${app.frontend-url}")
     private String frontendUrl;
-
-    private static final int OTP_LENGTH = 6;
-
-    private static final String[] CONFERENCE_HEADERS = {
-            "name", "acronym", "description", "location", "startDate", "endDate",
-            "websiteUrl", "country", "province", "area", "contactInformation", "chairEmails",
-            "bannerImageUrl", "societySponsor"
-    };
-    private static final String[] TICKET_TYPE_HEADERS = {
-            "name", "description", "price", "currency", "category", "maxQuantity", "deadline", "active"
-    };
-    private static final String[] TRACK_HEADERS = {"name", "description"};
-    private static final String[] SA_HEADERS = {"trackName", "name", "description", "parentName"};
-
-    // ===================== CONFERENCE =====================
 
     @Override
     public ImportResultDTO previewConferenceFromExcel(MultipartFile file) {
@@ -120,6 +116,8 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 .build();
     }
 
+    // ===================== TRACKS =====================
+
     @Override
     public byte[] generateConferenceTemplate() {
         try (Workbook wb = new XSSFWorkbook()) {
@@ -139,8 +137,6 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             throw new RuntimeException("Failed to generate template", e);
         }
     }
-
-    // ===================== TRACKS =====================
 
     @Override
     public ImportResultDTO previewTracksFromExcel(MultipartFile file) {
@@ -187,6 +183,8 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 .build();
     }
 
+    // ===================== SUBJECT AREAS =====================
+
     @Override
     public byte[] generateTrackTemplate() {
         try (Workbook wb = new XSSFWorkbook()) {
@@ -207,8 +205,6 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             throw new RuntimeException("Failed to generate template", e);
         }
     }
-
-    // ===================== SUBJECT AREAS =====================
 
     @Override
     public ImportResultDTO previewSubjectAreasFromExcel(MultipartFile file) {
@@ -299,6 +295,8 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 .build();
     }
 
+    // ===================== MEMBERS =====================
+
     @Override
     public byte[] generateSubjectAreaTemplate() {
         try (Workbook wb = new XSSFWorkbook()) {
@@ -321,10 +319,6 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             throw new RuntimeException("Failed to generate template", e);
         }
     }
-
-    // ===================== MEMBERS =====================
-
-    private static final String[] MEMBER_HEADERS = {"email", "role", "trackName"};
 
     @Override
     public ImportResultDTO previewMembersFromExcel(MultipartFile file) {
@@ -436,9 +430,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
             // Check if user is currently unavailable
             LocalDate today = LocalDate.now();
-                boolean isUnavailable = unavailableDayRepository != null && unavailableDayRepository
+            boolean isUnavailable = unavailableDayRepository != null && unavailableDayRepository
                     .existsByUser_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(user.getId(), today, today);
-                if (isUnavailable) {
+            if (isUnavailable) {
                 List<UnavailableDay> activeDays = unavailableDayRepository != null ? unavailableDayRepository.findByUser_IdOrderByStartDateDesc(user.getId()) : List.of();
                 String untilDate = activeDays.stream()
                         .filter(d -> !d.getStartDate().isAfter(today) && !d.getEndDate().isBefore(today))
@@ -757,7 +751,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         userRole.setUser(user);
         userRole.setRole(authorRole);
         userRoleRepository.save(userRole);
-        
+
         // Create empty UserProfile
         UserProfile profile = new UserProfile();
         profile.setUser(user);
@@ -770,7 +764,7 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
      * Sends an HTML invitation email with Accept/Decline buttons (same style as manual invite).
      */
     private void sendImportInvitationEmail(User user, Conference conference, ConferenceUserTrack cut,
-                                            ConferenceTrackRole role, ConferenceTrack track) {
+                                           ConferenceTrackRole role, ConferenceTrack track) {
         try {
             String roleName = formatRoleName(role);
             String trackName = track != null ? track.getName() : null;
@@ -780,10 +774,11 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
             String fullName = (user.getFirstName() != null ? user.getFirstName() : "") + " "
                     + (user.getLastName() != null ? user.getLastName() : "");
 
-                emailService.sendInvitationEmail(
+            emailService.sendInvitationEmail(
                     user.getEmail(),
                     fullName.trim(),
                     "Invitation to " + conference.getName() + " as " + roleName + trackLabel,
+                    conference,
                     conference.getName(),
                     roleName,
                     trackName,
@@ -910,7 +905,8 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
                 boolean found = false;
                 for (int j = 0; j < i; j++) {
                     if (parentName.equals(rows.get(j).get("name")) && trackName.equals(rows.get(j).getOrDefault("trackName", ""))) {
-                        found = true; break;
+                        found = true;
+                        break;
                     }
                 }
                 if (!found) {
@@ -973,7 +969,9 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
         }
     }
 
-    private boolean notBlank(String s) { return s != null && !s.isBlank(); }
+    private boolean notBlank(String s) {
+        return s != null && !s.isBlank();
+    }
 
     private BigDecimal parseBigDecimal(String s) {
         if (s == null || s.isBlank()) return null;
@@ -1021,10 +1019,14 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
 
     private LocalDateTime parseDate(String s) {
         if (s == null || s.isBlank()) return null;
-        try { return LocalDate.parse(s.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atStartOfDay(); }
-        catch (DateTimeParseException e) {
-            try { return LocalDateTime.parse(s.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")); }
-            catch (DateTimeParseException e2) { return null; }
+        try {
+            return LocalDate.parse(s.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atStartOfDay();
+        } catch (DateTimeParseException e) {
+            try {
+                return LocalDateTime.parse(s.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            } catch (DateTimeParseException e2) {
+                return null;
+            }
         }
     }
 
@@ -1046,14 +1048,17 @@ public class ConferenceImportServiceImpl implements ConferenceImportService {
     private boolean isRowEmpty(Row row) {
         for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
             Cell cell = row.getCell(c);
-            if (cell != null && cell.getCellType() != CellType.BLANK && !getCellValueAsString(cell).isEmpty()) return false;
+            if (cell != null && cell.getCellType() != CellType.BLANK && !getCellValueAsString(cell).isEmpty())
+                return false;
         }
         return true;
     }
 
     private CellStyle createHeaderStyle(Workbook wb) {
         CellStyle s = wb.createCellStyle();
-        Font f = wb.createFont(); f.setBold(true); s.setFont(f);
+        Font f = wb.createFont();
+        f.setBold(true);
+        s.setFont(f);
         s.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
         s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         return s;

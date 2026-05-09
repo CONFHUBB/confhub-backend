@@ -6,6 +6,7 @@ import com.capstone.confhub.entity.*;
 import com.capstone.confhub.exception.BadRequestException;
 import com.capstone.confhub.exception.ResourceNotFoundException;
 import com.capstone.confhub.repository.*;
+import com.capstone.confhub.service.EmailService;
 import com.capstone.confhub.service.NotificationService;
 import com.capstone.confhub.service.PaperFileService;
 import com.capstone.confhub.utils.PaginationUtils;
@@ -35,6 +36,7 @@ public class PaperFileServiceImpl implements PaperFileService {
     private final ConferenceActivityRepository conferenceActivityRepository;
     private final PaperAuthorRepository paperAuthorRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,6 +49,9 @@ public class PaperFileServiceImpl implements PaperFileService {
     @Override
     @Transactional
     public PaperFileResponseDTO createPaperFile(PaperFileDTO dto) {
+        Paper paper = paperRepository.findById(dto.getPaperId())
+                .orElseThrow(() -> new EntityNotFoundException("Paper not found with ID: " + dto.getPaperId()));
+
         // Duplicate detection is now advisory — handled by findDuplicateInfo
         // Just log if duplicate found (info is already in plagiarism report)
         if (dto.getFileHash() != null && !dto.getFileHash().isBlank()) {
@@ -72,7 +77,10 @@ public class PaperFileServiceImpl implements PaperFileService {
 
         PaperFile entity = new PaperFile();
         mapDtoToPaperFileEntity(dto, entity);
-        return mapToPaperFileResponseDTO(paperFileRepository.save(entity));
+        PaperFile saved = paperFileRepository.save(entity);
+
+        sendManuscriptUploadEmails(paper);
+        return mapToPaperFileResponseDTO(saved);
     }
 
     @Override
@@ -405,6 +413,38 @@ public class PaperFileServiceImpl implements PaperFileService {
             log.info("Sent {} notification to {} authors for paper {}", type, authors.size(), paper.getId());
         } catch (Exception e) {
             log.error("Failed to send {} notifications for paper {}: {}", type, paper.getId(), e.getMessage());
+        }
+    }
+
+    private void sendManuscriptUploadEmails(Paper paper) {
+        try {
+            Conference conference = paper.getTrack() != null ? paper.getTrack().getConference() : null;
+            List<PaperAuthor> authors = paperAuthorRepository.findByPaperId(paper.getId());
+            for (PaperAuthor pa : authors) {
+                User user = pa.getUser();
+                if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+                    continue;
+                }
+                String authorName = ((user.getFirstName() != null ? user.getFirstName() : "") + " " +
+                        (user.getLastName() != null ? user.getLastName() : "")).trim();
+                if (authorName.isBlank()) {
+                    authorName = user.getEmail();
+                }
+                emailService.sendManuscriptUploadConfirmationEmail(
+                        user.getEmail(),
+                        authorName,
+                        paper.getTitle(),
+                        conference,
+                    paper.getId(),
+                    paper.getPlagiarismScore(),
+                    paper.getPlagiarismStatus()
+                );
+            }
+            log.info("Manuscript upload confirmation queued for {} author(s) of paper {}",
+                    authors.size(), paper.getId());
+        } catch (Exception e) {
+            log.warn("Failed to send manuscript upload confirmation for paper {}: {}",
+                    paper.getId(), e.getMessage());
         }
     }
 }

@@ -63,6 +63,16 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.getReviewsByPaper(paperId));
     }
 
+    @GetMapping("/top-reviewers")
+    @Operation(summary = "Get top reviewers by completed reviews")
+    public ResponseEntity<java.util.List<TopReviewerResponseDTO>> getTopReviewers(
+            @RequestParam(defaultValue = "5") int limit) {
+        if (limit <= 0 || limit > 20) {
+            throw new BadRequestException("Limit must be between 1 and 20");
+        }
+        return ResponseEntity.ok(reviewService.getTopReviewers(limit));
+    }
+
     @GetMapping("/{id}/versions")
     @Operation(summary = "Get all versions of a specific review")
     public ResponseEntity<java.util.List<ReviewVersionResponseDTO>> getReviewVersions(@PathVariable Integer id) {

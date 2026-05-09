@@ -36,7 +36,6 @@ public class EmailController {
 
     private final EmailService emailService;
     private final ExternalInvitationService externalInvitationService;
-    private final ConferenceUserTrackService conferenceUserTrackService;
     private final ConferenceUserTrackRepository conferenceUserTrackRepository;
     private final ConferenceRepository conferenceRepository;
 
@@ -50,10 +49,10 @@ public class EmailController {
     @PostMapping
     @Operation(summary = "Send an email", description = "Send an email to a specified recipient with subject and text content")
     public ResponseEntity<String> sendSimpleEmail(@Valid @RequestBody EmailDTO emailDTO) {
-        try{
+        try {
             emailService.sendSimpleMessage(emailDTO.getTo(), emailDTO.getSubject(), emailDTO.getText());
             return ResponseEntity.ok("Email sent successfully to: " + emailDTO.getTo());
-        } catch (MailException e){
+        } catch (MailException e) {
             return ResponseEntity.internalServerError().body("Send email unsuccessfully. Internal mail server error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Unexpected error occurred while sending email: " + e.getMessage());

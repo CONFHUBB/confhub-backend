@@ -41,8 +41,8 @@ public class ActivityNotificationSender {
         for (String word : words) {
             if (!word.isEmpty()) {
                 sb.append(Character.toUpperCase(word.charAt(0)))
-                  .append(word.substring(1).toLowerCase())
-                  .append(" ");
+                        .append(word.substring(1).toLowerCase())
+                        .append(" ");
             }
         }
         return sb.toString().trim();
@@ -102,7 +102,7 @@ public class ActivityNotificationSender {
                         boolean isChair = members.stream()
                                 .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
                                         (m.getAssignedRole() == ConferenceTrackRole.CONFERENCE_CHAIR ||
-                                         m.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR));
+                                                m.getAssignedRole() == ConferenceTrackRole.PROGRAM_CHAIR));
                         boolean isReviewer = members.stream()
                                 .anyMatch(m -> m.getUser().getId().equals(user.getId()) &&
                                         m.getAssignedRole() == ConferenceTrackRole.REVIEWER);

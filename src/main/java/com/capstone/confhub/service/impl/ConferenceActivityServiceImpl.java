@@ -283,12 +283,19 @@ public class ConferenceActivityServiceImpl implements ConferenceActivityService 
                     .findFirst()
                     .orElse(null);
             if (emailService != null) {
-                emailService.sendTimelinePhaseChangeEmails(
-                        conference,
-                        enabledType,
-                        formatActivityName(enabledType),
-                        enabledActivity != null ? enabledActivity.getDeadline() : null
-                );
+                if (enabledType == ActivityType.EVENT_DAY) {
+                    emailService.sendEventDayProgramEmails(
+                            conference,
+                            enabledActivity != null ? enabledActivity.getDeadline() : null
+                    );
+                } else {
+                    emailService.sendTimelinePhaseChangeEmails(
+                            conference,
+                            enabledType,
+                            formatActivityName(enabledType),
+                            enabledActivity != null ? enabledActivity.getDeadline() : null
+                    );
+                }
             } else {
                 log.debug("EmailService not available; skipping timeline phase change emails for conference {}", conference.getId());
             }

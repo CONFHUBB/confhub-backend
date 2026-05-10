@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Event Day Program</title>
+</head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0;">
+<div style="max-width: 620px; margin: 30px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="background-color: #10b981; padding: 24px 32px;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">🎉 Event Day Program</h2>
+    </div>
+
+    <div style="padding: 32px;">
+        <p style="color: #333333; font-size: 16px; margin-top: 0;">
+            Dear <strong th:text="${recipientName}">[Recipient Name]</strong>,
+        </p>
+
+        <p style="color: #555555; font-size: 15px; line-height: 1.6;">
+            We are excited to announce that
+            <strong th:text="${conferenceName}">[Conference Name]</strong>
+            has entered the <strong>Event Day</strong> phase!
+        </p>
+
+        <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 8px 0; color: #555555; font-size: 14px;">
+                <strong>Phase:</strong> Event Day
+            </p>
+            <p style="margin: 0; color: #555555; font-size: 14px;" th:if="${deadline != null}">
+                <strong>Date:</strong> <span th:text="${deadline}">[Event Date]</span>
+            </p>
+        </div>
+
+        <div th:if="${hasProgramSchedule}">
+            <h3 style="color: #333333; font-size: 18px; margin-top: 24px; margin-bottom: 12px;">📅 Event Program</h3>
+
+            <div th:if="${programDays != null and !programDays.isEmpty()}">
+                <div th:each="day : ${programDays}" style="margin-bottom: 20px;">
+                    <h4 style="color: #10b981; font-size: 16px; margin: 12px 0 8px 0;" th:text="${day.date}">[Date]</h4>
+
+                    <div th:if="${day.sessions != null and !day.sessions.isEmpty()}">
+                        <div th:each="session : ${day.sessions}" style="background-color: #f9fafb; padding: 12px; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #10b981;">
+                            <p style="margin: 0 0 4px 0; color: #333333; font-size: 14px; font-weight: 600;" th:text="${session.title}">[Session Title]</p>
+                            <p style="margin: 0; color: #666666; font-size: 13px;">
+                                <span th:if="${session.startTime != null}" th:text="${session.startTime}">[Start]</span>
+                                <span th:if="${session.startTime != null and session.endTime != null}"> - </span>
+                                <span th:if="${session.endTime != null}" th:text="${session.endTime}">[End]</span>
+                            </p>
+                            <p style="margin: 4px 0 0 0; color: #666666; font-size: 13px;" th:if="${session.location != null and !session.location.isEmpty()}">
+                                📍 <span th:text="${session.location}">[Location]</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${programDays == null or programDays.isEmpty()}">
+                <p style="color: #666666; font-size: 14px; font-style: italic;">
+                    The detailed program schedule will be available soon. Please check the conference website for updates.
+                </p>
+            </div>
+        </div>
+
+        <div th:unless="${hasProgramSchedule}">
+            <p style="color: #666666; font-size: 14px; line-height: 1.6;">
+                The event day program is being finalized. Please check the conference website or contact the organizers for the latest schedule information.
+            </p>
+        </div>
+
+        <p style="color: #555555; font-size: 15px; line-height: 1.6; margin-top: 24px;">
+            We look forward to seeing you at the event!
+        </p>
+
+        <p style="color: #999999; font-size: 13px; margin-top: 28px; border-top: 1px solid #eeeeee; padding-top: 16px;">
+            This notification is sent to all conference members and registered attendees.
+        </p>
+    </div>
+
+    <div style="background-color: #f8f9fa; padding: 16px 32px; text-align: center;">
+        <p style="color: #999999; font-size: 12px; margin: 0;">
+            Conference Management System (CONFHUB)
+        </p>
+    </div>
+</div>
+</body>
+</html>

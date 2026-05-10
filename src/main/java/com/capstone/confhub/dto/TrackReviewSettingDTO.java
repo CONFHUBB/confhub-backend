@@ -24,4 +24,6 @@ public class TrackReviewSettingDTO {
     private Boolean enableAuthorSelfConflict = true;
     private Boolean allowAuthorConfigureConflict = false;
 
+    private Boolean configured = false;
+
 }

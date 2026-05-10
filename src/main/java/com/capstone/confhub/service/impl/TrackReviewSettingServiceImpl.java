@@ -62,6 +62,7 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         if (dto.getEnableDomainConflict() != null) setting.setEnableDomainConflict(dto.getEnableDomainConflict());
         if (dto.getEnableAuthorSelfConflict() != null) setting.setEnableAuthorSelfConflict(dto.getEnableAuthorSelfConflict());
         if (dto.getAllowAuthorConfigureConflict() != null) setting.setAllowAuthorConfigureConflict(dto.getAllowAuthorConfigureConflict());
+        setting.setConfigured(true);
 
         TrackReviewSetting savedSetting = settingRepository.save(setting);
         track.setTrackReviewSetting(savedSetting);
@@ -113,6 +114,7 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setEnableDomainConflict(true);
             targetSetting.setEnableAuthorSelfConflict(true);
             targetSetting.setAllowAuthorConfigureConflict(false);
+            targetSetting.setConfigured(true);
         } else {
             // Copy fields from source
             targetSetting.setIsDoubleBlind(sourceSetting.getIsDoubleBlind());
@@ -131,6 +133,7 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
             targetSetting.setEnableDomainConflict(sourceSetting.getEnableDomainConflict());
             targetSetting.setEnableAuthorSelfConflict(sourceSetting.getEnableAuthorSelfConflict());
             targetSetting.setAllowAuthorConfigureConflict(sourceSetting.getAllowAuthorConfigureConflict());
+            targetSetting.setConfigured(true);
         }
 
         settingRepository.save(targetSetting);
@@ -156,6 +159,7 @@ public class TrackReviewSettingServiceImpl implements TrackReviewSettingService 
         dto.setEnableDomainConflict(entity.getEnableDomainConflict());
         dto.setEnableAuthorSelfConflict(entity.getEnableAuthorSelfConflict());
         dto.setAllowAuthorConfigureConflict(entity.getAllowAuthorConfigureConflict());
+        dto.setConfigured(Boolean.TRUE.equals(entity.getConfigured()));
         return dto;
     }
 }

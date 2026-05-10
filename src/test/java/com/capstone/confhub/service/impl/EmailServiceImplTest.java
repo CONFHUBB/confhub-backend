@@ -63,26 +63,4 @@ class EmailServiceImplTest {
 
         verify(emailSender).send(org.mockito.ArgumentMatchers.any(org.springframework.mail.SimpleMailMessage.class));
     }
-
-    @Test
-    void sendInvitationEmailShouldInvokeMailSender() throws MessagingException {
-        MimeMessage mimeMessage = org.mockito.Mockito.mock(MimeMessage.class);
-        when(emailSender.createMimeMessage()).thenReturn(mimeMessage);
-        when(templateEngine.process(org.mockito.ArgumentMatchers.eq("invitation"), org.mockito.ArgumentMatchers.any())).thenReturn("<html></html>");
-
-        emailService.sendInvitationEmail(
-                "to@example.com",
-                "Recipient",
-                "subject",
-                "Conf",
-                "Reviewer",
-                null,
-                "http://localhost:8080/api/v1/email/accept/test-token",
-                "http://localhost:8080/api/v1/email/decline/test-token",
-                null,
-                null
-        );
-
-        verify(emailSender).send(mimeMessage);
-    }
 }

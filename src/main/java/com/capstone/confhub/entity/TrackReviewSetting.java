@@ -78,4 +78,7 @@ public class TrackReviewSetting extends BaseEntity {
     @Column(name = "allow_author_configure_conflict", nullable = false)
     private Boolean allowAuthorConfigureConflict = false;
 
+    @Column(name = "configured")
+    private Boolean configured = false;
+
 }

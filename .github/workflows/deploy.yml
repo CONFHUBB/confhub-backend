@@ -8,7 +8,7 @@ jobs:
   deploy:
     strategy:
       matrix:
-        server: [server-110, server-111]
+        server: [server-110, server-111, server-195]
       fail-fast: false
     runs-on: [self-hosted, '${{ matrix.server }}']
 
@@ -30,9 +30,9 @@ jobs:
         run: |
           echo "" >> .env
           echo "# Production domain (auto-set by CI/CD)" >> .env
-          echo "APP_FRONTEND_URL=https://confhub.io.vn" >> .env
-          echo "APP_BASE_URL=https://confhub.io.vn" >> .env
-          echo "VNPAY_RETURN_URL=https://confhub.io.vn/api/v1/payment/vnpay-callback" >> .env
+          echo "APP_FRONTEND_URL=https://confhub.aitalab.net" >> .env
+          echo "APP_BASE_URL=https://confhub.aitalab.net" >> .env
+          echo "VNPAY_RETURN_URL=https://confhub.aitalab.net/api/v1/payment/vnpay-callback" >> .env
 
       - name: Clean Docker build cache
         run: docker builder prune -af
